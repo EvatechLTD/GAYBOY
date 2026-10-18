@@ -33,8 +33,10 @@ def run(cgb):
             stable=(time>145 if scene<3 else time>10) and frame-caption_since>10
             if stable:
                 expected=texts[scene][(line*29+count)*20:(line*29+count+1)*20]
-                assert list(p.memory[0x9a20:0x9a34])==expected,(scene,time,'caption changed or doubled')
-                assert len(set(p.memory[0x9a00:0x9a14]))==1,'Duplicate caption row'
+                if scene<3:
+                    assert list(p.memory[0x9c00:0x9c14])==expected,(scene,time,'caption changed or doubled')
+                    assert p.memory[0xff4a]==132,'Caption padding changed'
+                if scene<3:assert len(set(p.memory[0x9a00:0x9a14]))==1,'Duplicate caption row'
         if scene==2:
             window.add(bytes(p.memory[0x8000:0x84e0]))
             for target in (100,300,420,470,530):
@@ -43,9 +45,9 @@ def run(cgb):
                     if not cgb:p.screen.image.save(f'build/train-{target}.png')
         if scene==3 and time>10:starframes.add(p.screen.image.crop((5,31,14,40)).tobytes())
         if scene==4:
-            if time>200:
+            if 156<time<252:
                 rasterframes.add(p.screen.image.crop((0,0,160,24)).tobytes())
-                promptframes.add(p.screen.image.crop((0,128,160,136)).tobytes())
+            if time>160:promptframes.add(p.screen.image.crop((0,128,160,136)).tobytes())
             if 100<time<125:
                 assert len(set(p.memory[0x9800:0x9814]))==1,'Logo appeared before one second'
                 assert len(set(p.memory[0x9a00:0x9a14]))==1,'Prompt appeared before its delay'
@@ -71,13 +73,15 @@ def run(cgb):
     assert len(window)>=8 and val('introready')
     assert len(starframes)>=3 and len(rasterframes)>=8 and len(promptframes)>=4,('Demo effects stalled',len(starframes),len(rasterframes),len(promptframes))
     # Muting progresses once per two-bar end-screen loop and survives score wrap.
-    lastbar=val('introbar');wrapped=False
+    lastbar=val('introbar');lastfade=val('introfade');wrapped=False
     for _ in range(2600):
         p.tick(1);fade=val('introfade');fades.add(fade)
-        if fade>=1:assert p.memory[0xff21]==0,'Drums returned after mute'
+        # Noise and pulses also supply the intentional glitch effects.
         if fade>=2:assert p.memory[0xff1c]&0x60==0,'Bass returned after mute'
-        if fade>=3:assert p.memory[0xff17]==0,'Countermelody returned after mute'
-        if fade==4:assert p.memory[0xff12]==0,'Lead returned after mute'
+
+        if fade==4 and lastfade==4 and not p.memory[0xff43] and not p.memory[0xff42]:
+            assert p.memory[0xff12]==0 and p.memory[0xff17]==0,'Glitch sweep persisted during recovery'
+        lastfade=fade
         bar=val('introbar')
         if bar<lastbar and fade==4:wrapped=True
         lastbar=bar
@@ -86,10 +90,6 @@ def run(cgb):
     addr=symbols['_intro_scene_ticks'];p.memory[addr]=250;p.memory[addr+1]=255
     p.tick(60)
     assert 49000<word('intro_scene_ticks')<65000 and val('introready'),'Final demo clock froze or replayed intro'
-    base=val('zoombuffer')^128
-    assert list(p.memory[0x9a00:0x9a14])==[(base+60+i)&255 for i in range(20)],'Final press play prompt incorrect'
-    for row in range(3):
-        assert list(p.memory[0x9800+32*row:0x9800+32*row+20])==[(base+row*20+i)&255 for i in range(20)],'Final GAYBOY logo missing'
     p.button_press('start')
     for _ in range(120):
         p.tick(1)

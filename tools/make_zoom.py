@@ -7,6 +7,10 @@ root=Path(__file__).resolve().parents[1]
 namespace={'__file__':str(root/'tools/make_cinema.py')}
 exec(compile((root/'tools/make_cinema.py').read_text().split('\nphrases=')[0], 'cinema drawings', 'exec'),namespace)
 source=namespace['draw_scene'](5)
+# Credits belong to the cutscene, not the camera zoom's two 128-tile buffers.
+source_draw=ImageDraw.Draw(source)
+source_draw.rectangle((0,0,159,15),fill=3)
+source_draw.rectangle((0,128,159,143),fill=3)
 array=lambda xs:','.join(map(str,xs))
 frames=[]
 for frame in range(18):
@@ -53,6 +57,10 @@ for group in range(3):
     out+=f'void zoom{group}(uint8_t frame) BANKED {{uint16_t i,n;uint8_t row,col,buf[20];const uint8_t *pixels,*map;switch(frame%6){{\n'
     for local in range(6):
         out+=f'case {local}:pixels=tiles{local};map=screen{local};n={len(frames[group*6+local][0])};break;\n'
-    out+='default:return;}HIDE_SPRITES;SCX_REG=SCY_REG=0;BGP_REG=0xe4;zoombuffer^=128;for(i=0;i<n;i++)set_bkg_data(zoombuffer+i,1,pixels+i*16);for(row=0;row<18;row++){for(col=0;col<20;col++)buf[col]=map[(uint16_t)row*20+col]+zoombuffer;set_bkg_tiles(0,row,20,1,buf);}SHOW_BKG;}\n'
+    out+='default:return;}'
+    if group==0:out+='if(!frame){DISPLAY_OFF;}'
+    out+='HIDE_SPRITES;SCX_REG=SCY_REG=0;BGP_REG=0xe4;zoombuffer^=128;for(i=0;i<n;i++)set_bkg_data(zoombuffer+i,1,pixels+i*16);for(row=0;row<18;row++){for(col=0;col<20;col++)buf[col]=map[(uint16_t)row*20+col]+zoombuffer;set_bkg_tiles(0,row,20,1,buf);}SHOW_BKG;'
+    if group==0:out+='if(!frame){DISPLAY_ON;}'
+    out+='}\n'
     (root/f'src/zoom{group}.c').write_text(out)
     print(f'Zoom bank {29+group}: six frames, {total} asset bytes')

@@ -56,5 +56,5 @@ void cinema_frame(uint16_t frame) BANKED {
  }
  if(scene==1&&!(frame&3))cinema1_motion((introstep+15)&15,frame>>2);
  if(scene==2)train_frame(time);
- if(scene==3&&!(time&7)){cinema5_motion(time%140<12);cinema5_stars(time);}
+ if(scene==3&&!(time&7)){cinema5_motion((time%140<12)|(time>=48?2:0));cinema5_stars(time);}
 }

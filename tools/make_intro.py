@@ -1,7 +1,7 @@
 """Build native, tile-deduplicated BMO face animation (no bitmap dependencies)."""
 import ast
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 root = Path(__file__).resolve().parents[1]
 tree = ast.parse((root / 'tools/make_ui_font.py').read_text())
@@ -23,6 +23,7 @@ def tile(im):
 blank = tile(Image.new('1', (8, 8)))
 phrases = ['press play']
 text_maps = []
+face_images = []
 for phrase in phrases:
     prefixes = []
     for count in range(26):
@@ -36,6 +37,7 @@ for phrase in phrases:
     text_maps.append(prefixes)
 
 maps = []
+face_images = []
 for mood in range(7):
     im = Image.new('1', (160, 144))
     d = ImageDraw.Draw(im)
@@ -54,6 +56,7 @@ for mood in range(7):
     # Place the face's visual bounds around the display's vertical midpoint.
     centered = Image.new('1', (160, 144))
     centered.paste(im, (0, 18))
+    face_images.append(centered.convert('L').point(lambda v:3 if v else 0))
     maps.append([tile(centered.crop((x, y, x+8, y+8))) for y in range(0, 144, 8) for x in range(0, 160, 8)])
 assert len(tiles) < 256, len(tiles)
 assert len(tiles) <= 128, 'Face and captions must fit one display buffer'
@@ -86,11 +89,11 @@ for i,c in enumerate('GAYBOY'):
                 xx=12+i*23+x*3;yy=1+y*3
                 ld.rectangle((xx,yy,xx+2,yy+2),fill=(1,1,2,3,1,2,3)[y])
 prompt=Image.new('L',(160,8),0)
-for i,c in enumerate('press play'):
+for i,c in enumerate('press start'):
     for y,row in enumerate(glyphs.get(c.upper(),['00000']*7)):
         for x,v in enumerate(row):
             if v=='1':
-                for bold in (0,1):prompt.putpixel((40+i*8+x+bold,y),3)
+                for bold in (0,1):prompt.putpixel((36+i*8+x+bold,y),3)
 def fade_tiles(im,level):
     data=[]
     for ty in range(0,im.height,8):
@@ -120,6 +123,87 @@ for phase in range(8):
 demo='#pragma bank 27\n#include "api.h"\n'
 demo+='static const uint8_t raster[8][960]={'+','.join('{'+array(p)+'}' for p in raster)+'};\n'
 demo+='void intro_demo(uint8_t frame,uint8_t base) BANKED {set_bkg_data(base,60,raster[frame&7]);}\n'
+# Fractures start at physical screen edges and grow along stable paths inward.
+import random, math
+roots=[]
+for index in range(10):
+    rng=random.Random(2026+index);side=index%4
+    start=((0,rng.randrange(16,128)),(rng.randrange(16,144),0),(159,rng.randrange(16,128)),(rng.randrange(16,144),143))[side]
+    # Uneven fracture clusters follow the thirds, without a central starburst.
+    focal=((107,48),(53,96),(107,96),(53,48))[index%4]
+    target=(focal[0]+rng.randrange(-7,8),focal[1]+rng.randrange(-7,8))
+    dx,dy=target[0]-start[0],target[1]-start[1];distance=math.hypot(dx,dy)
+    path=[start]
+    for step in range(1,32):
+        length=step*8
+        bend=math.sin(length/28+index)*6
+        x=start[0]+dx*length/distance-dy*bend/distance+rng.randrange(-4,5)
+        y=start[1]+dy*length/distance+dx*bend/distance+rng.randrange(-4,5)
+        path.append((max(0,min(159,round(x))),max(0,min(143,round(y)))))
+    roots.append(path)
+for stage in range(1,11):
+    ink=Image.new('1',(160,144),0);pen=ImageDraw.Draw(ink)
+    for index in range(stage):
+        age=stage-index;depth=min(240,28+42*(age-1))
+        count=int(depth//8);fraction=(depth%8)/8
+        path=roots[index];points=path[:count+1]
+        a,b=path[count],path[count+1]
+        points.append((round(a[0]+(b[0]-a[0])*fraction),round(a[1]+(b[1]-a[1])*fraction)))
+        pen.line(points,fill=1,width=1+age//4)
+    pool=[];lookup={};frame_maps=[]
+    # Frozen image fragments simulate stuck VRAM; later tile rows address wrong places.
+    for original in face_images:
+        face=original.copy()
+        if stage>=6:
+            face=Image.new('L',(160,144),0)
+            for row in range(18):
+                band=original.crop((0,row*8,160,row*8+8))
+                shift=((row*13)%7-3)*(stage-4)*8
+                dest=(row+(stage-5)*((row%3)-1))%18
+                offset=shift%160
+                face.paste(band.crop((0,0,160-offset,8)),(offset,dest*8))
+                if offset:face.paste(band.crop((160-offset,0,160,8)),(0,dest*8))
+        if stage>=5:
+            for fragment in range((stage-4)**2+2):
+                stuck=random.Random(901+fragment)
+                template=face_images[stuck.randrange(7)]
+                sx,sy=stuck.choice(((32,40),(104,40),(56,72),(72,80),(88,64)))
+                dx,dy=stuck.randrange(18)*8,stuck.randrange(16)*8
+                face.paste(template.crop((sx,sy,sx+24,sy+24)),(dx,dy))
+        if stage>=8:
+            dead=ImageDraw.Draw(face)
+            for block in range((stage-7)*5):
+                failed=random.Random(4000+block)
+                x,y=failed.randrange(20)*8,failed.randrange(18)*8
+                dead.rectangle((x,y,x+7,y+7),fill=3 if block%3 else 2)
+        for y in range(144):
+            for x in range(160):
+                if x and ink.getpixel((x-1,y)):face.putpixel((x,y),0)
+                if ink.getpixel((x,y)):face.putpixel((x,y),3)
+        screen=[]
+        for ty in range(0,144,8):
+            for tx in range(0,160,8):
+                data=[]
+                for yy in range(8):
+                    colors=[face.getpixel((tx+xx,ty+yy)) for xx in range(8)]
+                    data.extend((sum((c&1)<<(7-i) for i,c in enumerate(colors)),sum(((c>>1)&1)<<(7-i) for i,c in enumerate(colors))))
+                key=bytes(data)
+                if key not in lookup:lookup[key]=len(pool);pool.append(key)
+                screen.append(lookup[key])
+        frame_maps.append(screen)
+    assert len(pool)<=256,(stage,len(pool))
+    name=f'intro_damage{stage}';bank=41+stage
+    code=f'#pragma bank {bank}\n#include "api.h"\n'
+    code+='static const uint8_t tiles[]={'+array(b for tile in pool for b in tile)+'};\n'
+    code+='static const uint8_t maps[7][360]={'+','.join('{'+array(frame)+'}' for frame in frame_maps)+'};\n'
+    code+=f'void {name}(uint8_t mood,uint8_t load) BANKED {{if(load){{DISPLAY_OFF;set_bkg_data(0,{min(128,len(pool))},tiles);'
+    if len(pool)>128:code+=f'set_bkg_data(128,{len(pool)-128},tiles+2048);'
+    code+='}set_bkg_tiles(0,0,20,18,maps[mood%7]);if(load){DISPLAY_ON;}}\n'
+    (root/f'src/{name}.c').write_text(code)
+    demo+=f'void {name}(uint8_t mood,uint8_t load) BANKED;\n'
+demo+='void intro_cracks(uint8_t stage,uint8_t mood,uint8_t load) BANKED {switch(stage){\n'
+for stage in range(1,11):demo+=f'case {stage}:intro_damage{stage}(mood,load);break;\n'
+demo+='}}\n'
 (root/'src/intro_demo.c').write_text(demo)
 (root / 'src/intro_assets.h').write_text(out)
 print(f'Intro: {len(tiles)} tiles, seven expressions')

@@ -3,6 +3,7 @@
 #include <gb/cgb.h>
 #include "intro_assets.h"
 void intro_demo(uint8_t frame,uint8_t base) BANKED;
+void intro_cracks(uint8_t stage,uint8_t mood,uint8_t load) BANKED;
 void zoom0(uint8_t frame) BANKED;
 void zoom1(uint8_t frame) BANKED;
 void zoom2(uint8_t frame) BANKED;
@@ -140,10 +141,14 @@ static void face(uint8_t mood){
 static void overlay(uint8_t stage,uint8_t prompt){
  uint8_t base=zoombuffer^128;
  if(prompt){set_bkg_data(base+60,20,intro_prompt[stage]);intro_map(0,16,20,1,intro_prompt_map);}
- else{set_bkg_data(base,60,intro_logo[stage]);intro_map(0,0,20,3,intro_logo_map);}
+ else{
+  if(stage==3){uint8_t i;static const uint8_t blank[16]={0};for(i=0;i<60;i++)set_bkg_data(base+i,1,blank);}
+  else set_bkg_data(base,60,intro_logo[stage]);
+  intro_map(0,0,20,3,intro_logo_map);
+ }
 }
 void intro_run(void) BANKED {
- uint8_t mood=255,next,i,pad,previous=joypad(),logophase=255,promptphase=255,rasterphase=255,faceinit=0,lastzoom=255,scene;uint16_t reveal,sceneclock,lasttick,delta,ticks;
+ uint8_t mood=255,next,i,pad,previous=joypad(),logophase=255,promptphase=255,rasterphase=255,faceinit=0,lastzoom=255,cracks=0,damage_started=0,scene;uint16_t reveal,sceneclock,lasttick,delta,ticks,effectclock=0,fuzz=0xace1;
  static const uint8_t basswave[16]={0x89,0xab,0xcd,0xee,0xff,0xee,0xdc,0xba,0x98,0x65,0x43,0x21,0x00,0x12,0x34,0x67};
  introactive=1;introready=introbar=introstep=zoombuffer=0;introframe=0;
  DISPLAY_OFF;HIDE_SPRITES;BGP_REG=0xe4;
@@ -160,7 +165,7 @@ void intro_run(void) BANKED {
   if(scene<4){cinema_frame(((uint16_t)scene<<10)+(scene==2?ticks>>2:ticks>>1));previous=joypad();continue;}
   sceneclock=((uint32_t)ticks*15)>>6;
   if(sceneclock<=72){
-   HIDE_SPRITES;
+   HIDE_WIN;HIDE_SPRITES;
    next=sceneclock?(sceneclock-1)>>2:0;
    if(next!=lastzoom){if(next<6)zoom0(next);else if(next<12)zoom1(next-6);else zoom2(next-12);lastzoom=next;}
    previous=joypad();continue;
@@ -172,17 +177,20 @@ void intro_run(void) BANKED {
    for(i=0;i<INTRO_TILES;i++)set_bkg_data(zoombuffer+i,1,intro_tiles+(uint16_t)i*16);
    intro_map(0,0,20,18,intro_faces[0]);
   }
-  BGP_REG=0xe4;SCX_REG=0;
+  if(effectclock<600){BGP_REG=0xe4;SCX_REG=SCY_REG=0;}
   reveal=sceneclock-72;
   if(reveal<60)next=0;else if(reveal<68)next=1;
   else if(reveal<130)next=2;else if(reveal<200)next=6;
   else if(reveal<270)next=3;else if(reveal<345)next=5;
-  else if(reveal<410)next=4;else next=(reveal%240<8)?1:0;
-  if(next!=mood){face(next);mood=next;}
+  else if(reveal<410)next=4;else{static const uint8_t expressions[8]={0,2,6,3,5,4,0,1};next=expressions[(reveal/90)&7];}
+  if(next!=mood){if(!cracks)face(next);mood=next;if(cracks)intro_cracks(cracks,mood,0);}
   /* Local face time: logo starts at 1 s, prompt starts at 1.5 s. */
   reveal=sceneclock-72;
   if(reveal>=60){
    if(reveal<84){next=(reveal-60)/8;if(next>2)next=2;
+    if(next!=logophase){overlay(next,0);logophase=next;}
+   }else if(reveal>=180){
+    next=reveal<188?2:reveal<196?1:reveal<204?0:3;
     if(next!=logophase){overlay(next,0);logophase=next;}
    }else{
     next=((reveal-84)/8)&7;
@@ -190,11 +198,39 @@ void intro_run(void) BANKED {
    }
   }
   if(reveal>=90){
-   if(reveal<106){next=(reveal-90)/8;}
-   else{static const uint8_t pulsefade[8]={2,2,1,0,3,0,1,2};next=pulsefade[((reveal-106)/16)&7];}
+   /* Two one-second pulses with slow fades, then permanent silence. */
+   uint16_t phase=(reveal-90)%360;
+   next=reveal>=510?3:phase<12?0:phase<24?1:phase<36?2:phase<48?1:phase<60?0:3;
    if(next!=promptphase){overlay(next,1);promptphase=next;}
    if(next==2)introready=1;
   }
+  /* Wait five seconds after the score ends, then ten seconds between faults. */
+  if(!damage_started){
+   if(introfade<4)effectclock=0;
+   else{effectclock+=delta;if(effectclock>=300){damage_started=1;effectclock=600;}}
+  }else effectclock+=delta;
+  if(effectclock>=618){
+   effectclock=0;SCX_REG=SCY_REG=0;BGP_REG=0xe4;NR12_REG=NR22_REG=NR42_REG=0;NR10_REG=0;NR51_REG=0xf7;
+   if(_cpu==CGB_TYPE){set_bkg_palette_entry(0,0,RGB(22,30,23));set_bkg_palette_entry(0,3,RGB(2,7,6));}
+   if(cracks<10)cracks++;
+   intro_cracks(cracks,mood,1);
+  }else if(effectclock>=600){
+   uint8_t fault[20];
+   SCX_REG=(effectclock&1)?12:244;SCY_REG=(effectclock&2)?4:252;
+   BGP_REG=(effectclock&2)?0x1b:0xe4;
+   if(_cpu==CGB_TYPE){set_bkg_palette_entry(0,0,(effectclock&2)?RGB(31,0,7):RGB(0,31,31));set_bkg_palette_entry(0,3,RGB(31,31,31));}
+   for(i=0;i<20;i++)fault[i]=zoombuffer+(i*7+(effectclock&7)*13)%INTRO_TILES;
+   set_bkg_tiles(0,3,20,1,fault);set_bkg_tiles(0,10,20,1,fault);
+   if(effectclock-delta<600||!(effectclock%3)){
+    fuzz=(fuzz>>1)^((fuzz&1)?0xb400:0);
+    NR51_REG=0xff;
+    NR10_REG=0x10|((fuzz>>5)&0x6f);NR11_REG=(fuzz&3)<<6;NR12_REG=0xa1;
+    NR13_REG=fuzz;NR14_REG=0x80|((fuzz>>8)&7);
+    NR21_REG=((fuzz>>2)&3)<<6;NR22_REG=0x81;NR23_REG=fuzz>>4;NR24_REG=0x80|((fuzz>>11)&7);
+    NR41_REG=0;NR42_REG=0xc1|((fuzz>>8)&0x30);NR43_REG=(fuzz>>3)&0x7f;NR44_REG=0x80;
+   }
+  }
+
   pad=joypad();if(introready&&(pad&J_START)&&!(previous&J_START))break;previous=pad;
   /* Saturate scene time after the reveal; music and blink keep looping. */
   if(introframe==5000)introframe=2200;

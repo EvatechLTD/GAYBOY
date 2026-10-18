@@ -1,13 +1,40 @@
 """Hand-drawn four-shade pixel cinematics, converted to native Game Boy tiles."""
 import ast
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 root = Path(__file__).resolve().parents[1]
 tree = ast.parse((root / 'tools/make_ui_font.py').read_text())
 glyphs = next(eval(compile(ast.Expression(n.value), '<local font>', 'eval'), {'__builtins__': {}})
               for n in tree.body if isinstance(n, ast.Assign)
               and any(isinstance(t, ast.Name) and t.id == 'glyphs' for t in n.targets))
+
+# Compact lowercase lettering for the handheld's dialogue and footer.
+small_letters = dict(zip('abcdefghijklmnopqrstuvwxyz', (
+ '000/011/101/111/101','100/100/110/101/110','000/011/100/100/011',
+ '001/001/011/101/011','000/010/101/110/011','011/010/111/010/010',
+ '000/011/101/011/001','100/100/110/101/101','010/000/010/010/010',
+ '001/000/001/101/010','100/101/110/101/101','110/010/010/010/011',
+ '000/110/111/101/101','000/110/101/101/101','000/010/101/101/010',
+ '000/110/101/110/100','000/011/101/011/001','000/101/110/100/100',
+ '000/011/110/001/110','010/111/010/010/011','000/101/101/101/011',
+ '000/101/101/101/010','000/101/101/111/101','000/101/010/010/101',
+ '000/101/101/011/001','000/111/001/010/111')))
+small_letters.update({'2':'110/001/010/100/111','.':'000/000/000/000/010',
+                     '@':'010/101/111/100/011',' ':'000/000/000/000/000'})
+def small_text(im, text, x, y, color):
+    for i, char in enumerate(text):
+        for yy, row in enumerate(small_letters[char].split('/')):
+            for xx, bit in enumerate(row):
+                if bit=='1': im.putpixel((x+i*4+xx,y+yy),color)
+
+# Pillow's bundled Aileron font gives contacts familiar, unscaled letterforms.
+credit_font = ImageFont.load_default(size=16)
+footer_font = ImageFont.load_default(size=12)
+def credit_text(im, text, x, y, font=credit_font):
+    d=ImageDraw.Draw(im)
+    d.fontmode='1'
+    d.text((x,y),text,font=font,fill=0,anchor='lt')
 
 def room(d):
     d.rectangle((0, 16, 159, 127), fill=2)
@@ -156,26 +183,46 @@ def draw_scene(which, variant=0, emotion=0):
         d.polygon([(75,104),(88,105),(89,116),(91,127),(79,127),(75,124)],fill=3)
         d.rectangle((56,110,61,123),fill=2);d.rectangle((79,110,84,123),fill=2)
         h=8 if variant<3 else 0
-        d.polygon([(47,48+h),(50,36+h),(64,30+h),(80,32+h),(91,45+h),(94,72+h),(88,88+h),(83,81+h),(57,83+h),(48,88+h)],fill=3)
-        d.polygon([(54,46+h),(63,39+h),(78,40+h),(86,48+h),(84,66+h),(77,75+h),(70,79+h),(62,75+h),(56,66+h)],fill=0)
-        d.polygon([(47,49+h),(52,35+h),(66,29+h),(82,34+h),(91,47+h),(81,43+h),(73,55+h),(65,44+h),(57,58+h),(53,79+h),(46,85+h)],fill=3)
-        d.line((54,37+h,65,33+h,78,36+h),fill=0,width=2)
-        d.arc((46,31+h,94,78+h),175,355,fill=2,width=3)
-        d.ellipse((47,49+h,58,68+h),fill=3);d.rectangle((50,53+h,55,63+h),fill=0)
-        d.ellipse((83,49+h,94,68+h),fill=3);d.rectangle((86,53+h,91,63+h),fill=0)
-        if variant>=3:
-            d.ellipse((64,52,69,59),fill=3);d.ellipse((72,53,76,60),fill=3)
-            d.point((66,54),fill=0);d.point((74,55),fill=0)
-            d.ellipse((69,63,74,69),fill=3)
+        # Match the turntable portrait at the train shot's smaller scale.
+        d.polygon([(48,46+h),(53,34+h),(67,30+h),(81,34+h),(90,46+h),(89,68+h),(95,83+h),(84,80+h),(81,88+h),(52,83+h),(46,71+h)],fill=3)
+        d.polygon([(54,46+h),(62,37+h),(77,38+h),(85,47+h),(84,62+h),(78,73+h),(72,77+h),(68,77+h),(61,74+h),(55,64+h)],fill=0)
+        # Asymmetric choppy fringe and the same muted light streak.
+        d.polygon([(49,49+h),(52,36+h),(63,30+h),(77,31+h),(87,39+h),(91,51+h),(81,46+h),(76,52+h),(68,44+h),(61,52+h),(60,45+h),(54,58+h)],fill=3)
+        d.polygon([(55,38+h),(65,34+h),(77,35+h),(83,39+h),(70,37+h),(63,40+h),(60,46+h)],fill=1)
+        d.polygon([(52,53+h),(56,63+h),(58,80+h),(51,73+h),(48,79+h),(48,64+h)],fill=3)
+        d.polygon([(84,50+h),(89,59+h),(88,79+h),(83,85+h),(83,72+h)],fill=3)
+        # Keep her winged eyeliner when her eyes widen in surprise.
+        surprised=variant>=3
+        lift=2 if surprised else 0
+        d.line((56,54+h-lift,63,53+h-lift,66,55+h-lift),fill=3,width=1)
+        d.line((73,55+h-lift,76,53+h-lift,83,54+h-lift),fill=3,width=1)
+        if surprised:
+            d.polygon([(56,55+h),(65,54+h),(64,61+h),(58,62+h)],fill=3)
+            d.polygon([(73,54+h),(83,55+h),(81,62+h),(74,61+h)],fill=3)
+            d.rectangle((58,55+h,63,60+h),fill=0)
+            d.rectangle((75,55+h,80,60+h),fill=0)
+            d.rectangle((60,56+h,61,60+h),fill=3)
+            d.rectangle((77,56+h,78,60+h),fill=3)
         else:
-            d.polygon([(59,56+h),(68,58+h),(67,64+h),(60,63+h)],fill=3)
-            d.polygon([(73,58+h),(82,56+h),(81,63+h),(74,64+h)],fill=3)
-            d.rectangle((61,59+h,66,62+h),fill=0);d.rectangle((75,59+h,80,62+h),fill=0)
-            # Her pupils turn toward the backpack on the first shaking pose.
-            left,right=(61,75) if variant in (1,2) else (64,76)
-            d.rectangle((left,61+h,left+1,63+h),fill=3);d.rectangle((right,61+h,right+1,63+h),fill=3)
-            d.line((70,62+h,69,65+h,72,66+h),fill=2)
-            d.line((68,70+h,71,70+h),fill=3)
+            d.polygon([(56,56+h),(65,55+h),(64,60+h),(59,61+h)],fill=3)
+            d.polygon([(73,55+h),(83,56+h),(80,61+h),(75,60+h)],fill=3)
+            d.rectangle((58,56+h,63,58+h),fill=0)
+            d.rectangle((75,56+h,80,58+h),fill=0)
+            left,right=(58,75) if variant in (1,2) else (60,77)
+            d.rectangle((left,56+h,left+1,60+h),fill=3)
+            d.rectangle((right,56+h,right+1,60+h),fill=3)
+        d.line((69,62+h,68,65+h,71,66+h),fill=2)
+        if surprised:d.ellipse((68,69+h,72,73+h),fill=3)
+        else:d.line((65,70+h,73,70+h),fill=3)
+        # Knit beanie sits behind the headphones; the jagged bangs stay exposed.
+        d.polygon([(49,46+h),(51,37+h),(56,31+h),(65,27+h),(77,28+h),(86,33+h),(90,41+h),(91,47+h),(81,43+h),(74,40+h),(65,40+h),(56,43+h)],fill=2)
+        d.line((52,37+h,57,32+h,65,29+h,76,30+h,84,34+h),fill=1)
+        d.polygon([(49,43+h),(60,39+h),(73,38+h),(86,42+h),(91,47+h),(89,50+h),(78,45+h),(65,44+h),(53,48+h),(49,49+h)],fill=1)
+        for x,y in ((53,44),(58,42),(63,41),(68,41),(73,41),(78,43),(83,44),(88,46)):
+            d.line((x,y+h,x,y+2+h),fill=2)
+        d.arc((46,30+h,93,77+h),175,360,fill=1,width=3)
+        d.ellipse((47,48+h,57,66+h),fill=3);d.ellipse((49,51+h,55,63+h),fill=1)
+        d.ellipse((84,48+h,94,66+h),fill=3);d.ellipse((86,51+h,92,63+h),fill=1)
         if variant<8:
             # Bored, hands resting in her lap until the handheld reaches her.
             d.polygon([(50,86),(55,87),(59,100),(62,105),(55,107),(50,101),(47,91)],fill=1)
@@ -273,7 +320,7 @@ def draw_scene(which, variant=0, emotion=0):
         d.rounded_rectangle((50,29,110,85),radius=4,fill=3)
         d.rectangle((55,34,105,78),fill=1)
         d.rectangle((57,36,103,76),fill=0)
-        if variant:
+        if variant&1:
             d.line((65,51,70,51),fill=3,width=2);d.line((90,51,95,51),fill=3,width=2)
         else:
             d.ellipse((65,46,70,55),fill=3);d.ellipse((90,46,95,55),fill=3)
@@ -282,8 +329,21 @@ def draw_scene(which, variant=0, emotion=0):
         d.ellipse((94,95,102,103),fill=3);d.ellipse((83,103,91,111),fill=3)
         d.line((72,118,80,116),fill=2,width=2);d.line((86,118,94,116),fill=2,width=2)
         for x in (96,100,104):d.line((x,115,x,123),fill=2)
+        if variant&2:
+            # A pointed comic balloon connects directly to BMO's smile.
+            d.polygon([(81,63),(102,72),(97,81)],fill=3)
+            d.polygon([(83,65),(102,74),(99,78)],fill=0)
+            d.rounded_rectangle((94,69,158,103),radius=6,fill=3)
+            d.rounded_rectangle((96,71,156,101),radius=5,fill=0)
+            for line,y in zip(('this version','is obsolete'),(78,89)):
+                small_text(im,line,126-(len(line)*4-1)//2,y,3)
     # Widescreen crop and a subtle title-safe frame.
     d.rectangle((0,0,159,15),fill=3);d.rectangle((0,128,159,143),fill=3)
+    if which==5:
+        address='y2kcrisis.com'
+        address_font=footer_font
+        credit_text(im,address,(160-address_font.getbbox(address)[2])//2,3,address_font)
+        credit_text(im,'@bestjonever',(160-footer_font.getbbox('@bestjonever')[2])//2,130,footer_font)
     return im
 
 phrases=[['a processor running'],['is like an animal breathing'],['time is an illusion...','that helps things make sense'],[],[],['']]
@@ -300,6 +360,7 @@ for scene in (0,1,2,5):
         if key not in lookup:lookup[key]=len(tiles);tiles.append(key)
         return lookup[key]
     im=draw_scene(scene)
+    if scene==0:ImageDraw.Draw(im).rectangle((0,0,159,15),fill=3)
     if scene==2:
         train_window_base=im.copy()
         # This area is fully covered by the animated window layer at runtime.
@@ -313,19 +374,28 @@ for scene in (0,1,2,5):
         prefixes=[]
         for count in range(29):
             line=Image.new('L',(160,8),3)
+            if scene==5:
+                pass # Handheld credits are already part of the static background.
             advance=5 if len(phrase)>26 else 6
-            left=(160-(len(phrase)*advance-1))//2
+            # Give the long MPC caption a blank pixel between every letter.
+            # Narrow word spaces let its full 5x7 lettering fit without touching.
+            advances=[3 if c==' ' else 6 for c in phrase] if len(phrase)>26 else [advance]*len(phrase)
+            width=sum(advances)-1
+            assert width<=160,(phrase,width)
+            left=(160-width)//2
             printed=count if scene!=2 or phrase!='that helps things make sense' else (28 if count==28 else 0)
+            cursor=left
             for i,c in enumerate(phrase[:printed]):
                 for y,row in enumerate(glyphs.get(c.upper(),['00000']*7)):
                     for x,v in enumerate(row):
-                        if v=='1':line.putpixel((left+i*advance+x,y),0)
+                        if v=='1':line.putpixel((cursor+x,y),0)
+                cursor+=advances[i]
             prefixes.append([tile(line.crop((x,0,x+8,8))) for x in range(0,160,8)])
         texts.append(prefixes)
     motion=[]
     if scene in (0,5):
-        bounds=(8,88,112,128) if scene==0 else (56,40,104,80)
-        for variant in range(4 if scene==0 else 2):
+        bounds=(8,88,112,128) if scene==0 else (56,40,160,104)
+        for variant in range(4):
             shot=draw_scene(scene,variant)
             motion.append([tile(shot.crop((x,y,x+8,y+8))) for y in range(bounds[1],bounds[3],8) for x in range(bounds[0],bounds[2],8)])
     if scene==2:
@@ -348,7 +418,19 @@ for scene in (0,1,2,5):
         for group in range(2):
             code=f'#pragma bank {25+group}\n#include "api.h"\n'
             code+='static const uint8_t frames[5][1920]={'+','.join('{'+array(p)+'}' for p in train_frames[group*5:group*5+5])+'};\n'
-            code+=f'void train_motion{group}(uint8_t frame) BANKED {{uint8_t i;for(i=0;i<120;i++)set_bkg_data({motionbase}+i,1,frames[frame%5]+(uint16_t)i*16);}}\n'
+            # Only upload tiles changed by this pose's possible predecessors.
+            code+=f'void train_motion{group}(uint8_t frame) BANKED {{switch(frame%5){{'
+            for local in range(5):
+                pose=group*5+local
+                previous={0:[],1:[0,2],2:[0,1],3:[1,2]}.get(pose,[pose-1])
+                changed=[i for i in range(120) if any(train_frames[pose][i*16:(i+1)*16]!=train_frames[p][i*16:(i+1)*16] for p in previous)]
+                code+=f'case {local}:'
+                while changed:
+                    start=changed.pop(0);end=start+1
+                    while changed and changed[0]==end:end=changed.pop(0)+1
+                    code+=f'set_bkg_data({motionbase+start},{end-start},frames[{local}]+{start*16});'
+                code+='break;'
+            code+='}}\n'
             (root/f'src/train_motion{group}.c').write_text(code)
     assert len(tiles)<=256,(scene,len(tiles))
     if scene==1:assert len(tiles)<224
@@ -372,7 +454,10 @@ for scene in (0,1,2,5):
     clear='for(i=0;i<32;i++)set_bkg_tiles(0,i,32,1,border);' if scene==2 else ''
     out+=f'void cinema{scene}(uint8_t line,uint8_t count,uint8_t load) BANKED {{\n'
     out+=f' uint16_t i;if(load){{DISPLAY_OFF;HIDE_SPRITES;SPRITES_8x8;SCX_REG=SCY_REG=0;OBP0_REG=0xe4;for(i=0;i<40;i++)move_sprite(i,0,0);for(i=0;i<{len(tiles)};i++)set_bkg_data(i,1,tiles+i*16);{clear}set_bkg_tiles(0,0,20,18,screen);SHOW_BKG;DISPLAY_ON;}}\n'
-    out+=' if(count>28)count=28;set_bkg_tiles(0,17,20,1,text[line][count]);\n}\n'
+    if scene==5:
+        out+=' HIDE_WIN;\n}\n'
+    else:
+        out+=' if(count>28)count=28;LCDC_REG|=0x40;set_win_tiles(0,0,20,1,text[line][count]);set_win_tiles(0,1,20,1,text[0][0]);move_win(7,132);SHOW_WIN;\n}\n'
     if motion:
         x,y,right,bottom=bounds
         out+=f'void cinema{scene}_motion(uint8_t frame) BANKED {{set_bkg_tiles({x//8},{y//8},{(right-x)//8},{(bottom-y)//8},motion[frame%{len(motion)}]);}}\n'
@@ -439,7 +524,8 @@ for scene in (0,1,2,5):
         code+=f'static const uint8_t solid[8][{nextslot*32}]={{'+','.join('{'+array(p)+'}' for p in patches)+'};\n'
         code+='''void train_window_draw(uint8_t phase,uint8_t pose) BANKED {
  uint8_t i,slot;if(pose>9)pose=9;phase&=7;
- for(i=0;i<39;i++){slot=masks[pose][i];set_sprite_data(i*2,2,slot==255?passing[phase]+(uint16_t)i*32:solid[phase]+(uint16_t)slot*32);}
+ set_sprite_data(0,78,passing[phase]);
+ for(i=0;i<39;i++){slot=masks[pose][i];if(slot!=255)set_sprite_data(i*2,2,solid[phase]+(uint16_t)slot*32);}
 }
 '''
         (root/'src/train_window.c').write_text(code)

@@ -16,6 +16,7 @@ else:
  fcntl.flock(build_lock,fcntl.LOCK_EX)
 compiler=root/'tools/gbdk/bin/lcc.exe'; out=root/'build/objects';out.mkdir(exist_ok=True)
 names='pattern_io kits drum_samples32 drum_samples33 drum_samples34 drum_samples35 drum_samples36 main ui legacy experimental exp_waves5 exp_waves6 exp_waves7 exp_waves8 exp_coefficients exp_maps storage sequencer seq_clipboard tones tone_presets noiselab instruments seq_pixels finepitch global drum drum_samples drum_samples19 drum_samples20 mixer intro intro_demo cinema cinema0 cinema1 cinema2 cinema5 train_motion0 train_motion1 train_window zoom0 zoom1 zoom2'.split()
+names += ['intro_damage'+str(stage) for stage in range(1,11)]
 headers=b''.join(p.read_bytes() for p in sorted((root/'src').glob('*.h')))
 flags=['-Wf--opt-code-size','-Wa-l']
 def compile_one(name):
