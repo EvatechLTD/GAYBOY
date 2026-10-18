@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 import shutil
+import base64
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +17,12 @@ def main():
     html = html.replace('Nothing in this review package has been published.', 'This guide is published as a review draft; details may change.')
     html = html.replace('Local review draft', 'Review draft')
     html = html.replace('<nav aria-label="Contents">', '<nav aria-label="Contents"><a href="GAYBOY-user-guide-review.pdf">Download the PDF (review draft)</a><a href="https://github.com/dpjpandone/GAYBOY/tree/main/docs/user-guide">Guide source on GitHub</a>')
+    images = {}
+    def external_image(match):
+        name = 'illustration-' + str(len(images) + 1) + '.png'
+        images[name] = base64.b64decode(match.group(1), validate=True)
+        return 'src="screenshots/' + name + '"'
+    html = re.sub(r'src="data:image/png;base64,([^"]+)"', external_image, html)
     for folder in ('website/guide', 'network/apps/gayboy/guide'):
         target = ROOT / folder
         target.mkdir(parents=True, exist_ok=True)
@@ -24,6 +31,8 @@ def main():
         for name in ('GAYBOY-user-guide-review.pdf', 'capture-manifest.json'):
             shutil.copy2(source / name, target / name)
         shutil.copytree(source / 'screenshots', target / 'screenshots', dirs_exist_ok=True)
+        for name, content in images.items():
+            (target / 'screenshots' / name).write_bytes(content)
         print('Packaged review guide:', folder)
 
 
