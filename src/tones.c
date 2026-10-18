@@ -11,7 +11,8 @@ extern int8_t w2tables[8][3];
 extern __at (0xAC60) uint8_t noisepatch[2][5];
 extern uint8_t pulsekickpatch[8];
 static uint16_t bitpos,rawpos;
-static uint8_t operation,toneok,savedengine;
+static uint8_t operation,toneok;
+uint8_t savedengine;
 /* Optional extension in formerly zero padding. Factory kicks stay all-zero
    on disk, so existing saves and the original416-field layout stay intact. */
 #define KICK_EXTENSION 224U
@@ -863,35 +864,679 @@ static const ToneDestination tonedest[]={
 {softshape,2},
 {&savedengine,1},
 {0,0}};
+/* Native prepared state is also the new sparse store's patch representation.
+   Capture once on edit/save; no bit codec runs at a quantized handoff. The
+   old packed schema remains available for legacy patterns and import. */
+void tones_capture(void) BANKED {const ToneDestination *field=tonedest;uint8_t *out=RAW;
+ savedengine=waveengine<3?waveengine:0;
+ while(field->size){memcpy(out,field->destination,field->size);out+=field->size;field++;mixfill();}
+ memcpy(KICK_RAW,pulsekickpatch,8);
+}
 static void apply_prepared(void) __naked { __asm
- push bc
  ld de,#0xba00
- ld hl,#_tonedest
-tone_scatter_next$:
- ld a,(hl+)
- ld c,a
- ld a,(hl+)
- ld b,a
- ld a,(hl+)
- or a,a
- jr z,tone_scatter_done$
- push hl
- ld h,b
- ld l,c
- ld c,a
-tone_scatter_copy$:
+ ld hl,#_param
+ .rept 26
  ld a,(de)
  inc de
  ld (hl+),a
- dec c
- jr nz,tone_scatter_copy$
- pop hl
- jr tone_scatter_next$
-tone_scatter_done$:
- pop bc
+ .endm
+ ld hl,#_program
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_edited
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_mods
+ .rept 6
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablemode
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablelen
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tables
+ .rept 24
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_param+26
+ .rept 26
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_program+1
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_edited+1
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_mods+6
+ .rept 6
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablemode+1
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablelen+1
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tables+24
+ .rept 24
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_param+52
+ .rept 26
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_program+2
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_edited+2
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_mods+12
+ .rept 6
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablemode+2
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablelen+2
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tables+48
+ .rept 24
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_param+78
+ .rept 26
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_program+3
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_edited+3
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_mods+18
+ .rept 6
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablemode+3
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tablelen+3
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_tables+72
+ .rept 24
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_custom
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_customwave
+ .rept 16
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_finepitch
+ .rept 10
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_w2settings
+ .rept 5
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_w2program
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_w2tablemode
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_w2tablelen
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_w2tablespeed
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_w2tables
+ .rept 24
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+1
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+1
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+2
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+2
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+2
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+4
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+3
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+3
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+6
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+4
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+4
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+8
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+5
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+5
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+10
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+6
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+6
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+12
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+7
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+7
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+14
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+8
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+8
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+16
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+9
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+9
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+18
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+10
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+10
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+20
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+11
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+11
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+22
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+12
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+12
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+24
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+13
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+13
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+26
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+14
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+14
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+28
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+15
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+15
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+30
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+16
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+16
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+32
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+17
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+17
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+34
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+18
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+18
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+36
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+19
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+19
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+38
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monoset+20
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monodepth+20
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monophase+40
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_monosource
+ .rept 11
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_expconfig
+ .rept 27
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_exprelease
+ .rept 3
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_noisepatch
+ .rept 10
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_drumkit
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_master
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_vin
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_arprate
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_softshape
+ .rept 2
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
+ ld hl,#_savedengine
+ .rept 1
+ ld a,(de)
+ inc de
+ ld (hl+),a
+ .endm
  ret
  __endasm; }
-void tones_apply(void) BANKED {uint8_t c,i;apply_prepared();memcpy(pulsekickpatch,KICK_RAW,8);
+static void finalize_prepared(void) {uint8_t c,i;
  memset(phase,0,sizeof(phase));memset(age,0,sizeof(age));memset(stepclock,0,sizeof(stepclock));memset(tablepos,0,sizeof(tablepos));memset(notestep,0,sizeof(notestep));memset(tablerow,0,sizeof(tablerow));
  if(!seqplaying)memset(keycount,0,sizeof(keycount));memset(bend,0,sizeof(bend));memset(held,255,sizeof(held));for(c=0;c<4;c++)wheellast[c]=8192;
  memcpy(monoeffective,monoset,sizeof(monoeffective));
@@ -901,3 +1546,6 @@ void tones_apply(void) BANKED {uint8_t c,i;apply_prepared();memcpy(pulsekickpatc
  if(experimental_mode&&!monomode){expwaveon=expconfig[0]||expconfig[1]||exprelease[2]||expconfig[6]!=15||expconfig[7]||expconfig[8]||expconfig[10];expactive=expwaveon||exprelease[0]||exprelease[1];for(i=0;i<EXP_COUNT;i++)if(i!=4&&i!=6&&i!=21&&expconfig[i])expactive=1;}
  wavepending=1;pitchdirty=1;choice=selected<4?program[selected]:0;globals();if(experimental_mode&&monomode)exp_changed();dirty=1;
 }
+
+void tones_finalize(void) BANKED {finalize_prepared();}
+void tones_apply(void) BANKED {apply_prepared();memcpy(pulsekickpatch,KICK_RAW,8);finalize_prepared();}

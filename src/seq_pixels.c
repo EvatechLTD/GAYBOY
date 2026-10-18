@@ -36,6 +36,17 @@ void ui_upload_tile(uint8_t tile,const uint8_t *data,uint8_t sprite) BANKED {
  ui_vram_copy((uint8_t *)address,data,16);
 }
 void ui_upload_map(uint16_t address,const uint8_t *data,uint8_t count) BANKED {ui_vram_copy((uint8_t *)address,data,count);}
+/* Upload only the changed contiguous span of each row. Keep the visible map
+   synchronized after each successful transfer, including ordinary font pages. */
+void ui_flush_spans(void) BANKED {
+ uint8_t r,left,right,count,*a=canvas,*b=visible,*ap,*bp;
+ for(r=0;r<18;r++,a+=20,b+=20){
+  mixfill();if(!memcmp(a,b,20))continue;
+  left=0;ap=a;bp=b;while(*ap++==*bp++)left++;
+  right=20;ap=a+20;bp=b+20;while(*--ap==*--bp)right--;
+  count=right-left;ui_vram_copy((uint8_t *)(0x9800U+(uint16_t)r*32+left),a+left,count);memcpy(b+left,a+left,count);
+ }
+}
 extern uint8_t seqbeats,seqdenom;
 void roll_begin(void) BANKED;
 void roll_retain(void) BANKED;
@@ -396,6 +407,12 @@ selection_count_more$:
  pop bc
  ret
  __endasm; }
+/* Build reference counts while the ordinary render is already rebuilding its
+   map, so the first selection edge does not pay another full-map scan. */
+void roll_selection_prepare(uint8_t changed) BANKED {
+ if(rollcache[0]!=167&&rollcache[0]!=168)return;
+ if(changed||rollcache[0]==167){memset(rollonsets,0,240);roll_selection_count(canvas,360);rollcache[0]=168;}
+}
 static void roll_selection_pins(void) __naked { __asm
  ld de,#0xaf00
  ld hl,#0xad00
@@ -420,7 +437,9 @@ uint8_t roll_selection_update(void) BANKED {
  if(!seqfontdirty||(rollcache[0]!=167&&rollcache[0]!=168)||seqviewtrack!=seqtrack||seqviewbase!=seqbase||seqviewcols!=seqcols||rollcache[4]!=seqgridheight||(seqtrack!=6&&seqviewtop!=seqtop[seqtrack]))return 0;
  roll_box_pixels(old,rollcache[5],rollcache[6],rollcache[7],rollcache[8],rollcache[9]);
  roll_box_pixels(next,seqgrouptrack,seqgroupx0,seqgroupx1,seqgroupy0,seqgroupy1);
- ENABLE_RAM_MBC5;SWITCH_RAM_MBC5(0);memcpy(canvas,seqscreen,360);
+ /* Valid selection gestures enter with both maps synchronized. Mutate each
+    changed cell in both maps; the fallback discards both before a full retry. */
+ ENABLE_RAM_MBC5;SWITCH_RAM_MBC5(0);
  if(rollcache[0]!=168){memset(refs,0,240);roll_selection_count(seqscreen,360);}
  rollpinslazy=0;roll_selection_pins();roll_pin_bases();
  seqtileoverflow=0;rollbuilding=1;rollreplace=0;memset(rollpending,0,15);HIDE_SPRITES;
@@ -438,7 +457,7 @@ uint8_t roll_selection_update(void) BANKED {
    mask=rollrow[offset+x];if(!mask)continue;
    at=(uint16_t)(row+1)*20+x;n=roll_index(seqscreen[at]);if(n==255)goto selection_full;
    memcpy(pixels,rolltiles[n],16);roll_xor_tile(pixels,mask);
-   id=roll_intern(pixels);refs[n]--;refs[roll_index(id)]++;canvas[at]=id;roll_audio();
+   id=roll_intern(pixels);refs[n]--;refs[roll_index(id)]++;canvas[at]=seqscreen[at]=id;roll_audio();
   }
   service();
  }
@@ -611,8 +630,13 @@ void roll_upload_dirty(uint8_t row) BANKED {uint8_t x,old,id,n;uint16_t at,*refs
     their tile replacements before the next selection gesture pins its map. */
  if(rollcache[0]==168&&old!=id){n=roll_index(old);if(n!=255)refs[n]--;n=roll_index(id);if(n!=255)refs[n]++;}canvas[at]=id;}}
 void roll_upload(uint8_t row) BANKED {memset(rolldirty,1,20);roll_upload_dirty(row);}
-void roll_commit(void) BANKED {uint8_t n;if(!rollbuilding)return;
+void roll_commit(void) BANKED {uint8_t group,n,bits,tile;uint16_t address;if(!rollbuilding)return;
  if(rollreplace)ui_transition_begin();
- for(n=0;n<seqtilecount;n++)if(rollpending[n>>3]&(1<<(n&7))){ui_upload_tile(roll_id(n),rolltiles[n],0);roll_audio();}
+ /* Sparse gestures normally change only a handful of tiles. Skip whole
+    empty pending bytes, avoiding a variable mask shift for every cache tile. */
+ for(group=0;group<15;group++){
+  bits=rollpending[group];if(!bits)continue;n=group<<3;
+  do{if(bits&1){tile=roll_id(n);if(LCDC_REG&0x10)address=0x8000U+(uint16_t)tile*16;else address=tile<128?0x9000U+(uint16_t)tile*16:0x8800U+(uint16_t)(tile-128)*16;ui_vram_copy((uint8_t *)address,rolltiles[n],16);roll_audio();}n++;bits>>=1;}while(bits);
+ }
  memset(rollpending,0,15);rollreplace=rollbuilding=0;
 }

@@ -1,16 +1,20 @@
 """Drive the real one-shot boot intro before application regression checks."""
 from pathlib import Path
 
-def enter_app(p):
-    symbols = {l.split()[1]: int(l.split()[2], 16)
-               for l in Path('build/GAYBOY.noi').read_text().splitlines() if l.startswith('DEF ')}
+def enter_app(p, symbols=None):
+    if symbols is None:
+        symbols = {l.split()[1]: int(l.split()[2], 16)
+                   for l in Path('build/GAYBOY.noi').read_text().splitlines() if l.startswith('DEF ')}
     for _ in range(2800):
         p.tick(1)
         if p.memory[symbols['_introready']]:
             break
     assert p.memory[symbols['_introready']], 'Intro never reached Press Start'
     p.button_press('start')
-    for _ in range(120):
+    # Sparse libraries validate occupied slots and install optional hardware
+    # demo data before publishing the first editable screen. This is a boot
+    # liveness limit; live input/launch timing has separate strict checks.
+    for _ in range(1800):
         p.tick(1)
         if not p.memory[symbols['_introactive']] and p.memory[symbols['_page']]==8 and p.memory[symbols['_seqtrack']]==6 and not p.memory[symbols['_navopen']]:
             break

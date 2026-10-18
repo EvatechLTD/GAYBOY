@@ -1,4 +1,5 @@
 from pathlib import Path
+from check_memory import audit
 s={l.split()[1]:int(l.split()[2],16) for l in Path('build/GAYBOY.noi').read_text().splitlines() if l.startswith('DEF ')}
 assert s['s__GSFINAL']+s['l__GSFINAL']<=0x4000,'Fixed ROM bank overflow'
 for n,v in s.items():
@@ -13,6 +14,9 @@ r=Path('build/GAYBOY.gb').read_bytes()
 assert len(r)==1024*1024 and r[0x147]==0x1B and r[0x149]==3,'Expected MBC5 + 32 KiB RAM'
 assert (sum(r)-r[0x14e]-r[0x14f])&65535==int.from_bytes(r[0x14e:0x150],'big')
 print('ROM layout verified: 1 MiB MBC5 + battery, 32 KiB cartridge RAM, bounded ROM banks and work RAM')
+memory = audit(Path('build/GAYBOY.gb'))
+print('Engine reserves verified: %d bytes WRAM, %d bytes stack; bank zero excluded from song storage' %
+      (memory['wram_unused_below_audio_tables_bytes'], memory['stack_reserved_bytes']))
 
 for bank in range(32,37):
  assert (s['_drumdata'+str(bank)]&65535)==(s['_drumdata32']&65535), 'PCM fast fetch requires bank-aligned kit data'

@@ -101,6 +101,6 @@ void native_input(uint8_t p,uint8_t edge) BANKED {
  if(edge&J_B){play(selected,60,110);auditionvoice=selected;}p;
 }
 
-uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==23)return 1;if(item>=21)return page==8;if(!experimental_mode&&(item==2||item==5||item==6||item==7||item==9||item==14))return 0;return item&&(!(item>=1&&item<=6)||page<7);}
+uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==26)return clear_available();if(item==24||item==25)return sparse_enabled==1;if(item==23)return 1;if(item>=21)return page==8;if(!experimental_mode&&(item==2||item==5||item==6||item==7||item==9||item==14))return 0;return item&&(!(item>=1&&item<=6)||page<7);}
 
 void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint16_t magnitude=wheel<0?-wheel:wheel,result;uint8_t range=param[c][25];result=(magnitude>>6)*range+(((magnitude&63)*range)>>6);bend[c]=wheel<0?-(int16_t)result:result;updatepitch(c);}

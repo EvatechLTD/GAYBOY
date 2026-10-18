@@ -30,6 +30,7 @@ void prefetch(uint8_t s) BANKED;
 void applymeta(const uint8_t *meta) BANKED;
 void tailcopy(uint8_t *dst,const uint8_t *src,uint16_t size) BANKED;
 uint8_t restore(uint8_t s,uint8_t cached) BANKED;
+void mixer_tempo_edit(int16_t delta) BANKED;
 void mixer_launch_request(uint8_t slot,uint8_t edit) BANKED;
 void mixer_prepare_service(void) BANKED;
 void mixer_prepare_cancel(void) BANKED;

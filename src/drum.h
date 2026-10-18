@@ -1,6 +1,6 @@
 #ifndef DRUM_H
 #define DRUM_H
-extern uint32_t pulsekickleft;
+extern __at (0xAC59) uint32_t pulsekickleft;
 extern uint8_t drumkit;
 void kits_render(void) BANKED;
 void kits_input(uint8_t p,uint8_t edge) BANKED;

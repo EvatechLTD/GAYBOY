@@ -10,6 +10,8 @@ extern uint8_t seqevents_lo[256][4];
 extern __at (0xA800) uint8_t seqevents_hi[256][4];
 extern uint16_t seqeventcounts[7],seqeventoffsets[7];
 extern uint8_t seqeventfull;
+extern uint8_t seqeventcache;
+void seq_track_clear(uint8_t track) BANKED;
 uint16_t seq_event_count(uint8_t track) BANKED;
 uint16_t seq_event_total(void) BANKED;
 uint8_t seq_event_get(uint8_t track,uint16_t index,uint8_t *event) BANKED;

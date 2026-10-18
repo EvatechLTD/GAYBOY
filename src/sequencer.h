@@ -3,7 +3,7 @@
 #define SEQ_TRACKS 7
 #define SEQ_NOTE_TRACKS 6
 #define SEQ_STEPS 256
-#define PAGE_COUNT 24
+#define PAGE_COUNT 27
 extern volatile uint16_t seqticks;
 extern uint8_t seqflushpending,seqservicing;
 extern uint8_t seqapending,seqamoved;
@@ -13,14 +13,16 @@ extern uint8_t seqgrouptrack,seqgroupx0,seqgroupx1,seqgroupy0,seqgroupy1;
 uint8_t seq_group_contains(uint8_t step,uint8_t pitch) BANKED;
 extern uint8_t seqvelocityhidden;
 extern uint8_t seqplaying,seqtrack,seqmode,seqfocus,seqedit,seqmuted,seqsolo,seqhead;
-extern uint16_t seqbpm;
+extern uint16_t seqbpm,seqglobalbpm;
+extern uint8_t seqswing,seqswingphase;
+extern uint16_t seqthreshold;
 extern uint16_t seqdefaultdur[SEQ_TRACKS];
 extern uint8_t seqdefaultvel[SEQ_TRACKS];
 extern __at (0xACFB) uint8_t seqfontdirty;
 extern __at (0xACFC) uint8_t seqviewtrack;
 extern uint8_t seqviewtop,seqviewbase,seqviewcols;
 extern uint8_t seqzoom,seqbase,seqcols,seqrows,seqheight,seqgridheight,seqtilecount,seqtileoverflow;
-extern uint8_t seqdrawvalid,seqscreen[360],seqgrid[64],seqmarks[64];
+extern uint8_t seqdrawvalid,seqscreen[360],seqgrid[64];
 void seq_pixels(uint8_t navigation) BANKED;
 void roll_invert_selection(uint8_t row) BANKED;
 void seq_playhead(void) BANKED;
@@ -43,4 +45,10 @@ uint8_t seq_region_copy(uint8_t cut) BANKED;
 uint8_t seq_region_paste(uint8_t step,uint8_t pitch) BANKED;
 void seq_copy(void) BANKED;
 void seq_paste(void) BANKED;
+void seq_clear_notes(uint8_t track) BANKED;
+extern uint8_t genopen;
+void gen_open(void) BANKED;
+void gen_cancel(void) BANKED;
+void gen_input(uint8_t p,uint8_t edge) BANKED;
+void gen_render(void) BANKED;
 #endif

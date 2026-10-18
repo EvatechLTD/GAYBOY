@@ -1,6 +1,7 @@
 from pathlib import Path
-import concurrent.futures, hashlib, subprocess, sys, time
+import argparse, concurrent.futures, hashlib, subprocess, sys, time
 root=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser();parser.add_argument('--demo-seed',type=Path);options=parser.parse_args()
 # Concurrent sessions share object names; serialize compilation and linking.
 (root/'build').mkdir(exist_ok=True)
 build_lock=(root/'build/build.lock').open('a+b')
@@ -15,11 +16,19 @@ else:
  import fcntl
  fcntl.flock(build_lock,fcntl.LOCK_EX)
 compiler=root/'tools/gbdk/bin/lcc.exe'; out=root/'build/objects';out.mkdir(exist_ok=True)
-names='pattern_io kits drum_samples32 drum_samples33 drum_samples34 drum_samples35 drum_samples36 main ui legacy experimental exp_waves5 exp_waves6 exp_waves7 exp_waves8 exp_coefficients exp_maps storage sequencer seq_clipboard tones tone_presets noiselab instruments seq_pixels finepitch global drum drum_samples drum_samples19 drum_samples20 mixer intro intro_demo cinema cinema0 cinema1 cinema2 cinema5 train_motion0 train_motion1 train_window zoom0 zoom1 zoom2'.split()
+names='sparse_seed clear_pattern sparse_pool sparse_store sparse_journal pattern_io kits drum_samples32 drum_samples33 drum_samples34 drum_samples35 drum_samples36 main ui legacy experimental exp_waves5 exp_waves6 exp_waves7 exp_waves8 exp_coefficients exp_maps storage sequencer seq_gen seq_clipboard tones tones_native tone_presets noiselab instruments seq_pixels finepitch global drum drum_samples drum_samples19 drum_samples20 mixer intro intro_demo cinema cinema0 cinema1 cinema2 cinema5 train_motion0 train_motion1 train_window zoom0 zoom1 zoom2'.split()
+names += ['intro_damage'+str(stage) for stage in range(1,11)]
+if options.demo_seed:
+ from make_sparse_seed import generate
+ generate(options.demo_seed,root/'build/sparse_seed.c')
+from generate_native_scatter import generate as generate_native_scatter
+generate_native_scatter()
+from generate_startup_font import generate as generate_startup_font
+generate_startup_font(root/'src/ui_tiles.h',root/'src/ui_startup_font.h')
 headers=b''.join(p.read_bytes() for p in sorted((root/'src').glob('*.h')))
 flags=['-Wf--opt-code-size','-Wa-l']
 def compile_one(name):
- src=root/('src/'+name+'.c');obj=out/(name+'.o');stamp=out/(name+'.sha256')
+ src=root/('build/sparse_seed.c' if name=='sparse_seed' and options.demo_seed else 'src/'+name+'.c');obj=out/(name+'.o');stamp=out/(name+'.sha256')
  digest=hashlib.sha256(src.read_bytes()+headers+str(compiler.stat().st_mtime_ns).encode()+str(flags).encode()).hexdigest()
  if obj.exists() and stamp.exists() and stamp.read_text()==digest:return
  r=subprocess.run([str(compiler),*flags,'-c','-o',str(obj),str(src)],cwd=root,capture_output=True,text=True)

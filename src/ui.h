@@ -6,6 +6,8 @@ void mixer_prepare_cancel(void) BANKED;
 uint8_t canvas[360],visible[360],flushrow,page,cursor[8],edited[4],lastcc,lastvalue,midiage;
 __at (0xACF8) uint8_t ui_transition_hidden;
 __at (0xACF9) uint8_t ui_font_upload_pending;
+__at (0xACFE) uint8_t ui_loading_active;
+__at (0xACFF) uint8_t ui_loading_step;
 /* Never switch off the LCD or mask interrupts: only hide its background while
    a different page reuses the same tile graphics. Reveal after map publication. */
 void ui_transition_begin(void) BANKED {if(!ui_transition_hidden){HIDE_BKG;HIDE_SPRITES;ui_transition_hidden=1;}}
@@ -13,13 +15,19 @@ uint8_t auditionvoice=255,navopen,navchoice,navblocked,repeataxis,repeatsteps,mo
 uint16_t repeatstart,repeatlast;
 uint8_t livepitch[4],liveduty[4],tablefield;
 uint8_t graytiles[64];
-uint8_t wavepixels[1280],previewshape=255,previewwidth=255;
+/* MONOSYNTH preview and deferred font uploads are page-local scratch. The
+   roll and incoming pattern cache already own this region on other pages.
+   ui_render publishes deferred fonts in the same iteration's ui_flush,
+   before another preparation quantum can reuse it. Keep this out of WRAM
+   so engines retain 1280 bytes of headroom below their fixed lookup tables. */
+__at (0xB000) uint8_t wavepixels[1280];
+uint8_t previewshape=255,previewwidth=255;
 const uint8_t sourcehi[]={255,255,64,255,4,32,24,1,1,32,1};
 const char graychars[]="0123456789ACDEIKLNRSTUY";
 const char *expnames[]={"ENGINE","WAVE ADSR","WAVE ATTACK","WAVE DECAY","WAVE SUSTAIN","WAVE RELEASE","BRIGHTNESS","RESONANCE","FILTER MOD","FILTER SOURCE","PHASE DEPTH","PHASE RATE","DETUNE CENTS","CHORUS DEPTH","CHORUS RATE","NOTE DELAY","ECHO LEVEL","ECHO REPEATS","ECHO PAN","ZOMBIE ADSR","CONTROL RATE","DSP CUTOFF","DSP RESONANCE","AUDIO DELAY","DELAY MIX","FEEDBACK","SLEW"};
 const uint8_t exphi[]={1,1,255,255,64,255,15,3,15,2,31,32,64,32,32,120,15,8,1,1,2,7,7,64,15,12,7};
 const char *voices[]={"PULSE1","PULSE2","WAVE1","NOISE"};
-const char *pages[]={"LIVE","TONE","MODULATION","BANK","CC","TABLE","FX","MONOSYNTH","SEQUENCER","MASTURBATE","SEQ SETTINGS","P1","P2","WAVE1","WAVE2","NOISE","GLOBAL SETTINGS","DRUMSYNTH","MIXER","LOAD","SAVE","COPY TRACK","PASTE TRACK","KITS"};
+const char *pages[]={"LIVE","TONE","MODULATION","BANK","CC","TABLE","FX","MONOSYNTH","SEQUENCER","MASTURBATE","SEQ SETTINGS","P1","P2","WAVE1","WAVE2","NOISE","GLOBAL SETTINGS","DRUMSYNTH","MIXER","LOAD PATTERN","SAVE PATTERN","COPY","PASTE","KITS","LOAD SONG","SAVE SONG","CLEAR PATTERN"};
 const uint8_t channelmenu[5]={11,12,13,15,14};
 const uint8_t menuchannel[5]={0,1,2,4,3};
 const char *mononames[]={"OCTAVE","LEVEL","ATTACK","DECAY","PW","WAVEFORM","PAN"};
@@ -89,7 +97,7 @@ if(monoosc==4){start=cursor[7]>6?cursor[7]-6:0;if(start>EXP_COUNT-13)start=EXP_C
 
  if(navopen)ui_menu();
 }
-void ui_render(void) BANKED {uint8_t i,j,start,id,row,inv,n,h;if(tonepresetopen&&page==1){tone_preset_render();if(navopen)ui_menu();return;}if(page==23){seqflushpending=1;HIDE_SPRITES;if(seqfontdirty)ui_restore_seq_tiles();kits_render();if(navopen)ui_menu();return;}if(page>=18){seqflushpending=1;HIDE_SPRITES;if(seqfontdirty)ui_restore_seq_tiles();mixer_render();if(navopen)ui_menu();return;}if(page==17){HIDE_SPRITES;drum_synth_render();if(navopen)ui_menu();return;}if(page==16){HIDE_SPRITES;global_render();if(navopen)ui_menu();return;}if(page!=8){HIDE_SPRITES;}if(page!=8&&seqfontdirty)ui_restore_seq_tiles();if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_render();if(navopen)ui_menu();return;}if(selected==4&&page<7){w2_render();if(navopen)ui_menu();return;}if(page==7){mono_render();return;}if(page==9){noise_render();if(navopen)ui_menu();return;}if(page==10){seq_settings_render();if(navopen)ui_menu();return;}if(page==8){seq_render();if(navopen)ui_menu();return;}for(i=0;i<18;i++){memset(canvas+i*20,0,20);mixfill();}
+void ui_render(void) BANKED {uint8_t i,j,start,id,row,inv,n,h;if(page==26){if(seqfontdirty)ui_restore_seq_tiles();clear_render();return;}if(tonepresetopen&&page==1){tone_preset_render();if(navopen)ui_menu();return;}if(page==23){seqflushpending=1;HIDE_SPRITES;if(seqfontdirty)ui_restore_seq_tiles();kits_render();if(navopen)ui_menu();return;}if(page>=18){seqflushpending=1;HIDE_SPRITES;if(seqfontdirty)ui_restore_seq_tiles();mixer_render();if(navopen)ui_menu();return;}if(page==17){HIDE_SPRITES;drum_synth_render();if(navopen)ui_menu();return;}if(page==16){HIDE_SPRITES;global_render();if(navopen)ui_menu();return;}if(page!=8){HIDE_SPRITES;}if(page!=8&&seqfontdirty)ui_restore_seq_tiles();if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_render();if(navopen)ui_menu();return;}if(selected==4&&page<7){w2_render();if(navopen)ui_menu();return;}if(page==7){mono_render();return;}if(page==9){noise_render();if(navopen)ui_menu();return;}if(page==10){seq_settings_render();if(navopen)ui_menu();return;}if(page==8){seq_render();if(navopen)ui_menu();return;}for(i=0;i<18;i++){memset(canvas+i*20,0,20);mixfill();}
  band(0);textat(0,0,page==0&&!polymode?pages[channelmenu[selected]]:pages[page],1);textat(13,0,overflow?"RX FULL":midiage?"MIDI IN":"READY",1);
 
  textat(0,2,polymode?(monomode?"MONO 3":waveengine==2?"POLY 4":waveengine==1?"FASTARP":"POLY 3"):voices[selected],0);textat(8,2,"CH",0);number(10,2,polymode?5:selected+1,1,0);
@@ -124,8 +132,7 @@ void ui_flush(void) BANKED {
   ui_font_upload_pending=0;
  }
  if(page>=7||selected==4||ui_transition_hidden){
-  uint8_t *a=canvas,*b=visible;
-  for(r=0;r<18;r++,a+=20,b+=20){mixfill();if(memcmp(a,b,20)){ui_upload_map(0x9800U+(uint16_t)r*32,a,20);memcpy(b,a,20);}}
+  ui_flush_spans();
   if(ui_transition_hidden){ui_transition_hidden=0;SHOW_BKG;}
   if(page==8&&!navopen)seq_playhead();
   return;
@@ -136,7 +143,7 @@ void ui_flush(void) BANKED {
   if(left<20){ui_upload_map(0x9800U+(uint16_t)r*32+left,canvas+r*20+left,right-left+1);memcpy(visible+r*20+left,canvas+r*20+left,right-left+1);writes++;}
  }
 }
-void ui_init(void) BANKED {uint8_t tile,y,c,v,buf[16];uint16_t bit,packed;HIDE_SPRITES;memset(shadow_OAM,0,160);ui_transition_hidden=ui_font_upload_pending=seqfontdirty=0;*(volatile uint8_t *)0xACF7=0;*(volatile uint8_t *)0xACFA=0;*(volatile uint8_t *)0xACC2=0;*(volatile uint8_t *)0xACC3=255;seqviewtrack=255;BGP_REG=0xe4;for(tile=0;tile<243;tile++){if(tile==192)tile=220;if(tile>=220)graytiles[graychars[tile-220]-32]=tile;c=tile>=220?graychars[tile-220]-32:tile%96;for(y=0;y<8;y++){v=0;if(c<64&&y<7){bit=((uint16_t)c*7+y)*5;packed=ui_glyphs[bit>>3]|((uint16_t)ui_glyphs[(bit>>3)+1]<<8);v=((packed>>(bit&7))&31)<<2;}if(tile>=96&&tile<192)v^=255;buf[y*2]=v;buf[y*2+1]=tile>=220?0:v;}set_bkg_data(tile,1,buf);}for(tile=0;tile<12;tile++){for(y=0;y<8;y++){v=tile<9?(y+tile>=8?126:0):tile==9?(y==3?255:0):y==1||y==6?126:y>1&&y<6?(tile==11?126:66):0;buf[y*2]=v;buf[y*2+1]=tile==9?0:v;}set_bkg_data(192+tile,1,buf);}memset(visible,255,sizeof(visible));page=8;seqtrack=6;seq_open();ui_render();roll_commit();set_bkg_tiles(0,0,20,18,canvas);memcpy(visible,canvas,sizeof(visible));ui_transition_hidden=0;SHOW_BKG;}
+void ui_loading_prepare(void) BANKED {if(seqfontdirty)ui_restore_seq_tiles();}
 void auditionstop(void){uint8_t c;if(auditionvoice==5){monocount=0;monorelease();}else if(auditionvoice==4){for(c=0;c<3;c++)stop(c);}else if(auditionvoice<4)stop(auditionvoice);auditionvoice=255;}
 void auditionstart(void){auditionstop();if(monomode){monokeys[0]=60;monocount=1;monostart(60,110);auditionvoice=5;}else if(polymode){polynote(60,110);polynote(64,110);polynote(67,110);if(waveengine==2)polynote(72,110);auditionvoice=4;}else{play(selected,60,110);auditionvoice=selected;}}
 void browse(int8_t d){int16_t n=(int16_t)program[selected]+d;if(n<0)n+=100;if(n>=100)n-=100;choice=n;if(polymode)polyload(n);else load(selected,n);edited[selected]=0;if(lastpad&J_B)auditionstart();}
@@ -169,8 +176,9 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {uint8_t max;if(experimental_mode&
  if(((lastpad&J_A)&&!(p&J_A))||(edge&J_START))seq_audition_stop();
  if((lastpad&J_B)&&!(p&J_B))auditionstop();
  if(!(p&J_START))navblocked=0;
- if((edge&J_START)&&!navblocked){if(page==18)mixer_prepare_cancel();tonepresetopen=0;monoedit=0;navopen=1;navchoice=page==0&&!polymode?channelmenu[selected]:page;dirty=1;}
- if(navopen){if(edge&J_UP){ui_menu_step(-1);dirty=1;}if(edge&J_DOWN){ui_menu_step(1);dirty=1;}if(!(p&J_START)){if(navchoice==21||navchoice==22){navopen=0;if(navchoice==21)seq_copy();else seq_paste();dirty=1;return;}if(page==9&&navchoice!=9)noise_close();if(navchoice>=11&&navchoice<=15){ui_channel(menuchannel[navchoice-11]);page=1;}else page=navchoice;navopen=0;if(page>=18&&page<=20)mixer_open();if(page==7&&!monomode)monoenable();if(page==8||page==10){seq_open();if(page==10)seqfocus=1;}if(page==9&&!noisesaved)noise_open();dirty=1;}return;}
+ if(page==26){clear_input(edge);return;}
+ if((edge&J_START)&&!navblocked){gen_cancel();clear_capture();if(page==18)mixer_prepare_cancel();tonepresetopen=0;monoedit=0;navopen=1;navchoice=page==0&&!polymode?channelmenu[selected]:page;dirty=1;}
+ if(navopen){if(edge&J_UP){ui_menu_step(-1);dirty=1;}if(edge&J_DOWN){ui_menu_step(1);dirty=1;}if(!(p&J_START)){if(navchoice==26){navopen=0;clear_open();return;}if(navchoice==21||navchoice==22){navopen=0;if(navchoice==21)seq_copy();else seq_paste();dirty=1;return;}if(page==9&&navchoice!=9)noise_close();if(navchoice>=11&&navchoice<=15){ui_channel(menuchannel[navchoice-11]);page=1;}else page=navchoice;navopen=0;if((page>=18&&page<=20)||page==24||page==25)mixer_open();if(page==7&&!monomode)monoenable();if(page==8||page==10){seq_open();if(page==10)seqfocus=1;}if(page==9&&!noisesaved)noise_open();dirty=1;}return;}
  if(page==1&&tonepresetopen){tone_preset_input(edge);return;}
  if(page==23){kits_input(p,edge);return;}if(page>=18){mixer_input(p,edge);return;}if(page==17){drum_synth_input(p,edge);return;}if(page==16){global_input(p,edge);return;}if(page==7){mono_input(p,edge);return;}if(page==8||page==10){seq_input(p,edge);return;}if(page==9){noise_input(p,edge);return;}
  if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%(experimental_mode?5:4);choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}

@@ -1,0 +1,26 @@
+GEN hardware test - branch gen
+
+From the displayed sequencer, tap Select to open SEQ SETTINGS.
+Hold Select and press A to open GEN for that track.
+Arrows up/down choose a row; left/right change its value.
+Choose TRY and press A to create a preview.
+Opening GEN, TRY, KEEP and cancel preserve running playback.
+Select explicitly starts/stops playback. KEEP accepts; B or BACK restores the original.
+Opening the Start page menu also cancels an uncommitted preview.
+Change SEED for another candidate. The same settings and seed repeat exactly.
+
+Only the displayed track's active loop is generated (all its steps, beyond
+screen zoom if needed). Notes starting beyond the loop are preserved.
+GEN uses/replaces the copy clipboard. Settings reset when GEN opens;
+accepted notes save normally with the pattern.
+
+Initial functions: melody, bass, arpeggio, Euclidean note rhythm, drum groove.
+Styles: House, Hip-hop, Chip. Scales: major, minor, Dorian, minor pentatonic.
+Drums use sample rows 1-4. Pitch controls apply to note tracks only.
+Noise pitch follows noise hardware behavior rather than a tuned instrument.
+No automatic patch, tempo or swing changes. Current key/scale are generator
+settings for the current visit, rather than persisted pattern metadata.
+Region generation, note locks, chord progressions and motif variation are
+follow-up features; this build generates the current track's full active loop.
+
+Desktop SameBoy: arrows = D-pad, X = A, Z = B, Space = Select, Shift = Start.

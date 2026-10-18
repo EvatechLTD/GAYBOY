@@ -4,8 +4,8 @@
 void stocktable(uint8_t c,uint8_t n) BANKED {uint8_t i,b=stocktables[n];int8_t *dst=&tables[c][0][0];const int8_t *p=stockpitch[b&3],*s=stockshape[(b>>2)&15],*pan=stockpan[b>>6];for(i=0;i<8;i++){*dst++=*p++;*dst++=(*s+i)&s[1];*dst++=*pan++;}}
 /* Neutral APU instruments at boot. Browsing still loads the stock library. */
 const uint8_t startupvalues[26]={2,10,0,0,0,0,0,0,0,0,7,0,7,0,0,2,0,0,4,0,3,3,0,0,0,2};
-void startup(void) BANKED {uint8_t c,i;for(c=0;c<4;c++){load(c,c*10);memcpy(param[c],startupvalues,26);memset(mods[c],0,6);tablemode[c]=0;tablelen[c]=1;for(i=0;i<8;i++){tables[c][i][0]=0;tables[c][i][1]=c<2?(c?1:2):c==2?0:4;tables[c][i][2]=3;}edited[c]=1;held[c]=255;}
- param[1][0]=1;param[3][1]=8;param[3][3]=3;master=0x77;route=0xFF;vin=0;globals();}
+void startup(void) BANKED {uint8_t c,i;for(c=0;c<4;c++){load(c,c*10);memcpy(param[c],startupvalues,26);memset(mods[c],0,6);tablemode[c]=0;tablelen[c]=1;for(i=0;i<8;i++){tables[c][i][0]=0;tables[c][i][1]=c<2?(c?1:2):c==2?6:4;tables[c][i][2]=3;}edited[c]=1;held[c]=255;}
+ param[1][0]=1;param[2][14]=6;param[3][1]=8;param[3][3]=3;master=0x77;route=0xFF;vin=0;globals();}
 /* Two DDS oscillators at 8192 samples/sec, packed into 32-sample blocks.
    No note/envelope state is changed at a block boundary. */
 uint16_t ddsraw(uint8_t note,int16_t bendvalue){int16_t pitch=(int16_t)note*128+bendvalue;uint8_t n,f;uint16_t v;if(pitch<0)pitch=0;if(pitch>13696)pitch=13696;n=pitch>>7;f=pitch&127;v=ddsnotes[n];if(f&&n<107)v+=((uint16_t)(ddsnotes[n+1]-v)*f)>>7;return v;}

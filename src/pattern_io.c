@@ -3,15 +3,20 @@
 #include "api.h"
 #include "tones.h"
 #include "mixer_shared.h"
+#include "sparse_store.h"
 extern uint16_t seqcachedbpm,seqstepunits,seqgateunits[7],seqdeadline;
 extern uint8_t seqgate[7],seqbeats,seqdenom;
 #define PREP_UNITS ((uint16_t *)0xACD0)
 #define PREP_STEP (*(uint16_t *)0xACDE)
+#define PREP_ONSETS (*(uint8_t *)0xACCF)
 void mixer_prepare_barrier(void) BANKED;
 uint8_t toneready;
 __at (0xACCC) uint8_t pattern_dirty;
 __at (0xACCD) uint16_t pattern_generation;
-void mixer_pattern_changed(void) BANKED {pattern_dirty=1;pattern_generation++;if(mx.magic==0xD3)mx.presaved=0;}
+void mixer_pattern_changed(void) BANKED {pattern_dirty=1;pattern_generation++;if(mx.magic==0xD3){mx.presaved=0;
+ /* Editing the playing generation cancels its queued launch. This keeps
+    subsequent edits on the visible pattern and never revives an old stage. */
+ if(sparse_enabled==1&&sparse_journal_slot==mx.slot&&sparse_journal_busy()){mx.pending=255;mx.padcache=0;dirty=1;}}}
 void mixer_pattern_clean(void) BANKED {pattern_dirty=0;}
 static void ram(uint8_t b){ENABLE_RAM;SWITCH_RAM(b);}
 static uint8_t bank(uint8_t s){return s<3?1:s<6?2:3;}
@@ -113,17 +118,17 @@ void writepart(uint8_t s,uint16_t off,const uint8_t *src,uint16_t n) BANKED {uin
   if(mx.checking)mx.checksum+=partial;addr+=chunk;src+=chunk;n-=chunk;mixfill();
  }
 }
-uint8_t tag(uint8_t s) BANKED {uint8_t v;readpart(s,0,&v,1);return v;}
+uint8_t tag(uint8_t s) BANKED {uint8_t v;if(sparse_enabled)return sparse_enabled==1&&s<8&&sparse_slots[s]!=POOL_NONE?VALID:0;readpart(s,0,&v,1);return v;}
 uint8_t valid(uint8_t s) BANKED {uint8_t v=tag(s);return v==VALID||v==NOTE_VALID||v==SPARSE_VALID||v==OLD_VALID;}
-void getname(uint8_t s,char *name) BANKED {uint8_t i,ended=0;if(valid(s))readpart(s,1,(uint8_t *)name,17);else name[0]=0;name[16]=0;for(i=0;i<17;i++){if(!name[i])ended=1;if(ended)name[i]=0;}}
-void defaults(void) BANKED {uint8_t c;mixer_pattern_changed();seqgrouptrack=255;seq_storage_clear();for(c=0;c<7;c++){seqlength[c]=16;seqdefaultvel[c]=100;seqdefaultdur[c]=c==6?0:c==5?4:1;seqgate[c]=(c<2||c>=5)?100:80;mx.level[c]=127;mx.pan[c]=3;}drummutemask=drumsolomask=0;seqmuted=seqsolo=seqmode=0;seqbpm=120;seqbeats=seqdenom=4;memset(mx.name,0,17);}
-void snapshot(uint8_t s) BANKED {uint16_t generation;uint8_t meta[METASIZE],i=0;mixer_prepare_barrier();generation=pattern_generation;if(!mx.name[0]){mx.name[0]='0';mx.name[1]='0';mx.name[2]='1'+mx.slot;mx.name[3]=0;}mx.checking=0;writepart(s,0,&i,1);mx.checksum=0;mx.checking=1;writepart(s,1,(uint8_t *)mx.name,17);writepart(s,DATA,(uint8_t *)seqevents_lo,1024);writepart(s,DATA+1024,(uint8_t *)seqevents_hi,1024);
+void getname(uint8_t s,char *name) BANKED {uint8_t i,ended=0;if(sparse_enabled){sparse_name(s,name);return;}if(valid(s))readpart(s,1,(uint8_t *)name,17);else name[0]=0;name[16]=0;for(i=0;i<17;i++){if(!name[i])ended=1;if(ended)name[i]=0;}}
+void defaults(void) BANKED {uint8_t c;mixer_pattern_changed();seqgrouptrack=255;seq_storage_clear();for(c=0;c<7;c++){seqlength[c]=16;seqdefaultvel[c]=100;seqdefaultdur[c]=c==6?0:c==5?4:1;seqgate[c]=(c<2||c>=5)?100:80;mx.level[c]=127;mx.pan[c]=3;}drummutemask=drumsolomask=0;seqmuted=seqsolo=seqmode=0;seqbpm=seqglobalbpm?seqglobalbpm:120;seqbeats=seqdenom=4;memset(mx.name,0,17);}
+void snapshot(uint8_t s) BANKED {uint16_t generation;uint8_t meta[METASIZE],i=0;if(sparse_enabled){if(!sparse_snapshot(s))mx.error=2;return;}mixer_prepare_barrier();generation=pattern_generation;if(!mx.name[0]){mx.name[0]='0';mx.name[1]='0';mx.name[2]='1'+mx.slot;mx.name[3]=0;}mx.checking=0;writepart(s,0,&i,1);mx.checksum=0;mx.checking=1;writepart(s,1,(uint8_t *)mx.name,17);writepart(s,DATA,(uint8_t *)seqevents_lo,1024);writepart(s,DATA+1024,(uint8_t *)seqevents_hi,1024);
  memcpy(meta,seqeventcounts,14);memcpy(meta+14,seqlength,14);memcpy(meta+28,seqdefaultdur,14);memcpy(meta+42,seqdefaultvel,7);memcpy(meta+49,seqgate,7);memcpy(meta+56,mx.level,7);memcpy(meta+63,mx.pan,7);meta[70]=seqmuted;meta[71]=seqsolo;meta[72]=seqbeats;meta[73]=seqdenom;meta[74]=seqmode;setword(meta+75,seqbpm);setword(meta+77,drummutemask);setword(meta+79,drumsolomask);writepart(s,META,meta,METASIZE);tones_pack();writepart(s,TONE_OFFSET,TONE_PACK,TONE_SIZE);mx.checking=0;writepart(s,18,(uint8_t *)&mx.checksum,2);i=VALID;writepart(s,0,&i,1);mx.protectedslots&=~(1<<s);mx.padcache=0;if(s==mx.slot&&generation==pattern_generation)mixer_pattern_clean();
 }
 void autosnapshot(uint8_t s) BANKED {if(pattern_dirty&&!(mx.protectedslots&(1<<s)))snapshot(s);}
 uint8_t oldmetaok(const uint8_t *m) BANKED {uint8_t i;uint16_t bpm=getword(m+47);if(bpm<30||bpm>300||m[44]<1||m[44]>12||(m[45]!=2&&m[45]!=4&&m[45]!=8&&m[45]!=16)||m[46]>1)return 0;for(i=0;i<7;i++)if(!m[i]||m[i]>64||!m[7+i]||m[7+i]>127||m[14+i]>64||m[21+i]>100||m[28+i]>127||m[35+i]>3)return 0;return 1;}
-uint8_t metaok(const uint8_t *m) BANKED {uint8_t c;uint16_t n,total=0,bpm=getword(m+75),i;const uint8_t *event=CACHE+DATA;if((getword(m+77)|getword(m+79))&0xE000)return 0;if(bpm<30||bpm>300||m[72]<1||m[72]>12||(m[73]!=2&&m[73]!=4&&m[73]!=8&&m[73]!=16)||m[74]>1)return 0;
- for(c=0;c<7;c++){n=getword(m+c*2);if(n>512||total+n>512||!getword(m+14+c*2)||getword(m+14+c*2)>256||(getword(m+28+c*2)>256||(c<6&&!getword(m+28+c*2)))||!m[42+c]||m[42+c]>127||m[49+c]>100||m[56+c]>127||m[63+c]>3)return 0;total+=n;for(i=0;i<n;i++,event+=4){if(!event[1]||event[1]>(c==6?13:128)||event[2]>127)return 0;if(!(i&7))mixfill();}}
+uint8_t metaok(const uint8_t *m) BANKED {uint8_t c;uint16_t n,total=0,bpm=getword(m+75),i;const uint8_t *event=CACHE+DATA;PREP_ONSETS=0;if((getword(m+77)|getword(m+79))&0xE000)return 0;if(bpm<30||bpm>300||m[72]<1||m[72]>12||(m[73]!=2&&m[73]!=4&&m[73]!=8&&m[73]!=16)||m[74]>1)return 0;
+ for(c=0;c<7;c++){n=getword(m+c*2);if(n>512||total+n>512||!getword(m+14+c*2)||getword(m+14+c*2)>256||(getword(m+28+c*2)>256||(c<6&&!getword(m+28+c*2)))||!m[42+c]||m[42+c]>127||m[49+c]>100||m[56+c]>127||m[63+c]>3)return 0;total+=n;for(i=0;i<n;i++,event+=4){if(!event[1]||event[1]>(c==6?13:128)||event[2]>127)return 0;if(c<6&&!event[0])PREP_ONSETS|=1<<c;if(!(i&7))mixfill();}}
  return 1;
 }
 uint8_t migrate(uint8_t s) BANKED {uint8_t old[49],*scratch=(uint8_t *)0xBC00,*meta=CACHE+META,c,n,best,event[4];uint16_t total=0,count,i,at,age,min;
@@ -146,9 +151,9 @@ void prefetch(uint8_t s) BANKED {uint8_t t=tag(s),i;uint16_t expected,bpm;tonere
  if(t==VALID){if(!tones_decode())return;toneready=1;}
  bpm=getword(CACHE+META+75);PREP_STEP=15360U/bpm;for(i=0;i<7;i++){PREP_UNITS[i]=(PREP_STEP*CACHE[META+49+i])/100;mixfill();}mx.cachevalid=1;
 }
-void applymeta(const uint8_t *meta) BANKED {seqgrouptrack=255;memcpy(seqeventcounts,meta,14);offsets();memcpy(seqlength,meta+14,14);memcpy(seqdefaultdur,meta+28,14);memcpy(seqdefaultvel,meta+42,7);memcpy(seqgate,meta+49,7);memcpy(mx.level,meta+56,7);memcpy(mx.pan,meta+63,7);seqmuted=meta[70];seqsolo=meta[71];seqbeats=meta[72];seqdenom=meta[73];seqmode=experimental_mode?meta[74]:0;seqbpm=getword(meta+75);drummutemask=getword(meta+77);drumsolomask=getword(meta+79);seqdeadline=1;seqeventfull=0;}
+void applymeta(const uint8_t *meta) BANKED {seqgrouptrack=255;memcpy(seqeventcounts,meta,14);offsets();memcpy(seqlength,meta+14,14);memcpy(seqdefaultdur,meta+28,14);memcpy(seqdefaultvel,meta+42,7);memcpy(seqgate,meta+49,7);memcpy(mx.level,meta+56,7);memcpy(mx.pan,meta+63,7);seqmuted=meta[70];seqsolo=meta[71];seqbeats=meta[72];seqdenom=meta[73];seqmode=experimental_mode?meta[74]:0;seqbpm=seqglobalbpm?seqglobalbpm:getword(meta+75);drummutemask=getword(meta+77);drumsolomask=getword(meta+79);seqdeadline=1;seqeventfull=0;}
 void tailcopy(uint8_t *dst,const uint8_t *src,uint16_t size) BANKED {uint8_t n;while(size){n=size>16?16:size;memcpy(dst,src,n);dst+=n;src+=n;size-=n;mixfill();}}
-uint8_t restore(uint8_t s,uint8_t cached) BANKED {uint16_t generation;mixer_prepare_barrier();if(!cached||!mx.cachevalid||mx.cacheslot!=s)prefetch(s);if(mx.cachevalid==3){mx.error=1;return 0;}if(mx.cachevalid==2){mx.cachevalid=0;defaults();return 1;}generation=pattern_generation;applymeta(CACHE+META);if(toneready)tones_apply();memcpy(mx.name,CACHE+1,17);mx.name[16]=0;tailcopy((uint8_t *)seqevents_lo,CACHE+DATA,1024);tailcopy((uint8_t *)seqevents_hi,CACHE+DATA+1024,1024);mx.cachevalid=0;if(s==mx.slot){if(generation==pattern_generation)mixer_pattern_clean();}else mixer_pattern_changed();return 1;}
+uint8_t restore(uint8_t s,uint8_t cached) BANKED {uint16_t generation;if(sparse_enabled)return sparse_restore(s);mixer_prepare_barrier();if(!cached||!mx.cachevalid||mx.cacheslot!=s)prefetch(s);if(mx.cachevalid==3){mx.error=1;return 0;}if(mx.cachevalid==2){mx.cachevalid=0;defaults();return 1;}generation=pattern_generation;applymeta(CACHE+META);if(toneready)tones_apply();memcpy(mx.name,CACHE+1,17);mx.name[16]=0;tailcopy((uint8_t *)seqevents_lo,CACHE+DATA,1024);tailcopy((uint8_t *)seqevents_hi,CACHE+DATA+1024,1024);mx.cachevalid=0;if(s==mx.slot){if(generation==pattern_generation)mixer_pattern_clean();}else mixer_pattern_changed();return 1;}
 
 /* A journal fits in unused record holes and bank tails. It never touches
    any checksummed pattern bytes, the boot magic, or the maximum 2064-byte
@@ -185,6 +190,7 @@ static uint16_t journal_copy(uint8_t slot,uint16_t at){uint8_t buf[16],n;uint16_
 }
 static uint8_t journal_header(uint8_t *header){uint8_t i,check=0;
  if(memcmp(header,"GBJ1",4)||header[4]>7||header[5]!=(uint8_t)(header[4]^255)||header[14]!=1)return 0;
+ if(header[15]&&header[15]!=VALID&&header[15]!=NOTE_VALID)return 0;check=header[15];
  for(i=0;i<10;i++)check+=header[i];
  return header[10]==check&&header[11]==(uint8_t)(check^255)&&header[12]==0xA5&&header[13]==0x5A;
 }
@@ -194,7 +200,18 @@ void mixer_journal_recover(void) BANKED {uint8_t header[16],buf[16],n,zero=0,val
  if(sum!=getword(header+6)){journal_clear();return;}
  writepart(header[4],0,&zero,1);
  for(at=0;at<JOURNAL_BYTES;)at=journal_copy(header[4],at);
- writepart(header[4],18,header+6,2);writepart(header[4],0,&validtag,1);journal_clear();
+ if(header[15])validtag=header[15];writepart(header[4],18,header+6,2);writepart(header[4],0,&validtag,1);journal_clear();
+}
+/* Legacy batteries retain their original format and recovery path. Clear an
+   inactive slot through the durable journal; never load it into the playing
+   voices or alter another track's patches/settings. */
+uint8_t mixer_clear_saved(uint8_t slot) BANKED {uint8_t header[16],i,format;
+ if(slot>=8)return 0;mixer_prepare_barrier();format=tag(slot);if(!format)return 1;prefetch(slot);if(mx.cachevalid!=1)return 0;
+ memset(CACHE+META,0,14);mx.checking=0;journal_clear();mx.checksum=0;mx.checking=1;
+ journal_part(JOURNAL_NAME,CACHE+1,17,1);journal_part(JOURNAL_DATA,CACHE+DATA,2048,1);journal_part(JOURNAL_META,CACHE+META,METASIZE,1);
+ if(format!=VALID)memset(CACHE+TONE_OFFSET,0,TONE_SIZE);journal_part(JOURNAL_TONE,CACHE+TONE_OFFSET,TONE_SIZE,1);
+ mx.checking=0;memset(header,0,16);memcpy(header,"GBJ1",4);header[4]=slot;header[5]=slot^255;setword(header+6,mx.checksum);header[12]=0xA5;header[13]=0x5A;header[14]=1;header[15]=format==VALID?VALID:NOTE_VALID;
+ header[10]=header[15];for(i=0;i<10;i++)header[10]+=header[i];header[11]=header[10]^255;journal_part(1,header+1,15,1);journal_part(0,header,1,1);mixer_journal_recover();mx.cachevalid=0;mx.padcache=0;return 1;
 }
 /* Only foreground preparation owns this gap between Mixer state and pad flash.
    No live audio buffers, renderer scratch or fixed DSP lookup tables overlap. */
@@ -205,6 +222,7 @@ void tones_decode_begin(void) BANKED;
 uint8_t tones_step(void) BANKED;
 static void prepare_once(void);
 void mixer_prepare_cancel(void) BANKED {
+ if(sparse_enabled){prep.phase=0;mx.pending=255;mx.cachevalid=0;return;}
  /* Capturing only changes journal holes. A started commit finishes from
     those private bytes in the background even after renderer scratch changes. */
  if(mx.magic==0xD3&&prep.phase==18){prep.pad|=8;mx.checking=0;mx.pending=255;mx.cachevalid=0;mx.presaved=0;return;}
@@ -216,6 +234,7 @@ void mixer_prepare_barrier(void) BANKED {
  mixer_prepare_cancel();while(prep.phase==18){prepare_once();mixfill();}
 }
 uint8_t mixer_prepare_busy(void) BANKED {
+ if(sparse_enabled)return 0;
  if(!prep.phase&&pattern_dirty&&mx.pending!=255&&mx.pending!=mx.slot&&!(mx.protectedslots&(1<<mx.slot)))return 1;
  return mx.pending==mx.slot&&((prep.phase==18&&(prep.pad&8))||(prep.pad&1))?0:prep.phase;
 }
@@ -229,14 +248,17 @@ uint8_t mixer_prepare_status(uint8_t slot) BANKED {
 /* Quiet work never writes the outgoing slot. A highlighted pad can be
    validated and decoded before A, without changing the live arrangement. */
 void mixer_prepare_focus(uint8_t slot) BANKED {
- if(mx.magic!=0xD3||mx.pending!=255||(prep.phase&&!(prep.pad&1)))return;
+ if(sparse_enabled)return;
+ if(navopen||mx.magic!=0xD3||mx.pending!=255||(prep.phase&&!(prep.pad&1)))return;
  if(slot==mx.slot)slot=seqplaying?(slot+1)&7:255;
  if(slot==255){if(prep.pad&1){prep.phase=0;prep.pad=0;mx.cachevalid=0;toneready=0;}return;}
- if((prep.pad&1)&&prep.target==slot&&(prep.phase||mx.cachevalid))return;
+ if((prep.pad&1)&&prep.target==slot&&(prep.phase||mx.cachevalid||prep.format==OLD_VALID))return;
  prep.phase=7;prep.pad=1;prep.target=slot;prep.edit=0;prep.source=mx.slot;prep.position=0;
  mx.cachevalid=0;mx.presaved=0;mx.openempty=0;mx.checking=0;toneready=0;
 }
 void mixer_launch_request(uint8_t slot,uint8_t edit) BANKED {
+ if(sparse_enabled){sparse_request(slot,edit);return;}
+ if(edit&&slot==mx.slot){mixer_prepare_cancel();page=8;seq_open();dirty=1;return;}
  if(slot==mx.pending)return;
  if(slot==mx.slot&&(prep.pad&1)){mx.pending=slot;mx.padcache=0;if(!seqplaying||!mx.quant){mx.pending=255;mixer_activate(slot,edit);}return;}
  if(prep.phase==18){
@@ -299,7 +321,7 @@ static void prepare_once(void){uint8_t v,c,result,header[16];uint16_t n,total;ui
  case 7:
   prep.format=tag(prep.target);mx.cacheslot=prep.target;mx.cachevalid=2;prep.position=0;mx.checksum=0;
   if(prep.format!=VALID&&prep.format!=NOTE_VALID&&prep.format!=SPARSE_VALID&&prep.format!=OLD_VALID){mx.openempty=1;prep.phase=17;break;}
-  if(prep.format==OLD_VALID){if(prep.pad&1){prep.phase=0;prep.pad=0;mx.cachevalid=0;break;}prefetch(prep.target);if(mx.cachevalid!=1){prepare_fail();break;}prep.phase=17;break;}
+  if(prep.format==OLD_VALID){if(prep.pad&1){prep.phase=0;mx.cachevalid=0;dirty=1;break;}prefetch(prep.target);if(mx.cachevalid!=1){prepare_fail();break;}prep.phase=17;break;}
   mx.checking=1;readpart(prep.target,1,CACHE+1,17);prep.phase=8;break;
  case 8:
   mx.checking=1;readpart(prep.target,DATA+prep.position,CACHE+DATA+prep.position,64);prep.position+=64;if(prep.position==2048)prep.phase=9;break;
@@ -308,10 +330,10 @@ static void prepare_once(void){uint8_t v,c,result,header[16];uint16_t n,total;ui
  case 10:
   mx.checking=1;n=TONE_SIZE-prep.position;if(n>64)n=64;readpart(prep.target,TONE_OFFSET+prep.position,CACHE+TONE_OFFSET+prep.position,n);prep.position+=n;if(prep.position==TONE_SIZE)prep.phase=11;break;
  case 11:
-  mx.checking=0;readpart(prep.target,18,(uint8_t *)&prep.expected,2);if(prep.expected!=mx.checksum){prepare_fail();break;}if(!prepare_metadata()){prepare_fail();break;}prep.position=0;prep.phase=12;break;
+  mx.checking=0;readpart(prep.target,18,(uint8_t *)&prep.expected,2);if(prep.expected!=mx.checksum){prepare_fail();break;}if(!prepare_metadata()){prepare_fail();break;}PREP_ONSETS=0;prep.position=0;prep.phase=12;break;
  case 12:
   total=prep.position+16;if(total>prep.expected)total=prep.expected;
-  for(;prep.position<total;prep.position++){uint16_t at=prep.position;uint8_t *e=CACHE+DATA+at*4;uint16_t offset=0;for(c=0;c<7;c++){offset+=getword(m+c*2);if(at<offset)break;}if(!e[1]||e[1]>(c==6?13:128)||e[2]>127){prepare_fail();return;}}
+  for(;prep.position<total;prep.position++){uint16_t at=prep.position;uint8_t *e=CACHE+DATA+at*4;uint16_t offset=0;for(c=0;c<7;c++){offset+=getword(m+c*2);if(at<offset)break;}if(!e[1]||e[1]>(c==6?13:128)||e[2]>127){prepare_fail();return;}if(c<6&&!e[0])PREP_ONSETS|=1<<c;}
   if(prep.position==prep.expected)prep.phase=prep.format==VALID?13:15;break;
  case 13:tones_decode_begin();prep.phase=14;break;
  case 14:result=tones_step();if(result){if(result==2){prepare_fail();break;}toneready=1;prep.phase=15;}break;

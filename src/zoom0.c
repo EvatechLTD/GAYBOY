@@ -20,4 +20,4 @@ case 2:pixels=tiles2;map=screen2;n=85;break;
 case 3:pixels=tiles3;map=screen3;n=97;break;
 case 4:pixels=tiles4;map=screen4;n=97;break;
 case 5:pixels=tiles5;map=screen5;n=91;break;
-default:return;}HIDE_SPRITES;SCX_REG=SCY_REG=0;BGP_REG=0xe4;zoombuffer^=128;for(i=0;i<n;i++)set_bkg_data(zoombuffer+i,1,pixels+i*16);for(row=0;row<18;row++){for(col=0;col<20;col++)buf[col]=map[(uint16_t)row*20+col]+zoombuffer;set_bkg_tiles(0,row,20,1,buf);}SHOW_BKG;}
+default:return;}if(!frame){DISPLAY_OFF;}HIDE_SPRITES;SCX_REG=SCY_REG=0;BGP_REG=0xe4;zoombuffer^=128;for(i=0;i<n;i++)set_bkg_data(zoombuffer+i,1,pixels+i*16);for(row=0;row<18;row++){for(col=0;col<20;col++)buf[col]=map[(uint16_t)row*20+col]+zoombuffer;set_bkg_tiles(0,row,20,1,buf);}SHOW_BKG;if(!frame){DISPLAY_ON;}}

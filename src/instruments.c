@@ -102,9 +102,11 @@ uint8_t ui_repeat(uint8_t p,uint8_t edge) BANKED {uint8_t axis,interval,resetmas
 void mixer_pattern_changed(void) BANKED;
 extern uint8_t seqrecordtrack;
 void seq_record_finish(void) BANKED;
-void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();edge=ui_repeat(p,edge);for(i=0;i<repeatsteps;i++){mixfill();/* Navigation alone cannot edit a pattern; conservatively track all input on editable pages. */if(edge&&!navopen&&!(p&J_START)&&(page<18||page==23))mixer_pattern_changed();ui_action(p,edge);}}
+void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;if(sparse_enabled&&edge)sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();edge=ui_repeat(p,edge);for(i=0;i<repeatsteps;i++){mixfill();/* Navigation alone cannot edit a pattern; conservatively track all input on editable pages. */if(edge&&!navopen&&!(p&J_START)&&(page<18||page==23))mixer_pattern_changed();ui_action(p,edge);}}
 
 /* Durations are one byte (zero means256); avoid a generic32-bit multiply
    in the real-time onset path. Validated tempo/gate bounds fit24 bits. */
 static uint32_t gate_multiply(uint32_t value,uint8_t count){uint32_t total=0;while(count){if(count&1)total+=value;count>>=1;if(count)value<<=1;}return total;}
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED {uint32_t total=duration?gate_multiply(units,duration):(uint32_t)units<<8;if(gate!=100)total=gate_multiply(total,gate)/100;return total?total:1;}
+
+void load(uint8_t c,uint8_t n) BANKED {keycount[c]=0;stop(c);if(c<3)polyowner[c]=0;memcpy(param[c],patch(n)->v,26);memcpy(mods[c],patch(n)->mod,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=patch(n)->tconfig&3;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;dirty=1;}

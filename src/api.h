@@ -6,6 +6,8 @@
 #include "experimental.h"
 #include "sequencer.h"
 #include "storage.h"
+#include "sparse_store.h"
+#include "clear_pattern.h"
 #include "drum.h"
 #include "mixer.h"
 #include "noiselab.h"
@@ -70,7 +72,8 @@ extern uint8_t auditionvoice,navopen,navchoice,navblocked,repeataxis,repeatsteps
 extern uint16_t repeatstart,repeatlast;
 extern uint8_t livepitch[4],liveduty[4],tablefield;
 extern uint8_t graytiles[64];
-extern uint8_t wavepixels[1280],previewshape,previewwidth;
+extern __at (0xB000) uint8_t wavepixels[1280];
+extern uint8_t previewshape,previewwidth;
 extern const uint8_t sourcehi[];
 extern const char graychars[];
 extern const char *voices[];
@@ -101,7 +104,7 @@ void liveparam(uint8_t c,uint8_t i);
 void play(uint8_t c,uint8_t note,uint8_t vel);
 void stocktable(uint8_t c,uint8_t n) BANKED;
 void startup(void) BANKED;
-void load(uint8_t c,uint8_t n);
+void load(uint8_t c,uint8_t n) BANKED;
 void cc(uint8_t c,uint8_t n,uint8_t x);
 void polyload(uint8_t n);
 void polynote(uint8_t note,uint8_t vel);
@@ -155,8 +158,15 @@ void mono_render(void);
 void ui_render(void) BANKED;
 void ui_flush(void) BANKED;
 void ui_init(void) BANKED;
+void ui_loading_begin(void) BANKED;
+void ui_loading_prepare(void) BANKED;
+void ui_loading(uint8_t done,uint8_t total) BANKED;
+extern __at (0xACFE) uint8_t ui_loading_active;
+extern __at (0xACFF) uint8_t ui_loading_step;
 void ui_transition_begin(void) BANKED;
 void roll_commit(void) BANKED;
+void ui_flush_spans(void) BANKED;
+void roll_selection_prepare(uint8_t changed) BANKED;
 extern __at (0xACF9) uint8_t ui_font_upload_pending;
 void auditionstop(void);
 void auditionstart(void);

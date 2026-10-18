@@ -40,8 +40,12 @@ void panic(void){panic_audio();}
 const int8_t arp[5][4]={{0,0,0,0},{0,4,7,12},{0,3,7,12},{0,7,12,7},{0,12,0,-12}};
 /* This path never writes a trigger, envelope register or macro counter. */
 uint16_t pitchvalue(uint8_t c){uint8_t ph=phase[c]?phase[c]-1:0,n,frac;int16_t pitch,f,delta;
+ extern uint16_t finebase[5];extern uint8_t finemode[5],finevalid[5];
  if(!monomode&&!bend[c]&&(!experimental_mode||!(mods[c][1]|mods[c][3]|mods[c][4]|tablemode[c]))){
-  n=basepitch[c];livepitch[c]=n;if(c==2)n+=12;return fine_apply(notes[n],c,0);
+  n=basepitch[c];livepitch[c]=n;if(c==2)n+=12;f=notes[n];
+  /* Preserve the fine editor's cache without a bank switch at unity tuning. */
+  if(!finepitch[c]){finebase[c]=f;finemode[c]=finevalid[c]=0;return f;}
+  return fine_apply(f,c,0);
  }
  pitch=(int16_t)basepitch[c]*128+bend[c]+(monomode?expoffset[c]:0);
  if(experimental_mode&&!(monomode&&c<3)){
@@ -84,7 +88,6 @@ void play(uint8_t c,uint8_t note,uint8_t vel){uint8_t *v=param[c],vol;uint16_t f
  }else{NR41_REG=v[7];NR42_REG=(vol<<4)|(v[2]<<3)|v[3];NR43_REG=(v[18]<<4)|(v[19]<<3)|v[20];NR44_REG=0x80|(v[8]<<6);}
  if(v[9]||v[22])stop(c);
 }
-void load(uint8_t c,uint8_t n){keycount[c]=0;stop(c);if(c<3)polyowner[c]=0;memcpy(param[c],patch(n)->v,26);memcpy(mods[c],patch(n)->mod,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=patch(n)->tconfig&3;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;dirty=1;}
 void cc(uint8_t c,uint8_t n,uint8_t x){uint8_t i,v,mask;lastcc=n;lastvalue=x;edited[c]=1;dirty=1;
  if(n==120||n==123){keycount[c]=0;stop(c);held[c]=255;return;}if(n==64){if(c==2&&waveengine){enginesustain(x>=64);return;}sustain[c]=x>=64;if(!sustain[c]&&held[c]==255)stop(c);return;}
  if(!experimental_mode&&((n>=112&&n<=126)||n==118||n==119))return;
@@ -143,17 +146,26 @@ void service(void){uint8_t b;uint16_t now,delta;mixfill();while(rd!=wr){b=rx[rd+
 void exp_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) NONBANKED {uint8_t saved=CURRENT_BANK;SWITCH_ROM(bank);memcpy(dst,(const void *)(0x4000+offset),16);SWITCH_ROM(saved);}
 extern uint16_t seqdeadline;
 void mixer_prepare_service(void) BANKED;
-void mixfill(void){if(rd!=wr){uint8_t b=rx[rd++];midi(b);}if(monomode&&expactive){exp_service();if(expconfig[0])exp_fill();}else if(waveengine==2&&mixrunning&&!mixready[mixwrite]){legacyfill();if(!mixready[mixwrite])legacyfill();}if(seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();}
+void mixfill(void){if(rd!=wr){uint8_t b=rx[rd++];midi(b);}if(monomode&&expactive){exp_service();if(expconfig[0])exp_fill();}else if(waveengine==2&&mixrunning&&!mixready[mixwrite]){legacyfill();if(!mixready[mixwrite])legacyfill();}
+ /* Retire a bounded part of the incoming installation before catching up
+    musical time. Otherwise repeated cartridge scans can keep the scheduler
+    busy forever and prevent the foreground installer from making progress.
+    The guard also prevents nested I/O yields from reentering this service. */
+ if(seqplaying&&!seqservicing&&seqeventcache==2){seqservicing=1;sparse_service();seqservicing=0;}
+ if(seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();}
 /* Intro audio can interrupt graphics in any ROM bank. Restore that bank before
    returning; the normal workstation timer is installed after the intro exits. */
 void intro_audio_tick(void);
 void intro_timer(void){uint8_t saved=CURRENT_BANK;SWITCH_ROM(21);intro_audio_tick();SWITCH_ROM(saved);}
-void main(void){uint8_t p,edge,frame=0;intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();startup();drum_init();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
+void main(void){uint8_t p,edge,frame=0;intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();drum_init();startup();ui_loading_begin();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
  disable_interrupts();padsampled=lastpad;add_VBL(input_vblank);add_SIO(serial_isr);add_TIM(engine_timer);SB_REG=0;SC_REG=0x80;set_interrupts(VBL_IFLAG|SIO_IFLAG|TIM_IFLAG);enable_interrupts();
- lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
+ /* Preparation runs on Mixer; its private journal commit (phase18 atACB4)
+    also finishes off-page. Avoid an idle bank round-trip on other pages. */
+ lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();if(sparse_enabled)sparse_service();else if(page==18||*(volatile uint8_t *)0xACB4==18)mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
  if(padread==end){ui_input(p,0);lastpad=p;}
  else while(padread!=end){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;ui_input(p,edge);lastpad=p;service();}
- if(dirty||(page!=8&&page<18&&!(++frame&(page>=7?1:3)))){dirty=0;ui_render();}ui_flush();}
+ /* Settings pages change on input. Periodic refresh is only for live views. */
+ if(dirty||(page<10&&page!=8&&!(++frame&(page>=7?1:3)))){dirty=0;ui_render();}ui_flush();}
  }
 }
 }
