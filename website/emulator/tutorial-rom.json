@@ -1,0 +1,27 @@
+{
+  "rom": "downloads/GAYBOY-tutorial.gb",
+  "sha256": "4a7e3e797061cb9d45f8207fc77e5f8d8ef99021fbfb4348b1394b32e09a6707",
+  "symbols": {
+    "page": 51014,
+    "navopen": 51030,
+    "navchoice": 51031,
+    "seqplaying": 53864,
+    "seqtrack": 53865,
+    "seqcursor": 53813,
+    "seqpitch": 55108,
+    "seqhead": 53871,
+    "seqfocus": 53867,
+    "seqedit": 53868,
+    "seqapending": 54376,
+    "seqposition": 53806,
+    "seqevents_lo": 52752,
+    "seqevents_hi": 43008,
+    "seqeventcounts": 53776,
+    "seqeventoffsets": 53790,
+    "seqmuted": 53869,
+    "seqsolo": 53870,
+    "seqlength": 55066,
+    "lastpad": 54621
+  },
+  "mixer": 44160
+}

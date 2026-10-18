@@ -1,0 +1,46 @@
+GAYBOY APLHA1 ? hardware-test alpha, 2026-10-18
+
+ROM: gayboyAPLHA1.gb (1 MiB, MBC5, 32 KiB battery RAM)
+SHA-256: cc468d64a4e93dd57df11c4fe8dbf4d5ee1c94182dea78ddd3b95ab4ce173008
+
+Four independent reviews covered sequencing/live launch, audio ownership,
+UI/navigation/VRAM safety, and memory/stability. Emulator verification is on
+DMG timing. This is a hardware-test alpha, not a claim of hardware certification.
+
+Fixes integrated:
+- DSP table relocation eliminates a confirmed stack/table collision and gives
+  the stack a 512-byte region. Stack stress retains IRQ reserve.
+- Scheduler catches up overdue steps in one call. Playhead drawing runs in
+  the UI loop, reducing accumulated timing drift during held scrolling.
+- Native pattern tone recalls retain timer phase and PCM ownership.
+- Faster bit serialization and ROM schema/scatter preserve old saved tones.
+- MIDI raw pitch CCs cannot retune PULSEKICK while it owns Pulse 1.
+- Runtime font refresh uses safe VRAM uploads under PCM interrupts.
+- Drum velocity lane refreshes when the selected row changes.
+- PK resumes a still-gated P1 note; same-pattern launches restart at the
+  quantized downbeat without releasing every voice.
+
+Measured remaining limitations:
+- Dense 512-event live Mixer pattern preparation is synchronous. Maximum
+  observed button acknowledgement: 1.44 s at 180 BPM, 1.93 s at 220 BPM,
+  2.80 s at 280 BPM. Audio continues during preparation.
+- Those dense live-launch cases show approximately 33 ms peak-to-peak note
+  jitter and do not meet the existing 12 ms live timing target. Audio underrun
+  counters remained zero; that does not prove perfect analog audio delivery.
+- At 220 BPM, held native scrolling measured 10.94 ms onset jitter with stable
+  note counts and no accumulating backlog. Typical native handoffs are about
+  11?12 ms. No tempo cap was added; 300 BPM remains an overload test.
+- The separate PCM timing suite reports failures of first-step/delivery
+  targets at 300 BPM. Its detailed report is retained; no thresholds were
+  relaxed to mark it passing.
+
+Hardware test priorities:
+1. Hear sustained P1 notes resume after PK, including kicks mid-note.
+2. Relaunch the current pad with BEAT/BAR quantization; check downbeat restart.
+3. Switch saved patterns at your usual tempo while playing and navigating.
+4. Hold scroll/edit controls while drums and pulse notes play.
+5. Exercise experimental synthesis/FX and save/load; check for crashes.
+6. Save, power off, and verify battery recall with your cartridge.
+
+Validation evidence: build/alpha1-validation/ (JSON metrics and per-test logs).
+No user's save file was used by the automated fixtures.

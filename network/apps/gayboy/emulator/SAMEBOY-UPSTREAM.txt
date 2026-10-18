@@ -1,0 +1,6 @@
+SameBoy 1.0.4 by Lior Halphon (Expat/MIT license).
+Source: https://github.com/LIJI32/SameBoy/tree/v1.0.4
+Built locally with Emscripten 4.0.10 and tools/browser_sameboy.c.
+No audio-core patches; GB_MODEL_DMG_B with accurate hardware high-pass.
+Hardware boot runs off-screen; logo frames and boot audio are discarded before cartridge LCD handoff.
+Boot ROM SHA256: 6f64da4cecd7e54e2f928eb3e3ba7810a7a567d0d247cc71737d1771e073a916

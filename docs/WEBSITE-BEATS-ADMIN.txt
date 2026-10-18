@@ -1,0 +1,49 @@
+Website beats and moderation
+===========================
+Share captures the running emulator, including unsaved notes, into an inert
+GBBT0001 data blob (8-byte version, 32-byte ROM SHA-256, SameBoy save state).
+It does not expose pattern importing. Links use ?beat=<24 hex characters>.
+The state resumes an already-running sequencer, bypassing the intro. A fresh
+browser requires one play gesture for audio; in-page links start on their click.
+Other people's beats use a separate machine. The original instance stays parked,
+and shared playback never writes the visitor's local save.
+
+V1 is pinned to SameBoy 1.0.4 / DMG_B and ROM
+4a7e3e797061cb9d45f8207fc77e5f8d8ef99021fbfb4348b1394b32e09a6707.
+Its complete payload is 83512 bytes. Keep v1 playback available before changing
+ROM or native save-state formats. The publisher rejects an uncoordinated ROM
+change. Never replace existing public beat data during deployment.
+
+Beats, comments, author deletion hashes and rate limits use the existing private
+SQLite database. Public endpoints return only the necessary public fields.
+Beat deletion is admin-only. The public delete action rejects every request,
+including legacy author tokens; posting no longer returns a deletion capability.
+Both submissions use the existing session-bound visual/audio human check,
+Origin and CSRF checks, honeypot, size bounds and per-IP HMAC rate limits.
+Names/titles/comments render as text. State blobs are never executable server files.
+
+Admin: /gayboy/admin/. The publisher installs CLI-only admin-init.php, which
+creates a one-use setup key valid for 24 hours only when no password exists.
+The key is stored hashed remotely; a newly generated key is written only to
+the local deployment backup's admin-setup.json for the owner. Credentials stay
+outside the public root in admin-auth.json. Deployments preserve them.
+Setup links use #setup=<key>; admin.js removes the fragment immediately.
+The owner chooses a password on the site. Login uses a separate HttpOnly,
+Secure, SameSite=Strict admin session cookie and a 24-hour server-side expiry.
+Login/setup are rate-limited. All mutations require both CSRF and same Origin.
+
+Comments and thumbnails stay private until explicitly approved. reviewed=0
+means pending; approval sets reviewed=1 and publishes the comment. Public lists,
+counts and thumbnail endpoints all exclude pending records. Admins view pending
+thumbnails through a separate authenticated endpoint. Only authenticated
+admins receive the pending-comment count inside the admin panel. No admin link
+or notification is shown on the public homepage. Open GAYBOY-Admin.cmd from the
+project folder to launch the panel in the default browser. The admin page can
+approve or delete comments and delete beats.
+CLI fallback: tools/moderate_comments.py and tools/moderate_beats.py.
+
+Local QA uses build/comments-private and localhost:18978 with the local-only
+GAYBOY_COMMENTS_LOCAL_TEST=1 flag. Never create public test posts or configure
+the owner's password in an automated test. Browser tests:
+ verify_browser_beats.py, verify_browser_admin.py, verify_comments.py,
+ verify_browser_tutorial_mobile.py, verify_browser_demo.py.

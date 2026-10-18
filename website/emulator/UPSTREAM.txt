@@ -1,0 +1,4 @@
+binjgb by Ben Smith
+MIT license (see LICENSE.txt)
+https://github.com/binji/binjgb
+Revision: 16621111ed0ee73bcc45c912a823bcebedcffc0f

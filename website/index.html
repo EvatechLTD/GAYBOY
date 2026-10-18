@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#260044">
+  <meta name="description" content="GAYBOY: a tiny music workstation with a big attitude. Synths, sequencing, drums and MIDI in a downloadable Game Boy ROM.">
+  <title>★ GAYBOY ★ welcome 2 my little corner of the internet</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="comments/style.css?v=wall-2">
+  <script src="comments/wall.js?v=wall-3" defer></script>
+  <link rel="stylesheet" href="emulator/player.css?v=beats-1">
+  <link rel="stylesheet" href="beats/style.css?v=beats-4">
+  <script src="page.js" defer></script>
+  <script src="emulator/tutorial.js?v=interactive-3" defer></script>
+  <script src="emulator/player.js?v=beats-1" defer></script>
+  <script src="beats/wall.js?v=beats-3" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the good stuff</a>
+  <div class="site-shell">
+    <div class="system-bar"><span>♥ a buttholechopper.com homepage ♥</span><a href="/">back to the mothership ↗</a></div>
+    <header>
+      <div class="welcome">✧･ﾟ: *✧･ﾟ:* YOU HAVE ENTERED THE GAYBOY ZONE *:･ﾟ✧*:･ﾟ✧</div>
+      <div class="logo-row"><span class="orbit" aria-hidden="true">✦</span><div><p class="pretitle">small cartridge. extremely big feelings.</p><h1>GAYBOY</h1><p class="tagline">~ the little music machine that lives in your Game Boy ~</p></div><span class="orbit" aria-hidden="true">✦</span></div>
+      <div class="ticker"><div>★ WELCOME 2 MY HOMEPAGE ★ MAKE A BEAT ★ START A BAND IN YOUR BEDROOM ★ DOWNLOAD THE ROM ★ PLEASE ENJOY YOUR STAY ★</div></div>
+      <nav aria-label="Main"><a href="#about">♥ about me</a><a href="#screenshots">▧ my pics</a><a href="#download">↓ downloads</a><a href="#howto">? how 2 play</a><a href="#comments">♥ comments</a><button id="motion" type="button" aria-pressed="false">✦ pause glitter</button></nav>
+    </header>
+    <main id="main" class="columns">
+      <aside class="sidebar">
+        <section class="panel profile">
+          <h2>GAYBOY's profile</h2>
+          <div class="profile-inner"><div class="avatar"><img src="images/train.png" alt="Pixel art of a headphone-wearing beatmaker on a train" width="160" height="144"></div><strong class="profile-name">GAYBOY <span>♥</span></strong><p>"a processor running is like an animal breathing"</p><p class="online"><span aria-hidden="true">●</span> making noises</p><dl><dt>Type:</dt><dd>music workstation</dd><dt>Lives in:</dt><dd>a .gb file</dd><dt>Mood:</dt><dd>128 bpm & emotional</dd><dt>Status:</dt><dd>work in progress ♡</dd></dl><a class="profile-download" href="#download">[ download me! ]</a></div>
+        </section>
+        <section class="panel contact"><h2>Contacting GAYBOY</h2><div><a href="#download">↓ Get the ROM</a><a href="#screenshots">▧ View my pics</a><button id="copy-link" type="button">♡ Copy page link</button><a href="/">↗ buttholechopper</a></div><p id="copy-status" role="status"></p></section>
+        <section class="panel interests"><h2>General interests</h2><p>square waves, bedroom beats, tiny screens, huge headphones, drum machines, train rides, staying up way too late.</p><div class="mini-badges"><span>GAME BOY<br><b>POWERED</b></span><span>100%<br><b>SMALL WEB</b></span><span>NO THOUGHTS<br><b>JUST WAVES</b></span><span>BEST VIEWED<br><b>WITH EYES</b></span></div></section>
+        <div class="construction"><span aria-hidden="true">⚒</span><strong>ALWAYS UNDER<br>CONSTRUCTION</strong><small>it's a lifestyle</small></div>
+        <p class="sidebar-note">hand-coded with too many<br>colors & a little bit of love.</p>
+      </aside>
+      <div class="main-column">
+        <section id="live-demo" class="panel demo-panel" aria-label="Play GAYBOY">
+          <div class="panel-content"><p class="demo-intro">a whole Game Boy. right here on my homepage.</p>
+            <div class="handheld"><div class="screen-label">DOT MATRIX WITH ATTITUDE ♥</div><div class="demo-screen"><canvas width="160" height="144" tabindex="0" aria-label="GAYBOY emulator screen. Arrow keys: D-pad. Z: B. X: A. Shift: Start. Space: Select. Escape: pause."></canvas><div class="demo-cover"><strong>GAYBOY<br>IS ALIVE.</strong><span>headphones recommended ♫</span><button id="demo-play" type="button">★ POWER ON ★</button><button id="demo-tutorial" type="button">play tutorial</button></div></div><div class="handheld-brand"><b class="shell-maker">evatech</b><i class="shell-model">GAYBOY</i><span>● POWER</span></div>
+              <div class="gamepad" aria-label="Game Boy controls"><div class="dpad"><button type="button" data-pad="up" data-runtime disabled aria-label="D-pad up">▲</button><button type="button" data-pad="left" data-runtime disabled aria-label="D-pad left">◀</button><span aria-hidden="true">✚</span><button type="button" data-pad="right" data-runtime disabled aria-label="D-pad right">▶</button><button type="button" data-pad="down" data-runtime disabled aria-label="D-pad down">▼</button></div><div class="ab-buttons"><button type="button" data-pad="B" data-runtime disabled aria-label="B button (Z key)">B</button><button type="button" data-pad="A" data-runtime disabled aria-label="A button (X key)">A</button></div><div class="system-buttons"><button type="button" data-pad="select" data-runtime disabled>SELECT</button><button type="button" data-pad="start" data-runtime disabled>START</button></div></div>
+            </div>
+            <div class="demo-toolbar"><button id="demo-tutorial-reopen" type="button" hidden>play tutorial</button><button id="demo-pause" data-runtime disabled type="button" aria-pressed="false">Ⅱ pause</button><button id="demo-mute" data-runtime disabled type="button" aria-pressed="false">♫ mute</button><button id="demo-restart" data-runtime disabled type="button">↻ restart</button><button id="demo-save" data-runtime disabled type="button">↓ download save</button><button id="demo-fullscreen" type="button">⛶ big screen</button></div>
+            <p class="demo-status" role="status">Press POWER ON to play. Sound starts when you do.</p>
+            <p class="demo-keys"><kbd>↑ ↓ ← →</kbd> D-pad · <kbd>Z</kbd> B · <kbd>X</kbd> A · <kbd>Shift</kbd> Start · <kbd>Space</kbd> Select</p>
+            <p class="demo-tip">Click the screen to use your keyboard, or use the buttons above. Hold buttons together for combinations. Press Shift / START to skip the intro and open the menu. Escape pauses. The demo also pauses when you leave this tab.</p>
+            <p class="demo-credit">Saved in-game patterns stay in this browser when storage is available. Download your save to keep a backup. Powered by <a href="https://sameboy.github.io/">SameBoy</a> · <a href="emulator/SAMEBOY-LICENSE.txt">Expat / MIT license</a>.</p>
+          </div>
+        </section>
+        <section class="status-box"><span class="new-sticker">NEW!</span><p><strong>GAYBOY is in your extended network.</strong><br><span>and probably using all four of your sound channels.</span></p></section>
+        <section id="about" class="panel about"><h2>★ GAYBOY's blurbs ★</h2><div class="panel-content"><h3>About me:</h3><p class="big-intro">your Game Boy has<br>a <em>music problem.</em></p><p>Good. Let's make it worse. GAYBOY turns that tiny handheld into a synth, sequencer, drum machine and performance mixer. Write little melodies. Program nasty drums. Make something weird on a screen that fits in your pocket.</p><p>Native pulse, wave and noise voices meet piano-roll editing, pattern pads and experimental sounds. There’s even a whole pixel-art intro, because being extra is the point.</p><div class="feature-tags"><span>♫ SYNTHS</span><span>▦ PIANO ROLL</span><span>✹ DRUMS</span><span>↔ MIDI</span></div><h3>Who I'd like to meet:</h3><p>Headphone people. Chiptune freaks. Anyone who has ever thought <i>“what if this toy was also a studio?”</i></p></div></section>
+        <section id="screenshots" class="panel gallery-panel"><h2>▧ My pics <span>(click 2 make big)</span></h2><div class="gallery"><a href="images/turntable.png"><figure><img src="images/turntable.png" alt="Intro scene: a beatmaker with headphones behind a turntable" width="160" height="144" loading="lazy"><figcaption>01. bedroom producer energy</figcaption></figure></a><a href="images/drum-machine.png"><figure><img src="images/drum-machine.png" alt="Intro scene: a pixel drum machine with pads and a waveform" width="160" height="144" loading="lazy"><figcaption>02. please touch the pads</figcaption></figure></a><a href="images/sequencer.png"><figure><img src="images/sequencer.png" alt="GAYBOY piano-roll sequencer with notes plotted on the grid" width="160" height="144" loading="lazy"><figcaption>03. tiny notes, big plans</figcaption></figure></a><a href="images/mixer.png"><figure><img src="images/mixer.png" alt="GAYBOY mixer with channel levels, mute, solo and eight pattern pads" width="160" height="144" loading="lazy"><figcaption>04. bedroom control room</figcaption></figure></a></div><p class="gallery-note">Actual intro + workstation screenshots. Pixels proudly left intact.</p></section>
+        <section id="download" class="panel download-panel"><h2>↓↓↓ THE DOWNLOAD ZONE ↓↓↓</h2><div class="panel-content"><div class="download-top"><span class="disk" aria-hidden="true">▣</span><div><h3>take me home.</h3><p>GAYBOY 0.3 · development ROM<br>Game Boy .gb file · 1 MiB</p></div><span class="free-stamp">ROM<br>SWEET<br>ROM</span></div><a class="download-button" href="downloads/GAYBOY-0.3.gb" download="GAYBOY-0.3.gb">★ DOWNLOAD GAYBOY.GB ★<small>one tiny file. a whole lot of noise.</small></a><p class="download-note">Open in a Game Boy emulator, or use a compatible flash cartridge. This is an evolving prototype; physical hardware testing is still in progress. Keep backups of your save files.</p><p class="build-date">ROM snapshot: October 17, 2026 · <a href="downloads/SHA256SUMS.txt">file checksum</a></p></div></section>
+        <section id="howto" class="panel howto"><h2>How 2 make some noise</h2><div class="panel-content"><ol><li><strong>Grab the .gb file.</strong><span>The big ridiculous button above is your friend.</span></li><li><strong>Load it in your Game Boy emulator.</strong><span>Map the D-pad, A, B, Start and Select. Press Start to skip the intro and open the menu.</span></li><li><strong>Find your sound.</strong><span>Choose an instrument or the sequencer from the Start menu. Experiment. Save a pattern when you like it.</span></li></ol><div class="nerd-note"><strong>♥ A note for the MIDI nerds:</strong> External MIDI uses Arduinoboy in mGB mode. Seven logical tracks share the Game Boy’s four physical sound channels. Pattern saves need battery SRAM support and don’t recall every synth setting yet.</div></div></section>
+        <section id="comments" class="panel wall-panel"><h2>GAYBOY's Comments <span id="wall-count">♥</span></h2>
+          <div class="wall-intro"><p>Leave a little love. Make a little noise.</p><a href="#comment-form">[ add a comment ]</a></div>
+          <div class="wall-list" aria-label="Visitor comments"><p class="wall-empty">Loading the wall…</p></div>
+          <button id="wall-more" type="button" class="wall-more" hidden>older comments ↓</button>
+          <form id="comment-form" class="wall-form" method="post" action="comments/api.php?action=post" enctype="multipart/form-data">
+            <h3>♥ leave GAYBOY a comment</h3><p>No account needed. Bring your own tiny profile pic.</p>
+            <label for="wall-name">Your display name</label><input id="wall-name" name="name" autocomplete="nickname" maxlength="40" required>
+            <label for="wall-body">Your comment <span>(up to 1,500 characters)</span></label><textarea id="wall-body" name="body" maxlength="1500" rows="5" required></textarea>
+            <label for="wall-avatar">Profile thumbnail <span>(optional)</span></label>
+            <div class="wall-avatar-picker"><div><img id="wall-default-preview" src="comments/default-avatar.svg" alt="Default Game Boy profile thumbnail" width="96" height="96"><canvas id="wall-preview" width="96" height="96" aria-label="Your thumbnail preview" hidden></canvas></div><div><input id="wall-avatar" name="avatar" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · under 2 MB · up to 2048 × 2048 pixels. Cropped to a square.</small><button id="wall-remove-avatar" type="button" hidden>remove thumbnail</button></div></div>
+            <label class="wall-honeypot" aria-hidden="true">Leave this field empty<input name="website" tabindex="-1" autocomplete="off"></label>
+            <fieldset><legend>♥ human check</legend><p>Type the six digits in the picture, or listen to the code.</p><img id="wall-code-image" class="wall-code-image" alt="Six-digit human check. An audio alternative is available below." width="320" height="90" hidden><div class="wall-code-tools"><button id="wall-refresh-code" type="button">get a new code</button><details><summary>listen to the code</summary><audio id="wall-code-audio" controls preload="none" aria-label="Spoken human-check digits"></audio></details></div><label for="wall-human-code" class="wall-code-label">The six digits</label><input id="wall-human-code" name="human_code" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" required></fieldset>
+            <button type="submit" class="wall-submit" disabled>POST COMMENT ♥</button><p id="wall-status" class="wall-status" role="status"></p><p class="wall-privacy">Comments and thumbnails become public after approval. Display names are not verified. Plain text only. You can delete your comments from this browser.</p>
+            <noscript>Enable JavaScript to load comments and the human check.</noscript>
+          </form>
+        </section>
+        <div class="webring"><span>←</span><a href="/">buttholechopper.com</a><b>♥ tiny machine appreciation society ♥</b><a href="#top" id="back-top">back 2 top</a><span>→</span></div>
+      </div>
+    </main>
+    <footer><div class="footer-badges"><span>MADE OF<br><b>PIXELS & FEELINGS</b></span><span>THIS PAGE IS<br><b>TOO MUCH</b></span><span>I ♥<br><b>THE INTERNET</b></span></div><p>~ thanks for visiting my little corner of the web ~</p><p class="fine-print">GAYBOY is an independent homebrew project. Game Boy is a trademark of Nintendo. No affiliation.</p></footer>
+  </div>
+  <div class="floating-star star-one" aria-hidden="true">✧</div><div class="floating-star star-two" aria-hidden="true">✦</div><div class="floating-star star-three" aria-hidden="true">✧</div>
+</body>
+</html>

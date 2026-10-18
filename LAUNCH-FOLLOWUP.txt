@@ -1,0 +1,63 @@
+15-minute pattern-launch follow-up ? 2026-10-18
+
+Result: NOT FULLY SOLVED. Tonight's gayboyAPLHA1.gb is unchanged.
+
+Four agents worked on ordinary-pattern measurements, tone preparation,
+sequencer voice handoff, and independent cancellation/memory review.
+
+Reproduction: 54 real-button cases cover 16/32/64 steps at 120/180/220 BPM,
+OFF/BEAT/BAR launch, same/new patterns, real PCM samples1/4, and different
+saved pulse tones. This is not only a 512-event or 300 BPM stress problem.
+
+Verified progress on the experimental candidate:
+- New-pattern A acknowledgement improved from up to1272ms to <=50.229ms.
+- Incremental tone serialization matches all old save bytes, including signed
+  and16bit values; invalid ranges/nonzero constraints are still rejected.
+- Outgoing native pulse hardware is not explicitly silenced before a new
+  pulse note replaces it. Adjacent notes, rests, zero-level notes and PK pass.
+- Native PCM-to-WAVE handoff passes actual sound/clock checks.
+- Cancelling a queued destination or leaving Mixer completes an outgoing save
+  transaction before abandoning it, preserving the saved slot's valid marker.
+- New worker state occupies a verified12byte SRAM gap, not DSP or audio RAM.
+
+Remaining blockers measured on the final full matrix:
+- Cold OFF launch readiness remains1786?2360ms (worse elapsed preparation
+  latency than alpha, although button handling is much quicker).
+- Up to8 eligible beat boundaries pass before preparation is ready.
+- Subsequent navigation can still take up to469ms because pad graphics are
+  rebuilt synchronously; this is separate from tone/pattern preparation.
+- P2 attack intervals can exceed their nominal step by about24.4ms.
+- Cancelling during an outgoing write may still synchronously finish that
+  write, producing a shorter but real control pause for save safety.
+- Legacy-format migration still uses the older synchronous fallback.
+- Dense experimental300BPM preparation exceeded a5second test allowance;
+  it eventually completed with a20second allowance. This is a limitation,
+  not a reason to relax the ordinary live-performance target.
+
+Morning priorities:
+1. Replace the incremental C tone-step loop with the bounded assembly path
+   already verified for synchronous serialization; use measured CPU-time
+   budgets, not a fixed number of operations per foreground iteration.
+2. Prepare likely incoming patterns before the launch button is pressed;
+   keep preparation correctness separate from quantized activation.
+3. Update only changed pad highlights/tiles instead of rebuilding all pads.
+4. Make cancellation finish the outgoing save cooperatively without cache
+   collisions, serializer reentrancy, or invalidating saved patterns.
+5. Require ordinary54-case timing acceptance, immediate follow-up navigation,
+   first-eligible quantization, save/reboot compatibility and stack bounds.
+
+Evidence:
+build/launch-baseline/ordinary.json
+build/launch-async-first/ordinary.json
+build/launch-async-final/ordinary.json
+build/audio-final-validation.txt
+build/tones-incremental.json
+build/alpha1-validation/launch-followup/
+
+The experimental candidate has NOT replaced the alpha ROM. Hardware testing
+and analog audio validation are still required.
+
+Final integrity follow-up: repaired a cross-ROM-bank literal pointer in the
+new IO module. Full pattern-tone save/restore/battery-reboot test and both
+cancellation persistence checks pass on the final experimental build.
+Experimental ROM retained under build/launch-followup-experimental/.

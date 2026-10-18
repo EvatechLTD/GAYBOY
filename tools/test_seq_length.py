@@ -1,0 +1,11 @@
+exec(open('tools/test_monosynth.py').read().split('# Native oscillator baseline')[0])
+choose(8)
+for n in range(32):p.memory[S['_seqnotes']+n]=61;p.memory[S['_seqduration']+n]=1
+p.memory[S['_seqlength']]=32;p.memory[S['_seqzoom']]=3;p.memory[S['_seqdrawvalid']]=0;p.memory[S['_dirty']]=1;p.tick(120)
+p.memory[S['_seqhead']]=4;p.memory[S['_dirty']]=1;p.tick(10)
+p.button_press('a');p.tick(5);press('left');p.button_release('a');p.tick(30)
+assert v('seqlength')==16 and all(v('seqnotes',i)==61 for i in range(32))
+p.screen.image.save('build/ui-seq-shortened-ghosts.png')
+p.button_press('a');p.tick(5);press('right');p.button_release('a');p.tick(30)
+assert v('seqlength')==32 and all(v('seqnotes',i)==61 for i in range(32))
+p.stop(save=False);print('PASS: A+left/right halve/double pattern length without erasing hidden notes')

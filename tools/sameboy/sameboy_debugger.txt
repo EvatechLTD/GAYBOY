@@ -1,0 +1,7 @@
+Looking for sameboy_debugger.exe?
+
+Starting with SameBoy v1.0.1, sameboy.exe and sameboy_debugger.exe
+have been merged into a single executable. You can open a debugger
+console at any time by pressing Ctrl+C to interrupt the currently
+open ROM. Once you're done debugging, you can close the debugger
+console and resume normal execution.

@@ -1,0 +1,105 @@
+.demo-panel{border-color:#ff81d9}.demo-panel>h2{background:linear-gradient(90deg,#b82688,#5f1d80)}.demo-panel h2>span{font-size:10px;font-weight:normal}.demo-intro{text-align:center;color:var(--pink);font-style:italic}.handheld{max-width:430px;margin:15px auto 19px;padding:17px 20px 20px;border:4px outset #b19dbd;border-radius:12px 12px 50px 12px;background:linear-gradient(125deg,#d1bed7,#a593b1);box-shadow:5px 5px #0e0019;color:#2a133f}.screen-label{text-align:center;font:bold 9px 'Courier New',monospace;letter-spacing:1px;margin-bottom:9px}.demo-screen{position:relative;border:14px solid #51445e;border-radius:8px 8px 22px 8px;background:#1b2512;overflow:hidden}.demo-screen canvas{display:block;width:100%;height:auto;aspect-ratio:160/144;image-rendering:pixelated;outline-offset:-4px}.demo-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:repeating-linear-gradient(0deg,#0000 0 3px,#0001 3px 4px),#d5e8a1;color:#243e25;text-align:center;padding:10px}.demo-cover strong{font:900 32px/.95 Impact,'Arial Black',sans-serif;letter-spacing:1px;text-shadow:2px 2px #9aaf73}.demo-cover>span{font:italic 12px Georgia,serif;margin:13px 0 16px}.demo-cover button{background:#263c23;color:#d5ff39;border:3px outset #a2ba83;padding:11px 13px;font:bold 13px 'Courier New',monospace}.demo-cover button:disabled{opacity:.6;cursor:wait}.demo-started .demo-cover{display:none}.handheld-brand{font:bold 17px/1.3 'Arial Black',Arial,sans-serif;margin:13px 0 17px;display:flex;align-items:center;flex-wrap:wrap;gap:5px}.handheld-brand i{font:italic 11px Georgia,serif}.handheld-brand>span{margin-left:auto;font:8px 'Courier New',monospace;color:#72294c}.gamepad{display:grid;grid-template-columns:1fr 1fr;gap:12px;user-select:none}.gamepad button{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;color:#ece0f7;border:3px outset #5e536c;background:#352d43;box-shadow:2px 3px #786581;font:bold 13px 'Courier New',monospace;min-height:44px;min-width:44px}.gamepad button.held{border-style:inset;transform:translateY(2px);background:#1c112b}.gamepad button:disabled{opacity:.6}.dpad{display:grid;grid-template-columns:44px 44px 44px;grid-template-rows:44px 44px 44px;justify-content:start}.dpad [data-pad=up]{grid-column:2;grid-row:1}.dpad [data-pad=left]{grid-column:1;grid-row:2}.dpad [data-pad=right]{grid-column:3;grid-row:2}.dpad [data-pad=down]{grid-column:2;grid-row:3}.dpad>span{grid-column:2;grid-row:2;background:#352d43;color:#51465f;display:grid;place-items:center;font-size:26px}.ab-buttons{display:flex;gap:16px;align-items:center;justify-content:flex-end;transform:rotate(-15deg)}.ab-buttons button{border-radius:50%;width:52px;height:52px;background:#982365;border-color:#c64b99;font-size:19px}.ab-buttons button.held{background:#681442}.system-buttons{grid-column:1/-1;display:flex;justify-content:center;gap:18px;margin:0 0 9px}.system-buttons button{font-size:9px;border-radius:15px;min-width:73px;min-height:40px}.demo-toolbar{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}.demo-toolbar button{background:#180625;color:var(--lime);border:2px outset #b67dd0;padding:9px 10px;font:11px 'Courier New',monospace;min-height:40px}.demo-toolbar button:disabled{opacity:.45;cursor:default}.demo-toolbar button:hover:enabled{background:#482151}.demo-panel .demo-status{border:1px dashed #b67dd0;background:#1b0626;padding:10px;font:11px/1.7 'Courier New',monospace;color:var(--lime)}.demo-panel .demo-keys{text-align:center;font-size:11px;line-height:2.3}kbd{background:#160421;border:1px solid #ae7dbf;border-bottom-width:3px;border-radius:3px;padding:2px 4px;color:var(--pink);font:11px 'Courier New',monospace}.demo-panel .demo-tip{font-size:11px;line-height:1.8}.demo-panel .demo-credit{font-size:10px;line-height:1.8;color:#ccafd7}.demo-panel button:focus-visible{outline:3px solid #70ebff;outline-offset:3px}
+.demo-panel.demo-expanded{position:fixed;inset:0;z-index:1000;margin:0;border:0;overflow:auto;background:#210331;padding:env(safe-area-inset-top) 8px env(safe-area-inset-bottom);overscroll-behavior:contain}.demo-expanded .panel-content{max-width:740px;margin:auto}.demo-expanded .handheld{max-width:430px}.demo-expanded .demo-intro{margin-top:0}.demo-expanded .demo-tip,.demo-expanded .demo-credit{max-width:550px;margin-inline:auto}body.demo-open{overflow:hidden}.demo-expanded>h2{text-align:center}
+@media(max-width:800px) and (min-width:591px){.handheld{padding:12px}.dpad{grid-template-columns:35px 35px 35px;grid-template-rows:35px 35px 35px}.gamepad button{min-width:35px;min-height:35px}.ab-buttons{gap:8px}.ab-buttons button{width:42px;height:42px}.handheld-brand>span{display:none}.demo-screen{border-width:10px}.demo-cover strong{font-size:26px}.demo-cover>span{font-size:10px}.demo-cover button{font-size:11px;padding:8px}.demo-expanded .dpad{grid-template-columns:44px 44px 44px;grid-template-rows:44px 44px 44px}.demo-expanded .gamepad button{min-width:44px;min-height:44px}}
+@media(max-width:400px){.handheld{padding:12px 10px}.demo-screen{border-width:10px}.ab-buttons{gap:8px}.ab-buttons button{width:44px;height:44px}.demo-cover strong{font-size:27px}.demo-cover button{font-size:11px;padding:9px}.handheld-brand>span{display:none}.demo-panel h2>span{display:block}.demo-panel>.panel-content{padding:12px}.gamepad{gap:6px}.demo-keys{display:none}}
+@media(max-height:600px) and (min-width:600px){.demo-expanded .handheld{display:grid;grid-template-columns:140px 1fr 120px;max-width:740px;padding:12px;align-items:center;gap:10px}.demo-expanded .screen-label,.demo-expanded .handheld-brand{display:none}.demo-expanded .demo-screen{grid-column:2;grid-row:1;max-height:65vh;border-width:10px}.demo-expanded .demo-screen canvas{max-height:60vh;width:auto;max-width:100%;margin:auto}.demo-expanded .gamepad{display:contents}.demo-expanded .dpad{grid-column:1;grid-row:1}.demo-expanded .ab-buttons{grid-column:3;grid-row:1}.demo-expanded .system-buttons{grid-column:2}.demo-expanded .demo-intro,.demo-expanded .demo-keys,.demo-expanded .demo-tip,.demo-expanded .demo-credit{display:none}.demo-expanded .demo-status{margin-bottom:0}}
+
+/* Keep keyboard focus on the handheld bezel, outside every display pixel. */
+.demo-screen canvas:focus-visible{outline:none}.demo-screen:focus-within{outline:3px solid #70ebff;outline-offset:5px}
+
+.demo-resume-overlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:85%;padding:18px 10px;border:3px outset #d5ff39;background:#243e25;color:#d5ff39;font:bold 15px 'Courier New',monospace;box-shadow:0 0 0 6px #182d24aa;z-index:2}.demo-resume-overlay[hidden]{display:none}
+
+
+/* Guided practice stays immediately above the handheld. */
+.demo-cover #demo-tutorial{margin-top:8px;padding:7px 12px;background:transparent;color:#263c23;font-size:12px}
+.demo-toolbar [hidden],.demo-tutorial[hidden]{display:none}
+.demo-tutorial{max-width:460px;margin:0 auto 10px;padding:12px 14px;border:2px ridge var(--pink);background:#180625;box-shadow:3px 3px #0e0019}
+.tutorial-heading{display:flex;align-items:center;gap:10px;color:var(--pink);font:10px 'Courier New',monospace}
+.tutorial-heading strong{margin-right:auto}.tutorial-score{color:var(--lime);white-space:nowrap}
+.demo-tutorial button{border:2px outset #b67dd0;background:#352043;color:var(--lime);padding:7px 9px;min-height:36px;font:11px 'Courier New',monospace}
+.demo-tutorial button:disabled{opacity:.45;cursor:default}
+.demo-tutorial progress{display:block;width:100%;height:5px;margin:8px 0;accent-color:var(--pink)}
+.tutorial-meta{font:10px 'Courier New',monospace;color:var(--pink);margin:7px 0}
+.demo-tutorial h3{color:var(--lime);margin:6px 0;font:bold 19px 'Courier New',monospace}
+.demo-panel .tutorial-description{font:12px/1.6 Verdana,sans-serif;margin:8px 0}
+.demo-panel .tutorial-feedback{font:11px/1.5 'Courier New',monospace;color:var(--cyan);margin:8px 0;min-height:17px}
+.tutorial-navigation{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.tutorial-navigation [data-tour=next]{margin-left:0}
+.demo-tutorial:focus{outline:none}.demo-tutorial:focus-visible{box-shadow:0 0 0 2px #88f9ff}
+.tutorial-active .demo-intro{display:none}
+.tutorial-active .panel-content{padding-top:10px}
+.tutorial-active .handheld{max-width:350px;margin:8px auto 12px;padding:10px 12px 12px;border-width:3px}
+.tutorial-active .screen-label{display:none}
+.tutorial-active .handheld-brand{margin:8px 0 10px;font-size:14px}
+.tutorial-active .demo-screen{width:min(100%,calc(clamp(96px,calc(100dvh - var(--tutorial-height,240px) - 300px),252px) * 160 / 144 + 20px));margin:auto;border-width:10px}
+.tutorial-active .demo-tip,.tutorial-active .demo-credit,.tutorial-active .demo-keys{display:none}
+.tutorial-active .system-buttons{margin-bottom:0}
+.tutorial-active .demo-toolbar{margin-top:10px}
+.tutorial-active .demo-status{font-size:10px;margin:10px auto;max-width:460px}
+.tutorial-demonstrating .gamepad{cursor:wait}
+/* A single molded cross, with independent 44px directional hit areas. */
+.dpad{position:relative;isolation:isolate;width:132px;height:132px;gap:0;--tilt-x:0deg;--tilt-y:0deg;transform:perspective(260px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));transform-origin:center;transition:transform 90ms ease-out;filter:drop-shadow(2px 5px 1px #5d4a68)}
+.dpad:before,.dpad:after{content:'';position:absolute;pointer-events:none;clip-path:polygon(33.333% 0,66.667% 0,66.667% 33.333%,100% 33.333%,100% 66.667%,66.667% 66.667%,66.667% 100%,33.333% 100%,33.333% 66.667%,0 66.667%,0 33.333%,33.333% 33.333%)}
+.dpad:before{inset:0;z-index:-2;background:linear-gradient(145deg,#77717c 0%,#413a48 35%,#15101d 80%)}
+.dpad:after{inset:3px;z-index:-1;background:linear-gradient(145deg,#403a49,#2b2433 65%,#211b2a)}
+.gamepad .dpad button,.gamepad .dpad button.held{position:relative;z-index:1;border:0;border-radius:0;background:transparent;box-shadow:none;transform:none;color:#ada4b6;font-size:15px;text-shadow:0 1px #100c18;outline-offset:-5px}
+.gamepad .dpad button.held{color:#f0def9;background:radial-gradient(ellipse,#ffffff0c,transparent 75%)}
+.dpad>span{background:radial-gradient(circle at 50% 50%,#231c2c 0 29%,#3d3548 31% 35%,transparent 38%);color:transparent;pointer-events:none}
+.dpad:has([data-pad=up].held){--tilt-x:10deg}.dpad:has([data-pad=down].held){--tilt-x:-10deg}
+.dpad:has([data-pad=left].held){--tilt-y:-10deg}.dpad:has([data-pad=right].held){--tilt-y:10deg}
+@media(max-width:800px) and (min-width:591px){.demo-cover>span{margin:8px 0}.demo-cover #demo-tutorial{padding:5px;margin-top:5px}.dpad{width:132px;height:132px;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}.gamepad button{min-width:44px;min-height:44px}.demo-expanded .dpad{width:132px;height:132px}}
+@media(max-width:400px){.tutorial-heading{gap:6px;font-size:9px}.demo-tutorial{padding:9px 10px}.demo-tutorial h3{font-size:17px}.tutorial-navigation button{font-size:10px;padding:6px}.tutorial-active .handheld{padding-inline:10px}.tutorial-active .handheld-brand>span{display:none}}
+@media(max-height:600px) and (min-width:600px){.tutorial-active .handheld{display:grid;grid-template-columns:140px minmax(100px,190px) 120px;max-width:520px;gap:8px}.tutorial-active .demo-screen{width:160px;max-height:none;grid-column:2}.tutorial-active .demo-screen canvas{width:100%;max-height:none}.tutorial-active .gamepad{display:contents}.tutorial-active .handheld-brand{display:none}.tutorial-active .system-buttons{grid-column:2}.tutorial-active .dpad{grid-column:1;grid-row:1}.tutorial-active .ab-buttons{grid-column:3;grid-row:1}.tutorial-active .demo-toolbar,.tutorial-active .demo-status{display:none}.tutorial-active .demo-tutorial{max-width:650px}.tutorial-active .panel-content{padding-top:6px}}
+
+.tutorial-active>h2{font-size:11px;padding-block:5px}.tutorial-active>h2>span{display:none}
+@media(max-height:720px) and (max-width:400px){.tutorial-active .tutorial-description{font-size:11px;line-height:1.5}.tutorial-active .tutorial-feedback{font-size:10px;line-height:1.3;min-height:13px}.tutorial-active .handheld-brand{margin:6px 0;font-size:12px}.tutorial-active .demo-tutorial{padding-block:7px}.tutorial-active .tutorial-meta{margin-block:5px}.tutorial-active .demo-tutorial progress{margin-block:6px}}
+
+/* On phones, spend the height on the instrument rather than repeated chrome. */
+@media(max-width:590px){
+ .tutorial-active .panel-content{padding:4px}
+ .tutorial-active .demo-tutorial{padding:5px 8px;margin-bottom:4px;box-shadow:none;max-width:430px}
+ .tutorial-active .tutorial-heading{justify-content:space-between;font-size:10px}
+ .tutorial-active .tutorial-heading strong{display:none}
+ .tutorial-active .demo-tutorial progress{height:3px;margin:3px 0}
+ .tutorial-active .tutorial-copy{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center}
+ .tutorial-active .tutorial-meta{font-size:9px;margin:3px 0}
+ .tutorial-active .demo-tutorial h3{font-size:13px;margin:3px 0}
+ .tutorial-active .tutorial-description{grid-column:1/-1;font-size:11px;line-height:1.35;margin:3px 0 5px}
+ .tutorial-active .tutorial-feedback{grid-column:1/-1;font-size:10px;line-height:1.3;margin:3px 0;min-height:0}
+ .demo-tutorial:is([data-stage=setup],[data-stage=demo],[data-stage=practice]) .tutorial-feedback{display:none}
+ .tutorial-active .demo-tutorial button{min-height:34px;padding:4px 7px;font-size:10px}
+ .tutorial-active .tutorial-heading button{min-height:28px}
+ .tutorial-active .tutorial-navigation{gap:4px}
+ .tutorial-active .handheld{max-width:390px;margin:4px auto;padding:7px 8px 8px}
+ .tutorial-active .demo-screen{border-width:8px;width:min(100%,calc(clamp(110px,calc(100dvh - var(--tutorial-height,160px) - 290px),340px) * 160 / 144 + 16px))}
+ .tutorial-active .handheld-brand{margin:4px 0;font-size:12px}
+ .tutorial-active .handheld-brand i{font-size:9px}
+ .tutorial-active .gamepad{gap:4px}
+ .tutorial-active .demo-toolbar{gap:5px;margin-top:5px}
+ .tutorial-active .demo-toolbar button{min-height:34px;padding:5px 8px;font-size:10px}
+ .tutorial-active #demo-tutorial-reopen,.tutorial-active #demo-restart,.tutorial-active #demo-save,.tutorial-active .demo-status{display:none}
+}
+
+/* BMO skin from tools/frame_native_demo.py and frame_sample_demo.py. */
+.handheld{position:relative;background:linear-gradient(#b2dfc966,#0000 5px),#62b8ab;border-color:#2c7974;border-style:solid;color:#193d69;box-shadow:inset 2px 2px #94d5c1,inset -2px -2px #358f88,4px 5px #123f43;border-radius:12px 12px 50px 12px}
+.handheld:after{content:'';position:absolute;right:13px;bottom:15px;width:40px;height:27px;background:repeating-linear-gradient(64deg,transparent 0 5px,#205e67 5px 8px,#3c918a 8px 10px,transparent 10px 14px);pointer-events:none;opacity:.8}
+.screen-label{color:#193d69}
+.demo-screen{border-color:#276c6b;background:#173c38;box-shadow:0 0 0 1px #358f88}
+.handheld-brand,.handheld-brand i{color:#193d69}
+.handheld-brand>span{color:#873442}
+.dpad{filter:drop-shadow(2px 4px 1px #43968c)}
+.dpad:before{background:linear-gradient(145deg,#e8d172,#b59e35 55%,#99852c)}
+.dpad:after{background:linear-gradient(145deg,#ffe36a,#f3d448 55%,#ddc23f)}
+.gamepad .dpad button,.gamepad .dpad button.held{color:#817025;text-shadow:0 1px #fff1a0}
+.gamepad .dpad button.held{color:#193d69;background:radial-gradient(ellipse,#fff6,transparent 75%)}
+.dpad>span{background:radial-gradient(circle,#ddc23f 0 32%,#e5ca45 34% 38%,transparent 40%)}
+.ab-buttons button{color:#193d69;border-color:#43968c;box-shadow:inset 1px 2px #ffffff66,2px 3px #2c7974}
+.ab-buttons [data-pad=B]{background:#dd5352}
+.ab-buttons [data-pad=A]{background:#b6df45}
+.ab-buttons [data-pad=B].held{background:#b63e40}
+.ab-buttons [data-pad=A].held{background:#94ba32}
+.system-buttons button{background:#193d69;border-color:#3c938b;color:#e0f3dc;box-shadow:inset 0 1px #56789b,2px 3px #43968c}
+.system-buttons button.held{background:#102a4b}
+.gamepad button.tutorial-target{outline:3px solid #173c38;outline-offset:2px;box-shadow:0 0 0 5px #bfffe0}
+.gamepad .dpad button.tutorial-target{outline-offset:-4px;box-shadow:inset 0 0 0 5px #bfffe0}
+@media(max-height:600px) and (min-width:600px){.demo-expanded .handheld:after{display:none}}

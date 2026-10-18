@@ -1,0 +1,5 @@
+<IfModule mod_headers.c>
+# Allow the local emulator's WebAssembly without allowing JavaScript eval.
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+</IfModule>
+AddType application/wasm .wasm

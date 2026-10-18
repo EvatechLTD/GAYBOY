@@ -1,0 +1,7 @@
+{
+  "recipe": "lsbatch-punch-v3",
+  "filter": "highpass=f=20,acompressor=threshold=-22dB:ratio=6:attack=3:release=70,volume=18dB,asoftclip,lowpass=f=5000,aresample=11468:filter_size=64:cutoff=0.95",
+  "peak_dbfs": -1,
+  "maximum_seconds": 0.65,
+  "tail_fade_samples": 80
+}

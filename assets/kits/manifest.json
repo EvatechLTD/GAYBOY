@@ -1,0 +1,322 @@
+[
+  {
+    "kit": "TR-808",
+    "slot": 1,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Kick05.wav",
+    "prepared": "assets\\kits\\1-1-TR-808Kick05.wav",
+    "samples": 7140,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-808",
+    "slot": 2,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Snare03.wav",
+    "prepared": "assets\\kits\\1-2-TR-808Snare03.wav",
+    "samples": 830,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-808",
+    "slot": 3,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Hat_C01.wav",
+    "prepared": "assets\\kits\\1-3-TR-808Hat_C01.wav",
+    "samples": 944,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-808",
+    "slot": 4,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Hat_O01.wav",
+    "prepared": "assets\\kits\\1-4-TR-808Hat_O01.wav",
+    "samples": 2101,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-808",
+    "slot": 5,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Clap01.wav",
+    "prepared": "assets\\kits\\1-5-TR-808Clap01.wav",
+    "samples": 2647,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-808",
+    "slot": 6,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Tom01.wav",
+    "prepared": "assets\\kits\\1-6-TR-808Tom01.wav",
+    "samples": 2998,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-808",
+    "slot": 7,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Tom05.wav",
+    "prepared": "assets\\kits\\1-7-TR-808Tom05.wav",
+    "samples": 1595,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-808",
+    "slot": 8,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-808\\TR-808Cow.wav",
+    "prepared": "assets\\kits\\1-8-TR-808Cow.wav",
+    "samples": 2283,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 1,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Kick 01.wav",
+    "prepared": "assets\\kits\\2-1-TR-909Kick 01.wav",
+    "samples": 3242,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 2,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Snare 01.wav",
+    "prepared": "assets\\kits\\2-2-TR-909Snare 01.wav",
+    "samples": 2782,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 3,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Hat C 01.wav",
+    "prepared": "assets\\kits\\2-3-TR-909Hat C 01.wav",
+    "samples": 799,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 4,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Hat O 03.wav",
+    "prepared": "assets\\kits\\2-4-TR-909Hat O 03.wav",
+    "samples": 4560,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 5,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Clap.wav",
+    "prepared": "assets\\kits\\2-5-TR-909Clap.wav",
+    "samples": 1325,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 6,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Tom Low 01.wav",
+    "prepared": "assets\\kits\\2-6-TR-909Tom Low 01.wav",
+    "samples": 3443,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 7,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Tom Hi 01.wav",
+    "prepared": "assets\\kits\\2-7-TR-909Tom Hi 01.wav",
+    "samples": 3026,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-909",
+    "slot": 8,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-909\\TR-909Rim.wav",
+    "prepared": "assets\\kits\\2-8-TR-909Rim.wav",
+    "samples": 468,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 1,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Kick01.wav",
+    "prepared": "assets\\kits\\3-1-TR-707Kick01.wav",
+    "samples": 956,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 2,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Snare01.wav",
+    "prepared": "assets\\kits\\3-2-TR-707Snare01.wav",
+    "samples": 1476,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 3,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Hat_C.wav",
+    "prepared": "assets\\kits\\3-3-TR-707Hat_C.wav",
+    "samples": 1366,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 4,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Hat_O.wav",
+    "prepared": "assets\\kits\\3-4-TR-707Hat_O.wav",
+    "samples": 3735,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 5,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Clap.wav",
+    "prepared": "assets\\kits\\3-5-TR-707Clap.wav",
+    "samples": 1784,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 6,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Tom_Lo.wav",
+    "prepared": "assets\\kits\\3-6-TR-707Tom_Lo.wav",
+    "samples": 7437,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 7,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Tom_Hi.wav",
+    "prepared": "assets\\kits\\3-7-TR-707Tom_Hi.wav",
+    "samples": 7446,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "TR-707",
+    "slot": 8,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Roland TR-707\\TR-707Cow.wav",
+    "prepared": "assets\\kits\\3-8-TR-707Cow.wav",
+    "samples": 1634,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 1,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\kick.wav",
+    "prepared": "assets\\kits\\4-1-kick.wav",
+    "samples": 2325,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 2,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\sd.wav",
+    "prepared": "assets\\kits\\4-2-sd.wav",
+    "samples": 1604,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 3,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\chh.wav",
+    "prepared": "assets\\kits\\4-3-chh.wav",
+    "samples": 1316,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 4,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\ohh.wav",
+    "prepared": "assets\\kits\\4-4-ohh.wav",
+    "samples": 7033,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 5,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\clap.wav",
+    "prepared": "assets\\kits\\4-5-clap.wav",
+    "samples": 2191,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 6,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\toml.wav",
+    "prepared": "assets\\kits\\4-6-toml.wav",
+    "samples": 7109,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 7,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\tomh.wav",
+    "prepared": "assets\\kits\\4-7-tomh.wav",
+    "samples": 3371,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "LINNDRUM",
+    "slot": 8,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Linn Linndrum\\tamb.wav",
+    "prepared": "assets\\kits\\4-8-tamb.wav",
+    "samples": 1812,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 1,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXKick01.wav",
+    "prepared": "assets\\kits\\5-1-DMXKick01.wav",
+    "samples": 1621,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 2,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXSnare01.wav",
+    "prepared": "assets\\kits\\5-2-DMXSnare01.wav",
+    "samples": 1729,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 3,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXHat_C.wav",
+    "prepared": "assets\\kits\\5-3-DMXHat_C.wav",
+    "samples": 1930,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 4,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXHat_O.wav",
+    "prepared": "assets\\kits\\5-4-DMXHat_O.wav",
+    "samples": 2328,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 5,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXClap.wav",
+    "prepared": "assets\\kits\\5-5-DMXClap.wav",
+    "samples": 1560,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 6,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXTomLo.wav",
+    "prepared": "assets\\kits\\5-6-DMXTomLo.wav",
+    "samples": 5197,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 7,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXTomHi.wav",
+    "prepared": "assets\\kits\\5-7-DMXTomHi.wav",
+    "samples": 5079,
+    "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "OBERHEIM DMX",
+    "slot": 8,
+    "source": "G:\\AUDIO\\300 Drum Machines\\Oberheim DMX\\DMXRim.wav",
+    "prepared": "assets\\kits\\5-8-DMXRim.wav",
+    "samples": 1233,
+    "mastering": "lsbatch-punch-v3"
+  }
+]
