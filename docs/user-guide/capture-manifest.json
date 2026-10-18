@@ -1,0 +1,564 @@
+{
+  "rom": "build/GAYBOY.gb",
+  "sha256": "0be14a91ccd4c38f7f327009536ac256e9c63014c3c10e74541104329545cf7d",
+  "emulator": "PyBoy DMG; isolated blank RAM; actual joypad controls; no memory writes",
+  "captures": [
+    {
+      "screenshot": "01-drum-roll",
+      "frame": 1817,
+      "page": 8
+    },
+    {
+      "button": "a",
+      "frame": 1841
+    },
+    {
+      "screenshot": "03-playing",
+      "frame": 1891,
+      "page": 8
+    },
+    {
+      "button": "a",
+      "frame": 1913
+    },
+    {
+      "button": "down",
+      "frame": 1948
+    },
+    {
+      "button": "down",
+      "frame": 1960
+    },
+    {
+      "button": "down",
+      "frame": 1972
+    },
+    {
+      "button": "down",
+      "frame": 1984
+    },
+    {
+      "button": "down",
+      "frame": 1996
+    },
+    {
+      "button": "down",
+      "frame": 2008
+    },
+    {
+      "button": "down",
+      "frame": 2020
+    },
+    {
+      "button": "down",
+      "frame": 2032
+    },
+    {
+      "button": "down",
+      "frame": 2044
+    },
+    {
+      "button": "down",
+      "frame": 2056
+    },
+    {
+      "button": "down",
+      "frame": 2068
+    },
+    {
+      "button": "down",
+      "frame": 2080
+    },
+    {
+      "button": "down",
+      "frame": 2092
+    },
+    {
+      "screenshot": "02-page-menu",
+      "frame": 2122,
+      "page": 8
+    },
+    {
+      "screenshot": "04-kits",
+      "frame": 2252,
+      "page": 23
+    },
+    {
+      "button": "down",
+      "frame": 2263
+    },
+    {
+      "button": "a",
+      "frame": 2274
+    },
+    {
+      "button": "b",
+      "frame": 2286
+    },
+    {
+      "screenshot": "05-kit-loaded",
+      "frame": 2316,
+      "page": 23
+    },
+    {
+      "button": "down",
+      "frame": 2334
+    },
+    {
+      "button": "down",
+      "frame": 2347
+    },
+    {
+      "button": "down",
+      "frame": 2360
+    },
+    {
+      "button": "down",
+      "frame": 2373
+    },
+    {
+      "button": "down",
+      "frame": 2386
+    },
+    {
+      "button": "down",
+      "frame": 2399
+    },
+    {
+      "button": "down",
+      "frame": 2412
+    },
+    {
+      "button": "down",
+      "frame": 2424
+    },
+    {
+      "button": "down",
+      "frame": 2437
+    },
+    {
+      "button": "down",
+      "frame": 2450
+    },
+    {
+      "screenshot": "06-drumsynth",
+      "frame": 2580,
+      "page": 17
+    },
+    {
+      "button": "select",
+      "frame": 2592
+    },
+    {
+      "screenshot": "07-snare",
+      "frame": 2622,
+      "page": 17
+    },
+    {
+      "button": "select",
+      "frame": 2633
+    },
+    {
+      "screenshot": "08-pulsekick",
+      "frame": 2663,
+      "page": 17
+    },
+    {
+      "button": "down",
+      "frame": 2681
+    },
+    {
+      "button": "down",
+      "frame": 2694
+    },
+    {
+      "button": "down",
+      "frame": 2707
+    },
+    {
+      "button": "down",
+      "frame": 2720
+    },
+    {
+      "button": "down",
+      "frame": 2733
+    },
+    {
+      "button": "down",
+      "frame": 2746
+    },
+    {
+      "button": "down",
+      "frame": 2759
+    },
+    {
+      "button": "down",
+      "frame": 2772
+    },
+    {
+      "button": "down",
+      "frame": 2785
+    },
+    {
+      "screenshot": "09-pulse-tone",
+      "frame": 2915,
+      "page": 1
+    },
+    {
+      "button": "b",
+      "frame": 2929
+    },
+    {
+      "button": "up",
+      "frame": 2943
+    },
+    {
+      "button": "a",
+      "frame": 2963
+    },
+    {
+      "screenshot": "10-preset-picker",
+      "frame": 2993,
+      "page": 1
+    },
+    {
+      "button": "b",
+      "frame": 3011
+    },
+    {
+      "button": "down",
+      "frame": 3032
+    },
+    {
+      "button": "down",
+      "frame": 3048
+    },
+    {
+      "button": "down",
+      "frame": 3065
+    },
+    {
+      "screenshot": "11-piano-roll",
+      "frame": 3195,
+      "page": 8
+    },
+    {
+      "button": "b",
+      "frame": 3217
+    },
+    {
+      "button": "right",
+      "frame": 3227
+    },
+    {
+      "button": "up",
+      "frame": 3237
+    },
+    {
+      "button": "b",
+      "frame": 3269
+    },
+    {
+      "screenshot": "12-note-entry",
+      "frame": 3299,
+      "page": 8
+    },
+    {
+      "button": "right",
+      "frame": 3364
+    },
+    {
+      "screenshot": "13-note-duration",
+      "frame": 3414,
+      "page": 8
+    },
+    {
+      "button": "down",
+      "frame": 3482
+    },
+    {
+      "screenshot": "14-zoom",
+      "frame": 3532,
+      "page": 8
+    },
+    {
+      "button": "up",
+      "frame": 3599
+    },
+    {
+      "button": "select",
+      "frame": 3629
+    },
+    {
+      "screenshot": "15-seq-settings",
+      "frame": 3659,
+      "page": 10
+    },
+    {
+      "button": "select",
+      "frame": 3669
+    },
+    {
+      "button": "down",
+      "frame": 3720
+    },
+    {
+      "button": "down",
+      "frame": 3732
+    },
+    {
+      "button": "down",
+      "frame": 3744
+    },
+    {
+      "button": "down",
+      "frame": 3756
+    },
+    {
+      "button": "down",
+      "frame": 3768
+    },
+    {
+      "button": "down",
+      "frame": 3780
+    },
+    {
+      "button": "down",
+      "frame": 3792
+    },
+    {
+      "button": "down",
+      "frame": 3804
+    },
+    {
+      "screenshot": "16-mixer",
+      "frame": 3934,
+      "page": 18
+    },
+    {
+      "button": "down",
+      "frame": 3953
+    },
+    {
+      "button": "down",
+      "frame": 3966
+    },
+    {
+      "screenshot": "17-save-pattern",
+      "frame": 4096,
+      "page": 20
+    },
+    {
+      "button": "a",
+      "frame": 4113
+    },
+    {
+      "screenshot": "18-name-keyboard",
+      "frame": 4143,
+      "page": 20
+    },
+    {
+      "button": "select",
+      "frame": 4158
+    },
+    {
+      "button": "b",
+      "frame": 4276
+    },
+    {
+      "button": "down",
+      "frame": 4455
+    },
+    {
+      "screenshot": "19-load-pattern",
+      "frame": 4585,
+      "page": 19
+    },
+    {
+      "button": "a",
+      "frame": 4618
+    },
+    {
+      "button": "down",
+      "frame": 4797
+    },
+    {
+      "button": "down",
+      "frame": 4811
+    },
+    {
+      "button": "down",
+      "frame": 4825
+    },
+    {
+      "button": "down",
+      "frame": 4839
+    },
+    {
+      "button": "down",
+      "frame": 4853
+    },
+    {
+      "screenshot": "20-save-song",
+      "frame": 4983,
+      "page": 25
+    },
+    {
+      "button": "b",
+      "frame": 5021
+    },
+    {
+      "button": "down",
+      "frame": 5200
+    },
+    {
+      "button": "down",
+      "frame": 5214
+    },
+    {
+      "button": "down",
+      "frame": 5228
+    },
+    {
+      "button": "down",
+      "frame": 5242
+    },
+    {
+      "screenshot": "21-load-song",
+      "frame": 5372,
+      "page": 24
+    },
+    {
+      "button": "down",
+      "frame": 5394
+    },
+    {
+      "button": "down",
+      "frame": 5410
+    },
+    {
+      "button": "down",
+      "frame": 5426
+    },
+    {
+      "button": "down",
+      "frame": 5442
+    },
+    {
+      "button": "down",
+      "frame": 5458
+    },
+    {
+      "button": "down",
+      "frame": 5474
+    },
+    {
+      "button": "down",
+      "frame": 5490
+    },
+    {
+      "button": "down",
+      "frame": 5506
+    },
+    {
+      "screenshot": "22-global-off",
+      "frame": 5636,
+      "page": 16
+    },
+    {
+      "button": "a",
+      "frame": 5648
+    },
+    {
+      "screenshot": "23-global-on",
+      "frame": 5678,
+      "page": 16
+    },
+    {
+      "button": "down",
+      "frame": 5694
+    },
+    {
+      "button": "down",
+      "frame": 5707
+    },
+    {
+      "button": "down",
+      "frame": 5720
+    },
+    {
+      "button": "down",
+      "frame": 5733
+    },
+    {
+      "button": "down",
+      "frame": 5746
+    },
+    {
+      "button": "down",
+      "frame": 5759
+    },
+    {
+      "button": "down",
+      "frame": 5772
+    },
+    {
+      "button": "down",
+      "frame": 5785
+    },
+    {
+      "screenshot": "24-monosynth",
+      "frame": 5915,
+      "page": 7
+    },
+    {
+      "button": "right",
+      "frame": 5939
+    },
+    {
+      "screenshot": "25-mono-pulse2",
+      "frame": 5989,
+      "page": 7
+    },
+    {
+      "button": "right",
+      "frame": 6021
+    },
+    {
+      "screenshot": "26-mono-wave",
+      "frame": 6071,
+      "page": 7
+    },
+    {
+      "button": "right",
+      "frame": 6103
+    },
+    {
+      "screenshot": "27-mono-mod",
+      "frame": 6153,
+      "page": 7
+    },
+    {
+      "button": "right",
+      "frame": 6186
+    },
+    {
+      "screenshot": "28-mono-exp",
+      "frame": 6236,
+      "page": 7
+    },
+    {
+      "button": "down",
+      "frame": 6255
+    },
+    {
+      "button": "down",
+      "frame": 6269
+    },
+    {
+      "screenshot": "29-masturbate",
+      "frame": 6399,
+      "page": 9
+    }
+  ]
+}

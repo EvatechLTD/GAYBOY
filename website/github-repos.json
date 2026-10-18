@@ -1,0 +1,29 @@
+{
+  "refreshed": "2026-10-18T23:01:44.452458+00:00",
+  "repositories": [
+    {
+      "name": "GAYBOY",
+      "url": "https://github.com/dpjpandone/GAYBOY",
+      "description": "GAYBOY is a Game Boy synth, piano-roll sequencer, sample drum machine and MIDI chiptune workstation. Play in your browser or download the homebrew ROM.",
+      "updated": "2026-10-18T15:32:19Z"
+    },
+    {
+      "name": "chipScripts",
+      "url": "https://github.com/dpjpandone/chipScripts",
+      "description": "scripts for processing samples for handheld trackers/sequencers",
+      "updated": "2026-04-12T20:19:59Z"
+    },
+    {
+      "name": "MainMan",
+      "url": "https://github.com/dpjpandone/MainMan",
+      "description": "Industrial Maintenance Manager",
+      "updated": "2025-07-04T18:04:00Z"
+    },
+    {
+      "name": "FOCOLOCOV2",
+      "url": "https://github.com/dpjpandone/FOCOLOCOV2",
+      "description": null,
+      "updated": "2014-04-10T08:41:11Z"
+    }
+  ]
+}
