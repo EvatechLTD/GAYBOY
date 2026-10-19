@@ -1,87 +1,49 @@
-MIXER IMPROVEMENTS — FIRST IMPLEMENTATION CHECKPOINT
-2026-10-19
-
+Mixer/link implementation candidate
+===================================
 Branch: mixer-improvements
-Worktree: G:/DEVELOPMENT/GAYBOY-mixer
-Base: main 258b713064ab6796443b6237a040718b1d5d7e9e
-The completed slave-launch quantization port is included in this base.
+Base main: 258b713064ab6796443b6237a040718b1d5d7e9e
+Worktree: G:\DEVELOPMENT\GAYBOY-mixer
+ROM: build/GAYBOY.gb
+SHA256: 095f4166bf9198fe79d630982e622bbeba562385d4594110f8c3f668a69d3964
 
-Implemented
------------
-Boot selects native GAYBOY / AUTO. The native ROLE selector offers AUTO,
-MASTER and SLAVE; other sync formats retain manual roles. AUTO peers listen
-while stopped, a local start claims master, and an incoming start retains
-slave. A master stop returns AUTO peers to listening. Selected policy and
-active role are separate. A locally stopped slave remembers the peer's
-running transport and cannot steal clock ownership on local restart.
-An already listening slave is not rearmed by foreground stop handling,
-which could otherwise restart an in-flight external serial transfer.
+Implemented: independent LOCAL/LINK visibility layouts and persistence,
+four 40-pixel pads/page with five-character labels and full focused names,
+AUTO native role election with manual overrides, negotiated peer discovery,
+automatic save/load/song-load names, remote mixer controls and pad launches,
+and prepared PAIR launches committed on the master's quantization boundary.
 
-SELECT on Mixer opens a visibility checklist for seven main tracks,
-13 drum voices and eight pads. A hides/shows; B restores all; SELECT closes.
-Visible tracks compact horizontally. Hidden pads use a compact labeled
-grid with original slot numbers and active/queued markers. Hidden active
-pads are called out. Navigation skips hidden items and an empty layout
-returns focus to the header. Hiding never changes audio or pattern data.
-Visibility currently lasts for the session, including page changes.
-The layout renderer lives in bank 60; bank 18 could not fit all new UI.
+Live optional data adds zero serial transfers. Forward data uses the spare
+bit in 48/64 existing numbered clocks; reverse data uses existing replies.
+All six clock-sequence bits and essential status codes remain intact.
+Slave serial rearm uses a precomputed reply, before optional selection.
+This fixes a reproduced missed-edge/corrupted-byte failure from selecting
+replies before rearming. Final real-cable traces assert zero unarmed edges.
+Optional receive backpressure drops/retries metadata, never musical clocks.
+Heartbeat spacing and name retry deadlines cover 30 BPM. Pair markers carry
+a flag inside the existing payload so stale prepared pairs cannot consume
+an ordinary later launch. Stop disarms the consumer before clearing bits.
 
-Not implemented / not claimed
------------------------------
-No handshake, name requests, background polls, extra serial transfers,
-remote control protocol, remote mirror, linked mixer strips, reorder or
-layout persistence is implemented in this checkpoint. No new serial ISR or
-oscillator instructions have been added. Live optional traffic must remain
-disabled until admission safety and instrument-level CPU/timing parity are
-demonstrated. Piggyback replies still require measured CPU work.
+Qualified ROM: all eight paired slots at 30/120/300 BPM, comparing P1/P2/drum
+grids; live controls, independent launches and saved names. The 300 BPM case
+also verifies pattern-load and song-load names. Zero missed serial edges,
+extra metadata transfers, aborted transfers, receive overflows or added
+underruns. CRC/retry/duplicate/malformed, reconnect, simultaneous-start,
+lost-READY timeout, legacy compatibility and raw slave-mode tests pass.
+UI cache, fader, drum, layout persistence/recovery and blink tests pass.
+See briefs/mixer-validation.json for the exact ROM hash and raw metrics.
 
-Near-simultaneous AUTO starts/collision arbitration and physical hardware
-verification remain outstanding. AUTO is not ready to promise collision
-recovery. Forced roles remain available. Do not publish this as a completed
-linked-mixer release or claim full timing parity from these initial tests.
+The old standalone mixer fixture and strict one-frame handoff gate are NOT
+green. Both also fail against pinned main (different fixture assertion for
+the old mixer test). Thresholds were not relaxed. Current IRQ/audio budget
+gates pass with zero underruns, maximum measured IRQ 7680 cycles. Immutable
+UI tables moved to ROM to retain 1045 bytes free WRAM and 512 bytes reserved
+stack. Hardware console/cable timing parity remains unverified. Metadata
+is deliberately slower at low BPM instead of borrowing a clock deadline.
 
-Verification
-------------
-python tools/build_rom.py: passes ROM-bank and memory checks; 1042 bytes
-WRAM reserve below engine tables and 512 bytes stack remain.
-python tools/test_mixer_layout.py: passes real-UI hide/show, navigation,
-empty layouts and audio-state isolation.
-python tools/test_sync.py: passes mode/role UI, MIDI/native parsing,
-transport, tempo and clock gating.
-python tools/test_slave_clock_cpu.py: passes grid/remainder conservation
-in all five sync modes at 120 and 300 BPM.
-node tools/test_sync_link.cjs --bpm 120: passes real-cable AUTO start in
-both directions, stop/listen, local slave restart and forced-role fallback.
-node tools/test_sync_link.cjs --bpm 300 --stress: same checks with dense PCM.
-node tools/test_slave_launch_sync.cjs --mode N --bpm 300 --stress:
-passes every N=1..5, including quantizations, pad changes and retriggers.
+Sparse layout uses root 110..120, avoiding the primary checkout's new Quick
+Menu assignments at 100..109. That separate, uncommitted Finder/Quick Menu
+work was not imported into this branch. User-directed initial-selection
+edits made there during the wrong-agent exchange remain in primary only.
 
-The IRQ/audio fixture needed to observe seq_native_hardware as well as
-the older play/seq_irq paths. The play-entry interval is now nullable when
-native hardware writes bypass play. Explicit ROM comparisons pass the
-matching symbol table into boot_helpers instead of using current symbols.
-The sync IRQ wrapper now accepts --rom and --output for baseline comparison.
-
-python tools/test_sync_irq_budget.py STILL FAILS the historical 66.36 ms
-startup threshold. A pinned main baseline also fails using the corrected
-hardware-write instrumentation: approximately 69.6 ms on the sequencer and
-72.4 ms on Mixer. The threshold is intentionally unchanged. Audio delivery,
-note rate and IRQ deadline checks pass with zero measured underruns in
-both builds. Raw measurements are in build/sync-irq-budget.json and
-build/main-baseline/sync-irq-budget.json. These short samples do not prove
-all per-instrument timing distributions equivalent.
-
-The local baseline ROM was rebuilt from main's original sync/mixer sources
-and otherwise unchanged objects, excluding mixer_layout; SHA256:
-309cb20e48437f552fc009a26cb60a135e505de51ee78d1a262832da6f2f6051
-Current checkpoint ROM SHA256:
-74d462c25f60f43209814832e0aad401fe7bb3e4492e694f724baeb1c3e0c30e
-
-Next gate
----------
-Finish role-collision behavior and repeat performance comparisons with
-matched workloads and longer note traces before extending the serial path.
-Then implement bounded capability/name/state framing with stopped-only
-transfer first. No optional operation may reset phase, block an instrument
-deadline, fill the essential TX ring or delay a due clock. Layout order and
-persistence need independent memory/storage ownership and recovery review.
+Architecture, UI controls, bandwidth, framing and reproduction commands:
+docs/linked-mixer.md

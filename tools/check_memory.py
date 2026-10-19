@@ -67,6 +67,7 @@ def audit(rom):
         reserve(bank, base + 32, 2417, 'pattern events/settings/patch')
     reserve(1, 2500, 4, 'legacy boot signature')
     reserve(3, 0x1400, 2064, 'maximum track/region clipboard')
+    reserve(3, 0x1C10, 32, 'legacy redundant mixer layout records')
     spans = [(2, 2560, 512), (5, 2560, 512), (8, 2560, 512),
              (0, 2449, 51), (0, 2504, 56)]
     spans += [(slot, 2449, 111) for slot in range(1, 8)]

@@ -64,6 +64,7 @@ sync_clock_due$:
  jr nz,sync_clock_raw$
  ldh a,(_synctick)
  or #0x80
+ call _link_clock_byte
  jr sync_clock_send$
 sync_clock_raw$:
  xor a

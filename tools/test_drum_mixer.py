@@ -1,9 +1,10 @@
 """Per-voice drum mixer UI, playback and saved-pattern compatibility on DMG."""
 from pathlib import Path
 from seq_storage_helpers import write_tracks, read_word, write_word
-env = {}
+legacy=bytearray(32768);legacy[8192+2500:8192+2504]=b'GBM2'
+env = {'legacy':legacy}
 exec(Path('tools/test_monosynth.py').read_text().split('# Native oscillator baseline')[0]
-     .replace('range(60)', 'range(600)').replace('sound_emulated=True,ram_file=', 'sound_emulated=True,cgb=False,ram_file='), env)
+     .replace('ram_file=BytesIO(bytes(32768))','ram_file=BytesIO(legacy)').replace('range(60)', 'range(600)').replace('sound_emulated=True,ram_file=', 'sound_emulated=True,cgb=False,ram_file='), env)
 p, S, v, choose, press = (env[k] for k in ('p', 'S', 'v', 'choose', 'press'))
 mx = S['_mx']
 def mask(n): return read_word(p, S['_' + n])
@@ -40,7 +41,7 @@ try:
     press('down')
     assert p.memory[mx + 4] == 30
     press('up')
-    assert p.memory[mx + 4] >= 38
+    assert p.memory[mx + 4] == 5
     p.screen.image.save('build/ui-drum-mixer.png')
     setmask('drummutemask', 0)
     setmask('drumsolomask', 0)

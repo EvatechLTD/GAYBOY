@@ -6,7 +6,7 @@ uint8_t noise_random(void){noiserandom^=noiserandom<<7;noiserandom^=noiserandom>
 uint8_t noisevalues[16]={36,24,3,5,4,15,20,3,12,12,3,24,8,7,12,12};
 const uint8_t noisecaps[16]={83,31,3,7,7,15,31,32,64,32,32,64,15,12,32,32};
 const uint8_t noisemaps[16]={255,255,255,21,22,6,10,11,12,13,14,23,24,25,8,255};
-const char *noisenames[]={"PITCH","WAVE","LEVEL","CUTOFF","RESONANCE","BRIGHTNESS","PHASE DEPTH","PHASE RATE","DETUNE","CHORUS DEPTH","CHORUS RATE","DELAY TIME","DELAY MIX","FEEDBACK","FILTER CHAOS","CHAOS RATE"};
+const char * const noisenames[]={"PITCH","WAVE","LEVEL","CUTOFF","RESONANCE","BRIGHTNESS","PHASE DEPTH","PHASE RATE","DETUNE","CHORUS DEPTH","CHORUS RATE","DELAY TIME","DELAY MIX","FEEDBACK","FILTER CHAOS","CHAOS RATE"};
 uint8_t noisecursor,noiseedit,noiseon,noisepitch,noisesaved;
 uint8_t noiseset[21],noisedepth[21],noisesource[11],noiseconfig[EXP_COUNT],noiserelease[3];
 void noise_text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *dst=canvas+(uint16_t)y*20+x;while(*s&&x++<20)*dst++=*s++-32+(inv?96:0);}

@@ -147,7 +147,7 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;if(seqplaying){seq_s
  }
  seq_native_prime();
  __critical {TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;}
- if(syncmode)sync_transport(1);
+ if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}
  seq_irq_launch();
  if(!seq_native_fire(0)){if(seq_enabled(6))seq_fire(6);
  for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);}seq_next_deadline();seq_irq_prepare();seqservicing=0;dirty=1;

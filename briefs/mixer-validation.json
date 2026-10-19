@@ -1,0 +1,828 @@
+{
+  "branch": "mixer-improvements",
+  "base": "258b713064ab6796443b6237a040718b1d5d7e9e",
+  "rom_sha256": "095f4166bf9198fe79d630982e622bbeba562385d4594110f8c3f668a69d3964",
+  "reference_rom_sha256": "309cb20e48437f552fc009a26cb60a135e505de51ee78d1a262832da6f2f6051",
+  "live_cable": {
+    "30": {
+      "bpm": 30,
+      "rom_sha256": "095f4166bf9198fe79d630982e622bbeba562385d4594110f8c3f668a69d3964",
+      "pairs": [
+        {
+          "slot": 0,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 1,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 2,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 3,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 4,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 5,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 6,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 7,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 0,
+              "b": 0,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        }
+      ],
+      "admission": {
+        "clockTransfers": 3123,
+        "clockCarriers": 409,
+        "extraMetadataTransfers": 0
+      },
+      "liveRemoteControls": true,
+      "independentRemoteLaunch": true,
+      "liveSaveFrames": 152,
+      "clock": {
+        "meanMs": 83.33337192425432,
+        "idealMs": 83.33333333333333,
+        "peakSpacingErrorMs": 2.68777211507161,
+        "maxDueToLaunchMs": 0.11348724365234375
+      },
+      "unarmedSerialEdges": 0
+    },
+    "120": {
+      "bpm": 120,
+      "rom_sha256": "095f4166bf9198fe79d630982e622bbeba562385d4594110f8c3f668a69d3964",
+      "pairs": [
+        {
+          "slot": 0,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 1,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 2,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 3,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 4,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 5,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 6,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 7,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        }
+      ],
+      "admission": {
+        "clockTransfers": 3989,
+        "clockCarriers": 407,
+        "extraMetadataTransfers": 0
+      },
+      "liveRemoteControls": true,
+      "independentRemoteLaunch": true,
+      "liveSaveFrames": 199,
+      "clock": {
+        "meanMs": 20.833458321742572,
+        "idealMs": 20.833333333333332,
+        "peakSpacingErrorMs": 2.062479654947918,
+        "maxDueToLaunchMs": 0.6351470947265625
+      },
+      "unarmedSerialEdges": 0
+    },
+    "300": {
+      "bpm": 300,
+      "rom_sha256": "095f4166bf9198fe79d630982e622bbeba562385d4594110f8c3f668a69d3964",
+      "pairs": [
+        {
+          "slot": 0,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 6,
+              "b": 6,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 6,
+              "b": 6,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 6,
+              "b": 6,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 43,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 1,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 4,
+              "b": 4,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 4,
+              "b": 4,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 4,
+              "b": 4,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 34,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 2,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 33,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 3,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 10,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 4,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 7,
+              "b": 7,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 7,
+              "b": 7,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 7,
+              "b": 7,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 5,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 6,
+              "b": 6,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 6,
+              "b": 6,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 6,
+              "b": 6,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 43,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 6,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 13,
+              "b": 13,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 13,
+              "b": 13,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 13,
+              "b": 13,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 63,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 7,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 5,
+              "b": 5,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 5,
+              "b": 5,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 5,
+              "b": 5,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        }
+      ],
+      "admission": {
+        "clockTransfers": 20330,
+        "clockCarriers": 677,
+        "extraMetadataTransfers": 0
+      },
+      "liveRemoteControls": true,
+      "independentRemoteLaunch": true,
+      "liveSaveFrames": 445,
+      "patternAndSongLoadNames": true,
+      "clock": {
+        "meanMs": 8.33324994566613,
+        "idealMs": 8.333333333333334,
+        "peakSpacingErrorMs": 3.22259267171224,
+        "maxDueToLaunchMs": 0.9059906005859375
+      },
+      "unarmedSerialEdges": 0
+    }
+  },
+  "irq_audio": [
+    {
+      "ui": "idle sequencer",
+      "full_irq_cpu_percent": 41.59436621322835,
+      "full_irq_cycles_max": 7084,
+      "audio_underruns": 0,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_startup_regression_budget": true,
+      "meets_subdivision_budget": true
+    },
+    {
+      "ui": "held right / viewport redraws",
+      "full_irq_cpu_percent": 41.15639477481583,
+      "full_irq_cycles_max": 7148,
+      "audio_underruns": 0,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_startup_regression_budget": true,
+      "meets_subdivision_budget": true
+    },
+    {
+      "ui": "Mixer held volume",
+      "full_irq_cpu_percent": 41.25474671527303,
+      "full_irq_cycles_max": 7680,
+      "audio_underruns": 0,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_startup_regression_budget": true,
+      "meets_subdivision_budget": true
+    }
+  ],
+  "asserted_live_invariants": {
+    "additional_audio_underruns": 0,
+    "serial_receive_overflows": 0,
+    "aborted_transfers": 0,
+    "stack_lower_bound_hex": "DE00"
+  },
+  "other_passes": [
+    "real-cable stopped discovery and mute/solo/volume/pan",
+    "CRC rejection/retry, duplicate suppression and malformed-frame recovery",
+    "lost READY timeout and unpaired-marker isolation",
+    "disconnect/reconnect session and names",
+    "AUTO competing starts, role reversal, forced roles, slave restart",
+    "pinned-main legacy master/slave compatibility",
+    "all five slave clock modes at 120/300 BPM",
+    "sparse and legacy layout/PAIR power cycles and redundant-record recovery",
+    "40 pad cache transitions, 56 fader cases, 25 whole-map/VRAM transitions",
+    "queued-pad blinking, replacement and active-pad quantized retrigger",
+    "local fader controls and drum mixer legacy save/load"
+  ],
+  "known_failures": [
+    "test_pattern_audio_handoff.py strict one-video-frame threshold fails on candidate and native pinned main; thresholds unchanged",
+    "test_mixer_live.py old fixture hits candidate input-release timeout and pinned-main cache-ownership assertion; not a passing acceptance gate"
+  ],
+  "limits": [
+    "emulation, not physical console/cable validation",
+    "bounded additional CPU work; zero additional live serial transfers is not zero CPU overhead",
+    "remote control/name bandwidth follows clock tempo; low-BPM discovery can exceed one minute"
+  ]
+}

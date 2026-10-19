@@ -10,8 +10,12 @@ from quick_demo import QuickDemo
 S={l.split()[1]:int(l.split()[2],16) for l in Path('build/GAYBOY.noi').read_text().splitlines() if l.startswith('DEF ')}
 p=PyBoy('build/GAYBOY.gb',window='null',sound_emulated=True,cgb=False,ram_file=BytesIO(bytes(32768)))
 p.set_emulation_speed(0)
-p.tick(150);p.button_press('start');p.tick(15);p.button_release('start');p.tick(30)
+from boot_helpers import enter_app
+enter_app(p,S)
 d=QuickDemo(p,S)
+# Keep the launched pad visible long enough to publish and sample its solid
+# appearance; the demo may otherwise leave Mixer in the same scheduler turn.
+d.mix_demo=lambda:d.wait(45)
 for _ in d.prepare():p.tick()
 d.frames=0;d.log=[];d.stage_times=[];d.sequence=d.run()
 states=[];active=set();solid=set();flash_uploads=[]
@@ -31,17 +35,18 @@ try:
   pending=p.memory[S['_mx']+2]
   if pending==1 and value('padflash_slot')==1:
    phase=value('padflash_off')
-   states.append((d.frames,phase,digest(21,39)))
-   active.add(digest(1,19))
+   states.append((d.frames,phase,digest(41,79)))
+   active.add(digest(1,39))
   elif p.memory[S['_mx']+1]==1 and pending==255 and value('padflash_slot')==255:
-   solid.add(digest(21,39))
+   solid.add(digest(41,79))
  assert d.done
  # Replace a queued pad with its adjacent neighbor. Their shared edge tile
- # must not make the cancelled pad flash, and picking the active pad cancels.
+ # must not make the cancelled pad flash, and picking the active pad replaces it with a quantized retrigger.
  def drive(sequence):
   for _ in sequence:p.tick();d.frames+=1
  drive(d.choose(18))
- p.memory[S['_seqbpm']]=30;p.memory[S['_seqbpm']+1]=0
+ for n in ('seqbpm','seqglobalbpm'):
+  p.memory[S['_'+n]]=30;p.memory[S['_'+n]+1]=0
  for _ in range(650):
   if p.memory[S['_mx']+10]==0 and p.memory[S['_mx']+11]==0:break
   p.tick()
@@ -52,10 +57,14 @@ try:
  assert p.memory[S['_mx']+2]==3
  neighbor=set();phases_replaced=set()
  for _ in range(50):
-  p.tick();neighbor.add(digest(41,59));phases_replaced.add(value('padflash_off'))
+  p.tick();neighbor.add(digest(81,119));phases_replaced.add(value('padflash_off'))
  assert len(neighbor)==1 and phases_replaced=={0,1}, 'Cancelled neighbor inherited the queued flash'
  neighbor_stable=True
  drive(d.tap('left'));drive(d.tap('left'));drive(d.tap('a'));p.tick(50)
+ assert p.memory[S['_mx']+1]==1 and p.memory[S['_mx']+2]==1
+ for _ in range(650):
+  p.tick()
+  if p.memory[S['_mx']+2]==255 and value('padflash_off')==0:break
  assert p.memory[S['_mx']+1]==1 and p.memory[S['_mx']+2]==255 and value('padflash_off')==0
  cancelled=True
 finally:p.stop(save=False)
@@ -69,9 +78,9 @@ on=Counter(h for _,phase,h in states if phase==0).most_common(1)[0][0]
 off=Counter(h for _,phase,h in states if phase==1).most_common(1)[0][0]
 assert on!=off and solid=={on}, 'Playing appearance differs from the illuminated queued pad'
 assert not flash_uploads, 'Blink animation regenerated graphics'
-assert d.transition_snapshot[:3]==[15,63,31], 'Launch missed the arrangement loop boundary'
+assert all(x%16==15 for x in d.transition_snapshot[:3]), 'Launch missed the 1/1 boundary'
 result={'flash_transitions':changes,'queued_samples':len(states),'active_pad_stable':True,
         'launched_pad_solid':True,'tile_uploads_during_blink':len(flash_uploads),
-        'replaced_neighbor_stable':neighbor_stable,'active_pad_cancels_queue':cancelled,'stages':d.stage_times}
+        'replaced_neighbor_stable':neighbor_stable,'active_pad_replaces_queue_with_retrigger':cancelled,'stages':d.stage_times}
 Path('build/queued-flash.json').write_text(json.dumps(result,indent=2))
 print(json.dumps(result,indent=2))

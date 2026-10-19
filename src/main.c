@@ -4,9 +4,13 @@
 #include <stdio.h>
 #include <string.h>
 #include "api.h"
+#include "link_control.h"
 #include "notes.h"
 #define REG(a) (*(volatile uint8_t *)(a))
 volatile uint8_t rx[256],wr,rd,overflow;
+extern volatile uint8_t link_rx_ready,link_peer_capable;
+extern volatile uint8_t linkbitqueued;
+void link_wire_service(void) BANKED;
 uint8_t param[4][26],program[4],held[4],velocity[4],active[4],sustain[4];
 extern uint8_t edited[4],lastcc,lastvalue,midiage,livepitch[4],liveduty[4];
 uint8_t selected=0,choice=0,dirty=1,lastpad=0,st=0,first=0,count=0;
@@ -132,24 +136,28 @@ void service(void){uint8_t b,budget=8;uint16_t now,delta;mixfill();while(rd!=wr&
 void exp_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) NONBANKED {uint8_t saved=CURRENT_BANK;SWITCH_ROM(bank);memcpy(dst,(const void *)(0x4000+offset),16);SWITCH_ROM(saved);}
 extern uint16_t seqdeadline;
 void mixer_prepare_service(void) BANKED;
-void mixfill(void){if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(rd!=wr&&!syncbusy&&(!syncmode||!seqservicing)){uint8_t b=rx[rd++];midi(b);}if(monomode&&expactive){exp_service();if(expconfig[0])exp_fill();}else if(waveengine==2&&mixrunning&&!mixready[mixwrite]){legacyfill();if(!mixready[mixwrite])legacyfill();}
+extern uint8_t mixer_layout_dirty;
+void mixer_layout_service(void) BANKED;
+void mixfill(void){if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);}if(monomode&&expactive){exp_service();if(expconfig[0])exp_fill();}else if(waveengine==2&&mixrunning&&!mixready[mixwrite]){legacyfill();if(!mixready[mixwrite])legacyfill();}
  /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */
  if(seqplaying&&!seqservicing&&seqeventcache==2){seqservicing=1;sparse_service();seqservicing=0;}
- if(rd==wr&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
- if(rd==wr&&seqplaying&&!seqservicing&&seqticks<seqdeadline)seq_native_prepare();}
+ if((rd==wr||(syncmode==1&&!syncslave))&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
+ if((rd==wr||(syncmode==1&&!syncslave))&&seqplaying&&!seqservicing&&seqticks<seqdeadline)seq_native_prepare();}
 /* Intro audio can interrupt graphics in any ROM bank. Restore that bank before
    returning; the normal workstation timer is installed after the intro exits. */
 void intro_audio_tick(void);
 void intro_timer(void){uint8_t saved=CURRENT_BANK;SWITCH_ROM(21);intro_audio_tick();SWITCH_ROM(saved);}
 void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();drum_init();startup();ui_loading_begin();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
- disable_interrupts();padsampled=lastpad;add_VBL(input_vblank);add_SIO(serial_isr);add_TIM(engine_timer);SB_REG=0;SC_REG=0x80;set_interrupts(VBL_IFLAG|SIO_IFLAG|TIM_IFLAG);enable_interrupts();
+ disable_interrupts();padsampled=lastpad;add_VBL(input_vblank);add_SIO(link_serial_isr);add_TIM(engine_timer);SB_REG=0;SC_REG=0x80;set_interrupts(VBL_IFLAG|SIO_IFLAG|TIM_IFLAG);enable_interrupts();
  /* Preparation runs on Mixer; its private journal commit (phase18 atACB4)
     also finishes off-page. Avoid an idle bank round-trip on other pages. */
  lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();if(sparse_enabled)sparse_service();else if(page==18||*(volatile uint8_t *)0xACB4==18)mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
  if(syncmode>1&&syncslave&&seqplaying)sync_advance(0);
+ if(syncmode==1)link_service();
+ if(mixer_layout_dirty&&!seqplaying)mixer_layout_service();
  if(padread==end){ui_input(p,0);if(p)seq_native_touch();lastpad=p;}
  else while(padread!=end){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;ui_input(p,edge);seq_native_touch();lastpad=p;service();}
  if(!syncmode&&seqplaying&&!seqservicing&&seqirqdirty&&!seqirqready&&!seqirqfired){seqservicing=1;seq_irq_prepare();seqservicing=0;}

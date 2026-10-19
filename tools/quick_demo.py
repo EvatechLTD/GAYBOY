@@ -49,8 +49,8 @@ class QuickDemo(IntroSongDemo):
         yield from self.tap('a')
         assert self.p.memory[self.s['_mx']+1] == 0
         assert self.v('seqmuted') == 72
-        # Queue on the final bar so BAR quantization lands on the 64-step wrap.
-        self.p.memory[self.s['_mx']+3] = 2
+        # Queue on the final bar; preparation launches at the next available 1/1 grid.
+        self.p.memory[self.s['_mx']+3] = 4
         yield from self.choose(8)
         yield from self.track(self.bass_track)
         assert self.v('seqcols') == 16
@@ -101,12 +101,11 @@ class QuickDemo(IntroSongDemo):
         assert self.p.memory[self.s['_mx']+1] == 1
         assert self.v('seqmuted') == 0
         assert self.transition_snapshot is not None
-        assert self.transition_snapshot[0:2] == [15,63], self.transition_snapshot
-        assert self.transition_snapshot[2] == 31, self.transition_snapshot
+        assert all(position % 16 == 15 for position in self.transition_snapshot[:4]+self.transition_snapshot[6:]), self.transition_snapshot
         self.stage_times.append({'frame':self.frames,'event':'drums entered through pattern pad 2'})
-        self.stage_times.append({'frame':self.frames,'event':'full-loop handoff verified','outgoing_positions':self.transition_snapshot})
+        self.stage_times.append({'frame':self.frames,'event':'bar handoff verified','outgoing_positions':self.transition_snapshot})
         assert self.frames/59.7275 < 15
-        self.label('Solid means playing.\nThe drums land on the loop boundary.')
+        self.label('Solid means playing.\nThe drums land on a bar boundary.')
         yield from self.mix_demo()
         yield from self.until(11)
         yield from self.tap('b')  # Pattern pad's direct Edit action, no menu detour.

@@ -24,19 +24,19 @@ __at (0xB000) uint8_t wavepixels[1280];
 uint8_t previewshape=255,previewwidth=255;
 const uint8_t sourcehi[]={255,255,64,255,4,32,24,1,1,32,1};
 const char graychars[]="0123456789ACDEIKLNRSTUY";
-const char *expnames[]={"ENGINE","WAVE ADSR","WAVE ATTACK","WAVE DECAY","WAVE SUSTAIN","WAVE RELEASE","BRIGHTNESS","RESONANCE","FILTER MOD","FILTER SOURCE","PHASE DEPTH","PHASE RATE","DETUNE CENTS","CHORUS DEPTH","CHORUS RATE","NOTE DELAY","ECHO LEVEL","ECHO REPEATS","ECHO PAN","ZOMBIE ADSR","CONTROL RATE","DSP CUTOFF","DSP RESONANCE","AUDIO DELAY","DELAY MIX","FEEDBACK","SLEW"};
+const char * const expnames[]={"ENGINE","WAVE ADSR","WAVE ATTACK","WAVE DECAY","WAVE SUSTAIN","WAVE RELEASE","BRIGHTNESS","RESONANCE","FILTER MOD","FILTER SOURCE","PHASE DEPTH","PHASE RATE","DETUNE CENTS","CHORUS DEPTH","CHORUS RATE","NOTE DELAY","ECHO LEVEL","ECHO REPEATS","ECHO PAN","ZOMBIE ADSR","CONTROL RATE","DSP CUTOFF","DSP RESONANCE","AUDIO DELAY","DELAY MIX","FEEDBACK","SLEW"};
 const uint8_t exphi[]={1,1,255,255,64,255,15,3,15,2,31,32,64,32,32,120,15,8,1,1,2,7,7,64,15,12,7};
-const char *voices[]={"PULSE1","PULSE2","WAVE1","NOISE"};
+const char * const voices[]={"PULSE1","PULSE2","WAVE1","NOISE"};
 const char * const pages[]={"LIVE","TONE","MODULATION","BANK","CC","TABLE","FX","MONOSYNTH","SEQUENCER","MASTURBATE","SEQ SETTINGS","P1","P2","WAVE1","WAVE2","NOISE","GLOBAL SETTINGS","DRUMSYNTH","MIXER","LOAD PATTERN","SAVE PATTERN","COPY","PASTE","KITS","LOAD SONG","SAVE SONG","CLEAR PATTERN","SYNC"};
 const uint8_t channelmenu[5]={11,12,13,15,14};
 const uint8_t menuchannel[5]={0,1,2,4,3};
-const char *mononames[]={"OCTAVE","LEVEL","ATTACK","DECAY","PW","WAVEFORM","PAN"};
-const char *sourcenames[]={"ATTACK","DECAY","SUSTAIN","RELEASE","LFO WAVE","LFO RATE","BEND RANGE","LFO MODE","","ARP RATE","VELOCITY"};
-const char *lfonames[]={"TRIANGLE","SAW","SQUARE","S/H","SINE"};
-const char *arpnames[]={"OFF","MAJOR","MINOR","FIFTH","OCTAVE"};
-const char *dutynames[]={"OFF","CYCLE","ALTERNATE","ACCENT"};
-const char *modnames[]={"SPEED","ARPEGGIO","DUTY SEQ","VIBRATO","SLIDE","GATE","TABLE MODE","TABLE LEN"};
-const char *paramnames[]={"DUTY","VOLUME","ENV DIR","ENV RATE","SWEEP TIME","SWEEP DIR","SWEEP SHIFT","LENGTH","LENGTH ON","MUTE","MASTER R","VIN R","MASTER L","VIN L","WAVE SHAPE","WAVE LEVEL","WAVE LENGTH","WAVE DAC OFF","NOISE SHIFT","NOISE WIDTH","NOISE DIV","PAN","DAC OFF","SUSTAIN","STOP","BEND RANGE"};
+const char * const mononames[]={"OCTAVE","LEVEL","ATTACK","DECAY","PW","WAVEFORM","PAN"};
+const char * const sourcenames[]={"ATTACK","DECAY","SUSTAIN","RELEASE","LFO WAVE","LFO RATE","BEND RANGE","LFO MODE","","ARP RATE","VELOCITY"};
+const char * const lfonames[]={"TRIANGLE","SAW","SQUARE","S/H","SINE"};
+const char * const arpnames[]={"OFF","MAJOR","MINOR","FIFTH","OCTAVE"};
+const char * const dutynames[]={"OFF","CYCLE","ALTERNATE","ACCENT"};
+const char * const modnames[]={"SPEED","ARPEGGIO","DUTY SEQ","VIBRATO","SLIDE","GATE","TABLE MODE","TABLE LEN"};
+const char * const paramnames[]={"DUTY","VOLUME","ENV DIR","ENV RATE","SWEEP TIME","SWEEP DIR","SWEEP SHIFT","LENGTH","LENGTH ON","MUTE","MASTER R","VIN R","MASTER L","VIN L","WAVE SHAPE","WAVE LEVEL","WAVE LENGTH","WAVE DAC OFF","NOISE SHIFT","NOISE WIDTH","NOISE DIV","PAN","DAC OFF","SUSTAIN","STOP","BEND RANGE"};
 const uint8_t toneids[4][20]={
  {0,1,2,3,4,5,6,7,8,9,21,22,25,10,12,11,13},
  {0,1,2,3,7,8,9,21,22,25,10,12,11,13},
@@ -44,7 +44,7 @@ const uint8_t toneids[4][20]={
  {1,2,3,18,19,20,7,8,9,21,22,10,12,11,13}};
 const uint8_t tonecount[]={17,14,12,15};
 const uint8_t modmax[]={15,4,3,7,16,63};
-const char *tablenames[]={"OFF","LOOP","ONCE","NOTE"};
+const char * const tablenames[]={"OFF","LOOP","ONCE","NOTE"};
 /* Yield between UI strings so audio macros and incoming MIDI never wait for a page. */
 
 

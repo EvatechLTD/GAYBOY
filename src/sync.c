@@ -1,6 +1,7 @@
 #pragma bank 59
 #include "api.h"
 #include "mixer_shared.h"
+#include "link_control.h"
 /* Native serial: F1/BPM, FA/FC transport, 80..BF numbered 24-PPQN clocks.
    LSDj/Arduinoboy: eight link clock edges per 24-PPQN tick.
    Pulse adapters translate one zero byte to one conditioned output pulse. */
@@ -33,6 +34,10 @@ static __at (0xFFF0) uint16_t pulsebpm;
    0 AUTO, 1 forced MASTER, 2 forced SLAVE. Raw protocols keep manual roles. */
 uint8_t syncrole;
 static uint8_t native_peer_running;
+static uint8_t native_claimed;
+static uint16_t native_claim_time;
+static uint16_t native_peer_frame;
+extern volatile uint8_t link_claiming;
 __at (0xFFB8) volatile uint8_t syncirqphase[3];
 __at (0xFFBB) volatile uint16_t syncincrement;
 __at (0xFFBD) volatile uint8_t synclimit[3];
@@ -48,9 +53,12 @@ __at (0xFFC8) volatile uint8_t syncstart;
 __at (0xFFC9) volatile uint8_t synctxbyte;
 static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUINOBOY","POCKET OPERATOR","GATE"};
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
+void link_clock_abort(void) NONBANKED;
+void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED;
 void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=0;syncmode=1;syncslave=1;}
 void sync_control_service(void) BANKED {
  __critical {if(syncr!=syncw&&!synctxwait&&!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)){
+  if(syncmode==1)link_clock_abort();
   synctxbyte=synctx[syncr];SB_REG=synctxbyte;syncr=(syncr+1)&31;SC_REG=0x81;
  }}
 }
@@ -75,31 +83,50 @@ static void tempo(void){uint16_t increment;if(!seqglobalbpm)seqglobalbpm=seqbpm;
 }
 void sync_pattern(void) BANKED {uint32_t phase,elapsed;uint16_t position,part;uint8_t tick;
  if(syncmode!=1||syncslave||!seqplaying)return;
+ /* A paired boundary already sent its marker before patch installation. */
+ if(link_pair_phase==6){link_pair_master_launched();return;}
+ if(link_pair_phase==5)link_pair_phase=6;
  /* Express beat one in the continuous oscillator epoch, including time
     accumulated while the new pattern was being prepared. */
- tempo();__critical {phase=syncirqphase[0]|((uint32_t)syncirqphase[1]<<8)|((uint32_t)syncirqphase[2]<<16);tick=synctick;elapsed=seqticks;}
+ if(link_pair_phase==2)link_pair_master_launched();tempo();__critical {phase=syncirqphase[0]|((uint32_t)syncirqphase[1]<<8)|((uint32_t)syncirqphase[2]<<16);tick=synctick;elapsed=seqticks;}
  elapsed=elapsed*seqbpm+seqclock;position=phase>>6;while(elapsed>=2560U){elapsed-=2560U;tick=(tick-1)&63;}part=elapsed;
  if(position<part){tick=(tick-1)&63;position+=2560U;}position-=part;
- send(0xF2);send(tick);send(position>>7);send(position&127);
+ /* Bit 6 tags a prepared pair commit without adding a transfer. A stale
+    pair must never consume an unrelated later unpaired launch marker. */
+ send(0xF2);send(tick|(link_pair_phase==6?64:0));send(position>>7);send(position&127);
 }
 void sync_transport(uint8_t playing) BANKED {uint32_t limit;
  if(!playing&&syncmode==1&&!syncslave&&syncarmed){send(0xFC);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
  if(syncarmed){__critical {syncarmed=0;syncdue=0;TMA_REG=TIMA_REG=syncreload;}}
+ /* Disarm the consumer before clearing its optional bit ring. */
+ if(!playing&&syncmode==1){link_clock_abort();if(link_pair_phase)link_reset();}
  remainder=seqbpm-1;syncalign=0;syncpending=0;beatcount=0;lastpulse=beatframe=frames();
  /* Native AUTO idle is externally clocked. A local transport start claims
     the clock; starts dispatched by sync_receive retain the listening role.
     seq_transport calls stop internally before start, so use syncbusy rather
     than the previous role to distinguish the two paths. */
  if(syncmode==1&&!syncrole){
+  if(!playing&&syncslave&&native_peer_running)native_peer_frame=frames();
+  if(playing&&native_peer_running&&(uint16_t)(frames()-native_peer_frame)>120)native_peer_running=0;
   if(!playing){if(!syncslave){syncslave=1;SB_REG=0;SC_REG=0x80;}}
-  else if(!syncbusy&&!native_peer_running){syncslave=0;SC_REG=0;}
+  else if(!syncbusy&&!native_peer_running&&(!native_claimed||(uint16_t)(frames()-native_claim_time)>60)){syncslave=0;SC_REG=0;}
  }
  if(!syncmode||syncslave||!playing)return;
+ /* No musical clock is armed yet. A short explicit claim distinguishes
+    simultaneous local starts from ordinary full-duplex byte echoes. */
+ if(syncmode==1&&!syncbusy){
+  link_reset();link_claiming=1;send(0xF5);
+  while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
+  if(!linkcollision){delay(4);send(0xF7);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
+  link_claiming=0;
+  if(linkcollision){link_reset();linkstate=4;syncslave=1;seqplaying=0;native_claimed=native_peer_running=0;__critical {rd=wr;SB_REG=0;SC_REG=0x80;}dirty=1;return;}
+ }
  limit=(uint32_t)pulse_units()<<6;
  __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synclimit[0]=limit;synclimit[1]=limit>>8;synclimit[2]=limit>>16;synctick=0;syncstart=syncmode==1;syncarmed=1;synctxwait=0;}
  sync_timer_config();sentbpm=0;tempo();
  if(syncmode==1){send(0xFA);while(syncstart)sync_control_service();}
  __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synctick=0;seqticks=0;}
+ if(syncmode==1)link_begin();
 }
 uint16_t sync_advance(uint16_t ticks) BANKED {uint16_t result=0,unit,part;uint8_t n;
  if(!syncmode)return ticks;
@@ -111,22 +138,25 @@ uint16_t sync_advance(uint16_t ticks) BANKED {uint16_t result=0,unit,part;uint8_
  return result;
 }
 static uint8_t receive(uint8_t b) {uint16_t bpm,elapsed;uint8_t ppqn;
- if(!syncslave)return 1;
+ if(!syncslave){if(syncmode==1)link_receive(b);return 1;}
  if(syncmode==1){
-  if((b>=0x80&&b<0xC0)||b==0xF8){uint8_t next=b==0xF8?(beatcount+1)&63:b&63,delta=(next-beatcount)&63;beatcount=next;if(tempo_state>=3)return 1;if(seqplaying){if(syncpending+delta<64)syncpending+=delta;else overflow=1;}return 1;}
+  if(b==0xF5){native_claimed=1;native_claim_time=frames();return 1;}
+  if(b==0xF7)return 1;
+  if((b>=0x80&&b<0xF0)||b==0xF8){uint8_t next=b==0xF8?(beatcount+1)&63:b&63,delta=(next-beatcount)&63;beatcount=next;if(!seqplaying){native_peer_running=1;native_peer_frame=frames();}if(tempo_state>=3)return 1;if(seqplaying){if(syncpending+delta<64)syncpending+=delta;else overflow=1;}if(b!=0xF8)link_clock_decode(b,delta);return 1;}
+  if(link_receive(b))return 1;
   if(b==0xF2){tempo_state=3;return 1;}
-  if(b==0xF1){tempo_state=1;return 1;}
+  if(b==0xF1){native_peer_running=1;native_peer_frame=frames();tempo_state=1;return 1;}
   if(tempo_state){
    if(b&128){tempo_state=0;return 1;}
    if(tempo_state==3){markerbase=b;tempo_state=4;return 1;}
    if(tempo_state==1||tempo_state==4){tempo_hi=b;tempo_state=tempo_state+1;return 1;}
    bpm=((uint16_t)tempo_hi<<7)|b;
    if(tempo_state==2){if(bpm>=30&&bpm<=300){seqglobalbpm=seqbpm=bpm;seqcachedbpm=0;dirty=1;}}
-   else if(seqplaying&&bpm<2560U){uint8_t clocks=(beatcount-markerbase)&63,busy=seqservicing;uint16_t ticks;seqservicing=1;syncpending=clocks;remainder=seqbpm-1;syncalign=bpm;ticks=sync_advance(0);__critical {seqclock=0;seqticks=ticks;}seq_pattern_release();seq_pattern_start();seqservicing=busy;}
+   else if(seqplaying&&bpm<2560U){uint8_t clocks=(beatcount-markerbase)&63,busy=seqservicing;uint16_t ticks;seqservicing=1;syncpending=clocks;remainder=seqbpm-1;syncalign=bpm;ticks=sync_advance(0);__critical {seqclock=0;seqticks=ticks;}if(!(markerbase&64)||!link_pair_hold||!link_pair_marker()){seq_pattern_release();seq_pattern_start();}seqservicing=busy;}
    tempo_state=0;return 1;
   }
-  if(b==0xFC){native_peer_running=0;if(seqplaying)seq_transport();return 1;}
-  if(b==0xFA){native_peer_running=1;if(seqplaying)seq_transport();seq_transport();return 1;}
+  if(b==0xFC){native_peer_running=native_claimed=0;if(seqplaying)seq_transport();return 1;}
+  if(b==0xFA){native_claimed=0;native_peer_running=1;native_peer_frame=frames();link_reset();if(seqplaying)seq_transport();seq_transport();return 1;}
   if(b==0xFB){native_peer_running=1;if(!seqplaying)seq_transport();return 1;}
   if(b!=0xF8)return 0;
  }else if(!seqplaying){seq_transport();lastpulse=beatframe=frames();return 1;}
@@ -156,6 +186,7 @@ void sync_render(void) BANKED {memset(canvas,0,360);memset(canvas,96,20);drawtex
  if(syncmode==1&&!syncrole&&seqplaying)drawtext(8,7,syncslave?"> SLAVE":"> MASTER",0);
  drawtext(1,8,"GLOBAL BPM",0);drawnumber(13,8,seqglobalbpm?seqglobalbpm:seqbpm);
  drawtext(0,11,"U/D SELECT L/R EDIT",0);drawtext(0,13,"A PLAY / STOP",0);
+ if(linkstate==4)drawtext(0,16,"START CLASH - RETRY",0);
  if(syncmode>=4)drawtext(0,15,"PULSE ADAPTER NEEDED",0);
  else if(syncmode==3)drawtext(0,15,"LSDJ SYNC MODE",0);
  else drawtext(0,15,"GAME BOY LINK CABLE",0);
@@ -165,14 +196,14 @@ void sync_input(uint8_t edge) BANKED {int8_t delta;
  if(edge&J_A){seq_transport();dirty=1;}
  if(!(edge&(J_LEFT|J_RIGHT)))return;
  if(seqplaying)seq_transport();delta=edge&J_LEFT?-1:1;
- __critical {SC_REG=0;IF_REG&=~SIO_IFLAG;syncr=syncw=0;rd=wr;st=count=0;}
+ __critical {remove_SIO(syncmode==1?link_serial_isr:serial_isr);SC_REG=0;IF_REG&=~SIO_IFLAG;syncr=syncw=0;rd=wr;st=count=0;}
  if(!focus)syncmode=(syncmode+(delta<0?5:1))%6;
  else if(syncmode==1)syncrole=(syncrole+(delta<0?2:1))%3;
  else syncslave^=1;
  if(syncmode==1){if(syncrole==1)syncslave=0;else syncslave=1;}
  if(syncmode&&syncslave&&mx.magic==0xD3&&!mx.quant)mx.quant=4;
  syncpending=syncalign=remainder=tempo_state=pulsebpm=0;sentbpm=0;
- native_peer_running=0;
+ native_peer_running=native_claimed=0;
  if(syncmode){if(!seqglobalbpm)seqglobalbpm=seqbpm;seqbpm=seqglobalbpm;}
- SB_REG=0;SC_REG=(!syncmode||syncslave)?0x80:0;dirty=1;
+ link_reset();__critical {add_SIO(syncmode==1?link_serial_isr:serial_isr);SB_REG=0;SC_REG=(!syncmode||syncslave)?0x80:0;}dirty=1;
 }

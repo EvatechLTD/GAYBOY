@@ -5,6 +5,7 @@ assert s['s__HRAM']+s['l__HRAM']<=0xFF98,'Library HRAM overlaps serial sync stat
 assert s['_synctx']==0xFF98 and s['_syncbusy']==0xFFDD,'Unexpected sync HRAM layout'
 assert s['_sync_clock_isr']<0x4000,'Clock IRQ must stay in fixed ROM'
 assert s['_syncirqphase']==0xFFB8 and s['_syncdue']==0xFFC4,'Clock state overlaps reserved HRAM'
+assert s['_pad_names']==0xAE40 and s['_mixer_image']>=0xAE68 and s['_mixer_image']+28<=0xAE90,'Five-character pad cache overlaps mixer renderer state'
 assert s['s__GSFINAL']+s['l__GSFINAL']<=0x4000,'Fixed ROM bank overflow'
 for n,v in s.items():
  if n.startswith('l__CODE_'):assert v<=0x4000,(n,v)

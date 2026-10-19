@@ -23,15 +23,18 @@ def render(force_pads=False,force_faders=False,invalidate_pads=True):
  put('dirty',1);before=len(flushes)
  for _ in range(600):
   p.tick(1)
-  if len(flushes)>before:break
- assert len(flushes)>before,'Mixer did not publish its render'
+  # A host frame can end halfway through an earlier render. Wait through
+  # its flush and the render requested by these fixture changes.
+  if len(flushes)>=before+2:break
+ assert len(flushes)>=before+2,'Mixer did not publish its render'
  p.tick(2)
 def capture(queued):
  bank=v('padbank');active=[bitmap(ptile(i,bank)) for i in range(40)]
  opposite=[]
- if queued<8:
-  col=queued*2+queued//2
-  opposite=[bitmap(ptile(row*20+col+x,bank^1)) for row in range(2) for x in range(3)]
+ focus=v('mx',4)-30
+ if queued<8 and queued//4==focus//4:
+  col=(queued%4)*5
+  opposite=[bitmap(ptile(row*20+col+x,bank^1)) for row in range(2) for x in range(5)]
  return active,opposite
 try:
  assert '_pad_names_valid' in S and '_fader_image_knob' in S,'Requires mixer pixel-cache candidate'
@@ -43,8 +46,7 @@ try:
   p.memory[at]=0xb9;p.memory[at+1:at+18]=list(name(slot)+bytes(14))
  p.memory[0x4000]=0
  a=S['_ui_flush'];p.hook_register(a>>16,a&65535,lambda _:flushes.append(p._cycles()),None)
- # Adjacent pads share half a tile: all ordered transitions include those
- # neighbors, far slots, no queue, and queued==playing.
+ # Cover both four-pad pages, off-page queues, and queued==playing.
  for playing in range(8):
   for queued in (255,playing,(playing+1)%8,(playing-1)%8,7-playing):
    sm(1,playing);sm(2,queued);sm(4,30+playing);live_name(playing)
@@ -83,9 +85,13 @@ try:
    else:put({'muted':'seqmuted','solo':'seqsolo','drummute':'drummutemask','page':'page'}[field],value)
   if 'slot' in changes:live_name(changes['slot'])
   invalidate='slot' in changes or 'pending' in changes
+  # Let background focus preparation settle before comparing two renders.
+  # READY/PREPARING are intentionally time-dependent footer contents.
+  p.tick(240)
   render(invalidate_pads=invalidate);incremental=screen_state()
   render(force_pads=True,force_faders=True);full=screen_state()
   result={'changes':changes,'vram_differing_bytes':sum(a!=b for a,b in zip(incremental[0],full[0])),'background_map_differing_bytes':sum(a!=b for a,b in zip(incremental[1],full[1]))};whole.append(result)
+  if result['background_map_differing_bytes']:print('map diffs',[(hex(0x9800+i),a,b) for i,(a,b) in enumerate(zip(incremental[1],full[1])) if a!=b])
   assert not result['vram_differing_bytes'] and not result['background_map_differing_bytes'],result
  # Exercise actual START menu opening/return, whose overlay reuses canvas.
  p.button_press('start')
@@ -98,5 +104,5 @@ try:
  p.button_release('start');p.tick(120);assert v('page')==18 and not v('navopen')
  render(invalidate_pads=False);incremental=screen_state();render(force_pads=True,force_faders=True);full=screen_state()
  assert incremental==full,'Returning from START menu leaves stale mixer pixels'
- report={'rom_sha256':hashlib.sha256(Path(args.rom).read_bytes()).hexdigest(),'model':'DMG','pad_cases':results,'fader_cases':faders,'whole_background_cases':whole,'retained_mixer_image_exercised':'_mixer_image' in S,'menu_open_and_return_equal':True,'passes':True};Path(args.output).write_text(json.dumps(report,indent=2));print('PASS: %d pad transitions compare all40 active tiles + queued6 opposite tiles; %d fader cases and %d whole-map/VRAM transitions match full regeneration'%(len(results),len(faders),len(whole)))
+ report={'rom_sha256':hashlib.sha256(Path(args.rom).read_bytes()).hexdigest(),'model':'DMG','pad_cases':results,'fader_cases':faders,'whole_background_cases':whole,'retained_mixer_image_exercised':'_mixer_image' in S,'menu_open_and_return_equal':True,'passes':True};Path(args.output).write_text(json.dumps(report,indent=2));print('PASS: %d pad transitions compare all40 active tiles + queued10 opposite tiles; %d fader cases and %d whole-map/VRAM transitions match full regeneration'%(len(results),len(faders),len(whole)))
 finally:p.stop(save=False)

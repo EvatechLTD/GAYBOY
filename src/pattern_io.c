@@ -1,6 +1,7 @@
 #pragma bank 41
 #pragma opt_code_speed
 #include "api.h"
+#include "link_control.h"
 #include "tones.h"
 #include "mixer_shared.h"
 #include "sparse_store.h"
@@ -123,7 +124,7 @@ uint8_t valid(uint8_t s) BANKED {uint8_t v=tag(s);return v==VALID||v==NOTE_VALID
 void getname(uint8_t s,char *name) BANKED {uint8_t i,ended=0;if(sparse_enabled){sparse_name(s,name);return;}if(valid(s))readpart(s,1,(uint8_t *)name,17);else name[0]=0;name[16]=0;for(i=0;i<17;i++){if(!name[i])ended=1;if(ended)name[i]=0;}}
 void defaults(void) BANKED {uint8_t c;mixer_pattern_changed();seqgrouptrack=255;seq_storage_clear();for(c=0;c<7;c++){seqlength[c]=16;seqdefaultvel[c]=100;seqdefaultdur[c]=c==6?0:c==5?4:1;seqgate[c]=(c<2||c>=5)?100:80;mx.level[c]=127;mx.pan[c]=3;}drummutemask=drumsolomask=0;seqmuted=seqsolo=seqmode=0;seqbpm=seqglobalbpm?seqglobalbpm:120;seqbeats=seqdenom=4;memset(mx.name,0,17);}
 void snapshot(uint8_t s) BANKED {uint16_t generation;uint8_t meta[METASIZE],i=0;if(sparse_enabled){if(!sparse_snapshot(s))mx.error=2;return;}mixer_prepare_barrier();generation=pattern_generation;if(!mx.name[0]){mx.name[0]='0';mx.name[1]='0';mx.name[2]='1'+mx.slot;mx.name[3]=0;}mx.checking=0;writepart(s,0,&i,1);mx.checksum=0;mx.checking=1;writepart(s,1,(uint8_t *)mx.name,17);writepart(s,DATA,(uint8_t *)seqevents_lo,1024);writepart(s,DATA+1024,(uint8_t *)seqevents_hi,1024);
- memcpy(meta,seqeventcounts,14);memcpy(meta+14,seqlength,14);memcpy(meta+28,seqdefaultdur,14);memcpy(meta+42,seqdefaultvel,7);memcpy(meta+49,seqgate,7);memcpy(meta+56,mx.level,7);memcpy(meta+63,mx.pan,7);meta[70]=seqmuted;meta[71]=seqsolo;meta[72]=seqbeats;meta[73]=seqdenom;meta[74]=seqmode;setword(meta+75,seqbpm);setword(meta+77,drummutemask);setword(meta+79,drumsolomask);writepart(s,META,meta,METASIZE);tones_pack();writepart(s,TONE_OFFSET,TONE_PACK,TONE_SIZE);mx.checking=0;writepart(s,18,(uint8_t *)&mx.checksum,2);i=VALID;writepart(s,0,&i,1);mx.protectedslots&=~(1<<s);mx.padcache=0;if(s==mx.slot&&generation==pattern_generation)mixer_pattern_clean();
+ memcpy(meta,seqeventcounts,14);memcpy(meta+14,seqlength,14);memcpy(meta+28,seqdefaultdur,14);memcpy(meta+42,seqdefaultvel,7);memcpy(meta+49,seqgate,7);memcpy(meta+56,mx.level,7);memcpy(meta+63,mx.pan,7);meta[70]=seqmuted;meta[71]=seqsolo;meta[72]=seqbeats;meta[73]=seqdenom;meta[74]=seqmode;setword(meta+75,seqbpm);setword(meta+77,drummutemask);setword(meta+79,drumsolomask);writepart(s,META,meta,METASIZE);tones_pack();writepart(s,TONE_OFFSET,TONE_PACK,TONE_SIZE);mx.checking=0;writepart(s,18,(uint8_t *)&mx.checksum,2);i=VALID;writepart(s,0,&i,1);mx.protectedslots&=~(1<<s);mx.padcache=0;link_names_dirty|=1<<s;if(s==mx.slot&&generation==pattern_generation)mixer_pattern_clean();
 }
 void autosnapshot(uint8_t s) BANKED {if(pattern_dirty&&!(mx.protectedslots&(1<<s)))snapshot(s);}
 uint8_t oldmetaok(const uint8_t *m) BANKED {uint8_t i;uint16_t bpm=getword(m+47);if(bpm<30||bpm>300||m[44]<1||m[44]>12||(m[45]!=2&&m[45]!=4&&m[45]!=8&&m[45]!=16)||m[46]>1)return 0;for(i=0;i<7;i++)if(!m[i]||m[i]>64||!m[7+i]||m[7+i]>127||m[14+i]>64||m[21+i]>100||m[28+i]>127||m[35+i]>3)return 0;return 1;}
@@ -257,6 +258,7 @@ void mixer_prepare_focus(uint8_t slot) BANKED {
  mx.cachevalid=0;mx.presaved=0;mx.openempty=0;mx.checking=0;toneready=0;
 }
 void mixer_launch_request(uint8_t slot,uint8_t edit) BANKED {
+ if(link_pair_request(slot,edit))return;
  /* A slave cannot establish a new clock epoch with an immediate launch. */
  if(syncmode&&syncslave&&!mx.quant){mx.quant=4;dirty=1;}if(!syncmode){seqirqready=0;seqirqdirty=1;}
  if(sparse_enabled){sparse_request(slot,edit);return;}

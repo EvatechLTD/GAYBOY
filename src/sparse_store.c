@@ -1,6 +1,7 @@
 #pragma bank 44
 #pragma opt_code_speed
 #include "api.h"
+#include "link_control.h"
 #include "tones.h"
 #include "mixer_shared.h"
 #include "sparse_store.h"
@@ -125,7 +126,7 @@ uint8_t sparse_snapshot(uint8_t slot) BANKED {uint16_t patch,object,size,at,gene
  for(at=0;at<size;at+=n){n=size-at>16?16:size-at;if(!pool_object_write(object,POOL_EVENTS_OFFSET+at,live(at),n))return 0;}
  if(!pool_object_finish(object))return 0;
  pool_set_reference(POOL_ACTIVE+slot*2,object);pool_root[7]=mx.slot;pool_root[8]=mx.quant;if(!pool_commit())return 0;refresh();mx.padcache=0;mx.error=0;
- if(slot==mx.slot&&generation==pattern_generation)mixer_pattern_clean();return 1;
+ link_names_dirty|=1<<slot;if(slot==mx.slot&&generation==pattern_generation)mixer_pattern_clean();return 1;
 }
 void sparse_name(uint8_t slot,char *name) BANKED {memset(name,0,17);if(slot<8&&sparse_slots[slot]!=POOL_NONE)pattern_read(sparse_slots[slot],0,(uint8_t *)name,16);name[16]=0;}
 uint8_t sparse_restore(uint8_t slot) BANKED {uint8_t busy=seqservicing;
@@ -222,7 +223,7 @@ uint8_t sparse_load_song(uint8_t song) BANKED {uint16_t object;uint8_t data[POOL
  for(i=0;i<8;i++){if(word(data+19+i*2)!=POOL_NONE&&!metadata_ok(word(data+19+i*2))){ui_loading(12,12);return 0;}ui_loading(i+1,12);}
  if(pattern_dirty&&!sparse_snapshot(mx.slot)){ui_loading(12,12);return 0;}ui_loading(9,12);
  if(run)seq_transport();for(i=0;i<8;i++)pool_set_reference(POOL_ACTIVE+i*2,word(data+19+i*2));pool_root[7]=data[18];pool_root[8]=data[17];if(!pool_commit()){ui_loading(12,12);return 0;}
- ui_loading(10,12);refresh();mx.quant=data[17];sparse_restore(data[18]);ui_loading(11,12);sparse_finish_install();sparse_song=song;memcpy(sparse_song_name,data,17);ui_loading(12,12);if(run)seq_transport();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
+ ui_loading(10,12);refresh();mx.quant=data[17];sparse_restore(data[18]);ui_loading(11,12);sparse_finish_install();sparse_song=song;memcpy(sparse_song_name,data,17);link_names_dirty=255;ui_loading(12,12);if(run)seq_transport();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
 }
 uint8_t sparse_delete_song(uint8_t song) BANKED {if(sparse_enabled!=1||song>=POOL_SONGS||!sparse_journal_flush())return 0;pool_set_reference(POOL_SONG_REFS+song*2,POOL_NONE);if(!pool_commit())return 0;if(sparse_song==song){sparse_song=255;memset(sparse_song_name,0,17);}return 1;}
 uint16_t sparse_song_size(void) BANKED {uint16_t needed=62U,ref;uint8_t i,j,added=0,snapshot=pattern_dirty||sparse_slots[mx.slot]==POOL_NONE,include;
@@ -247,5 +248,5 @@ uint8_t sparse_clear_slot(uint8_t slot) BANKED {uint16_t source,object;
 uint8_t sparse_load_pattern(uint8_t slot) BANKED {uint8_t active=mx.slot,run=seqplaying;uint16_t source,tone;
  if(sparse_enabled!=1||slot>=sparse_patterns)return 0;mx.pending=255;if(!sparse_journal_flush())return 0;source=library_reference(slot);if(!pool_object_read(source,POOL_PATCH_OFFSET,(uint8_t *)&tone,2))return 0;
  if(pattern_dirty&&!sparse_snapshot(active))return 0;
- if(run)seq_transport();pool_set_reference(POOL_ACTIVE+active*2,source);if(!pool_commit())return 0;sparse_slots[active]=source;sparse_tones[active]=tone;sparse_restore(active);sparse_finish_install();if(run)seq_transport();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
+ if(run)seq_transport();pool_set_reference(POOL_ACTIVE+active*2,source);if(!pool_commit())return 0;sparse_slots[active]=source;sparse_tones[active]=tone;sparse_restore(active);sparse_finish_install();link_names_dirty|=1<<active;if(run)seq_transport();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
 }
