@@ -223,3 +223,33 @@ Both PCM and wave receiver tests recorded zero VRAM writes or page changes
 during handoff on nine pages/menu contexts. Repeated AUTO competing starts,
 cable loss during preparation and reconnect passed. These emulator results
 do not resolve the hardware quantization observations described above.
+
+
+## Host versus slave launch investigation
+
+`node tools/profile_linked_launch_paths.cjs` compares twelve real-cable
+launches at 300 BPM: host-local, host-remote and slave-local repeated four times.
+The fixture is deliberately identical across slots, with P1/P2 sixteenth notes
+and two PCM voices, so changed musical contents cannot explain onset gaps.
+Only fixture contents/focus are written directly; launches use A button input.
+The harness records actual APU trigger writes and function entry cycles on both
+machines. Instrumentation is in the emulator, not the ROM or serial ISR.
+
+On ROM e37966ae, host-local handoff to first pulse attack measured
+14.993..16.455 ms, host-remote 11.927..13.670 ms and slave-local
+10.144..13.297 ms. Host sync_pattern spent about 2.8..3.4 ms before entering
+the first-step firing path; slave sync_pattern returns in about 0.08 ms.
+The host computes and queues F2 and its three phase bytes before its own
+first-step firing. That marker also calls seq_pattern_release and
+seq_pattern_start on the slave even with PAIR disabled. All four host-local
+launches restarted the slave sequence; neither slave launch path did.
+This is a confirmed asymmetry, not proof that it explains every audible skip.
+
+The remote launch path also suppresses drawing during preparation/install;
+local pad launches do not. Its contribution has not been isolated. These
+fixtures still show substantial note-spacing excursions despite unchanged
+underrun counters; zero underruns and settled grid alignment are insufficient
+as musical-onset acceptance criteria. The report is diagnostic and does not
+mark these timing distributions as passing. Firmware and the hardware-test ROM
+were left unchanged for this investigation. Raw samples are in
+build/launch-path-profile.json.
