@@ -2,6 +2,7 @@
 #pragma opt_code_speed
 #include "api.h"
 #include "mixer_shared.h"
+extern uint8_t link_ui_hold;
 #include "tones.h"
 #include "seq_native_types.h"
 
@@ -77,6 +78,6 @@ launch_copy_next$:
  __endasm;}
 uint8_t seq_native_launch_copy(uint8_t slot) BANKED {
  if(!launchinstalled)return 0;launchinstalled=0;
- if(buildphase!=7||page!=18||slot!=launchslot||slot>=8||launchidentity!=sparse_slots[slot]||STEP->bpm!=seqbpm)return 0;
+ if(buildphase!=7||(page!=18&&!link_ui_hold)||slot!=launchslot||slot>=8||launchidentity!=sparse_slots[slot]||STEP->bpm!=seqbpm)return 0;
  copy_packet();buildphase=0;return 1;
 }

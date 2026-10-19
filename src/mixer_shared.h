@@ -2,6 +2,8 @@
 #define MIXER_SHARED_H
 typedef struct {uint8_t magic,slot,pending,quant,focus,edit,browser,naming,letter,padcache;uint16_t boundary;uint8_t level[7],pan[7];char name[17];uint16_t checksum;uint8_t checking,presaved,openempty,cachevalid,cacheslot,error,protectedslots;} Mixer;
 extern __at (0xAC80) Mixer mx;
+#define MIXER_LINK_AVAILABLE (syncmode==1&&!syncslave&&linkstate==2)
+#define MIXER_LINK_VIEW (mixer_device&&MIXER_LINK_AVAILABLE)
 #define RECORD 2560U
 #define DATA 32U
 #define OLD_DRUM 1184U

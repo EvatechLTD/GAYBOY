@@ -95,7 +95,7 @@ void sync_pattern(void) BANKED {uint32_t phase,elapsed;uint16_t position,part;ui
     pair must never consume an unrelated later unpaired launch marker. */
  send(0xF2);send(tick|(link_pair_phase==6?64:0));send(position>>7);send(position&127);
 }
-void sync_transport(uint8_t playing) BANKED {uint32_t limit;
+void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte,guard;
  if(!playing&&syncmode==1&&!syncslave&&syncarmed){send(0xFC);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
  if(syncarmed){__critical {syncarmed=0;syncdue=0;TMA_REG=TIMA_REG=syncreload;}}
  /* Disarm the consumer before clearing its optional bit ring. */
@@ -109,7 +109,20 @@ void sync_transport(uint8_t playing) BANKED {uint32_t limit;
   if(!playing&&syncslave&&native_peer_running)native_peer_frame=frames();
   if(playing&&native_peer_running&&(uint16_t)(frames()-native_peer_frame)>120)native_peer_running=0;
   if(!playing){if(!syncslave){syncslave=1;SB_REG=0;SC_REG=0x80;}}
-  else if(!syncbusy&&!native_peer_running&&(!native_claimed||(uint16_t)(frames()-native_claim_time)>60)){syncslave=0;SC_REG=0;}
+  else if(!syncbusy){
+   /* A button can arrive while the peer's claim is still shifting in.
+      Keep the external receiver armed through one complete cable byte,
+      then inspect queued claims before changing the clock source. This
+      wait runs only on a local AUTO start, never on the musical clock. */
+   delay(2);
+   pending=rd;
+   while(pending!=wr){byte=rx[pending++];
+    if(byte==0xF5||byte==0xF7){native_claimed=1;native_claim_time=frames();}
+    if(byte==0xF1||byte==0xFA||(byte>=0x80&&byte<0xF0)){native_peer_running=1;native_peer_frame=frames();}
+   }
+   if(!native_peer_running&&(!native_claimed||(uint16_t)(frames()-native_claim_time)>60)){syncslave=0;SC_REG=0;}
+   else if(native_claimed&&!native_peer_running){seqplaying=0;return;}
+  }
  }
  if(!syncmode||syncslave||!playing)return;
  /* No musical clock is armed yet. A short explicit claim distinguishes
@@ -118,6 +131,13 @@ void sync_transport(uint8_t playing) BANKED {uint32_t limit;
   link_reset();link_claiming=1;send(0xF5);
   while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
   if(!linkcollision){delay(4);send(0xF7);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
+  /* A listening peer has now pipelined its nonzero F6 acknowledgement.
+     Check an all-zero guard as well: two internal claimants can sample
+     only high bits during F5/F7 and otherwise resemble an unplugged cable.
+     Keep this check in foreground; the steady serial ISR is unchanged. */
+  for(guard=0;guard<8&&!linkcollision;guard++){pending=wr;send(0);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
+   while(pending!=wr){if(!rx[pending++])linkcollision=1;}
+  }
   link_claiming=0;
   if(linkcollision){link_reset();linkstate=4;syncslave=1;seqplaying=0;native_claimed=native_peer_running=0;__critical {rd=wr;SB_REG=0;SC_REG=0x80;}dirty=1;return;}
  }

@@ -2,6 +2,7 @@
 #pragma opt_code_speed
 #include "api.h"
 #include "mixer_shared.h"
+extern uint8_t link_ui_hold;
 #include "tones.h"
 
 /* Mixer-only scratch, outside font uploads, outgoing journal capture and
@@ -55,14 +56,14 @@ static uint8_t native(void){return !experimental_mode&&!monomode&&(!waveengine||
    that I/O forever. The launch packet still validates its own BPM; stale
    timing is recalculated by the complete-step path at the boundary. */
 static uint8_t tempo_valid(void){return (syncmode>1&&syncslave)||prepared_bpm==(seqglobalbpm?seqglobalbpm:word(FULL+75));}
-static uint8_t cache_valid(uint8_t slot){return prepare_phase==6&&page==18&&target==slot&&identity==sparse_slots[slot]&&tempo_valid()&&native();}
+static uint8_t cache_valid(uint8_t slot){return prepare_phase==6&&(page==18||link_ui_hold)&&target==slot&&identity==sparse_slots[slot]&&tempo_valid()&&native();}
 static uint16_t offset(uint8_t track){uint8_t c;uint16_t at=POOL_EVENTS_OFFSET;for(c=0;c<track;c++)at+=word(HEAD+16+c*2)*4;return at;}
 
 /* One bounded read/scan quantum per foreground service. The playing pattern
    and its immutable source remain untouched throughout preparation. */
 static void prepare_once(void){uint8_t slot,e[4],found;uint16_t count,limit;
- if(page!=18||!native()){prepare_phase=0;target=255;return;}
- if(navopen)return;
+ if((page!=18&&!link_ui_hold)||!native()){prepare_phase=0;target=255;return;}
+ if(navopen&&!link_ui_hold)return;
  slot=demand<8?demand:mx.pending!=255?mx.pending:mx.focus>=30&&mx.focus<38?mx.focus-30:seqplaying?(mx.slot+1)&7:255;
  if(slot==mx.slot)slot=seqplaying?(slot+1)&7:255;
  if(slot>=8||sparse_slots[slot]==POOL_NONE||sparse_slots[slot]==SPARSE_JOURNAL_REF){prepare_phase=0;target=255;return;}
@@ -94,7 +95,7 @@ void sparse_prepare_service(void) BANKED {if(preparing)return;preparing=1;prepar
    service runs between quanta; mx.pending is clear so no boundary can activate
    this request underneath the caller. The slot and loop budget are bounded. */
 void sparse_prepare_now(uint8_t slot) BANKED {uint16_t budget=1024;
- if(preparing||page!=18||!native()||slot>=8||slot==mx.slot||sparse_slots[slot]==POOL_NONE||sparse_slots[slot]==SPARSE_JOURNAL_REF)return;
+ if(preparing||(page!=18&&!link_ui_hold)||!native()||slot>=8||slot==mx.slot||sparse_slots[slot]==POOL_NONE||sparse_slots[slot]==SPARSE_JOURNAL_REF)return;
  demand=slot;preparing=1;
  while(budget--&&!cache_valid(slot)){prepare_once();if(prepare_phase==7)break;mixfill();}
  preparing=0;demand=255;

@@ -18,6 +18,11 @@
 LinkMirror linkmirror;
 uint8_t linkstate,link_names_dirty,linkcollision;
 uint8_t linkpair,link_pair_hold,link_pair_phase;
+uint8_t link_ui_hold;
+static uint16_t ui_quiet_since,ui_clock_frame;
+static uint8_t ui_clock;
+extern uint16_t seqdeadline;
+void roll_clear_transition(void) BANKED;
 static uint8_t pairslot=255,pair_internal;
 static uint16_t pairdeadline;
 uint8_t mixer_prepare_busy(void) BANKED;
@@ -42,6 +47,7 @@ extern uint8_t mixer_device;
 extern uint16_t pattern_generation;
 
 static uint16_t link_frames(void){uint16_t t;__critical {t=sys_time;}return t;}
+static void ui_pause(void){link_ui_hold=1;ui_quiet_since=ui_clock_frame=link_frames();ui_clock=*(volatile uint8_t *)0xFFE1;}
 static uint8_t crc(uint8_t c,uint8_t b){uint8_t i;for(i=0;i<7;i++){uint8_t top=(c^b)&64;c=(c<<1)&127;if(top)c^=9;b<<=1;}return c;}
 static uint8_t idle(void){return linktxread==linktxsize;}
 static void packet(uint8_t type,uint8_t payload){uint8_t i,c=0,n=payload+5;
@@ -124,9 +130,9 @@ static void accept(void){uint8_t i,type=incoming[0],id=incoming[3];uint16_t peer
   if(type==SET&&rxsize==10&&incoming[4]<20&&((incoming[5]<2&&incoming[6]<2)||(incoming[4]<7&&incoming[5]==2)||(incoming[4]<7&&incoming[5]==3&&incoming[6]<4)||(incoming[5]==5&&incoming[6]>=1&&incoming[6]<=4))){
    if(id!=lastrequest){applied=0;if((incoming[7]|((uint16_t)incoming[8]<<7))==(pattern_generation&16383)){mixer_remote_apply(incoming[4],incoming[5],incoming[6]);applied=1;}}lastrequest=id;request=id;state_due=1;
   }else if(type==LAUNCH&&rxsize==6&&incoming[4]<8){
-   if(id!=lastrequest){if(page!=18){page=18;navopen=0;mixer_open();}mixer_launch_request(incoming[4],0);}lastrequest=id;request=id;state_due=1;
+   if(id!=lastrequest){ui_pause();mx.openempty=0;mixer_launch_request(incoming[4],0);mx.openempty=0;}lastrequest=id;request=id;state_due=1;
   }else if(type==PREPARE&&rxsize==6&&incoming[4]<8){
-   if(id!=lastrequest){if(page!=18){page=18;navopen=0;mixer_open();}pairslot=incoming[4];link_pair_hold=1;link_pair_phase=3;pairdeadline=link_frames();pair_internal=1;mixer_launch_request(pairslot,0);pair_internal=0;}
+   if(id!=lastrequest){ui_pause();mx.openempty=0;pairslot=incoming[4];link_pair_hold=1;link_pair_phase=3;pairdeadline=link_frames();pair_internal=1;mixer_launch_request(pairslot,0);mx.openempty=0;pair_internal=0;}
    else if(link_pair_phase==4)link_pair_phase=3;
    lastrequest=id;request=id;state_due=1;
   }
@@ -175,11 +181,24 @@ uint8_t link_target(uint8_t track,uint8_t field) BANKED {
  return !!((field?linkmirror.drumsolomask:linkmirror.drummutemask)&(1U<<(track-7)));
 }
 uint8_t link_pending(void) BANKED {return waiting||nextfield<6;}
+static void ui_release(void){uint16_t ticks;uint8_t clock=*(volatile uint8_t *)0xFFE1;
+ if(clock!=ui_clock){ui_clock=clock;ui_clock_frame=link_frames();}
+ /* Losing the cable must not trap the UI behind an uncommitted launch.
+    Cancel presentation/preparation only; do not reset musical clock phase. */
+ if((mx.pending<8||link_pair_phase)&&(uint16_t)(link_frames()-ui_clock_frame)>120){mixer_prepare_cancel();link_pair_hold=link_pair_phase=0;pairslot=255;waiting=0;}
+
+ if(mx.pending<8||link_pair_phase||sparse_install_slot!=255||sparse_journal_retaining()||mixer_prepare_busy()||seqservicing){ui_quiet_since=link_frames();return;}
+ __critical {ticks=seqticks;}
+ if(seqplaying&&((uint16_t)(link_frames()-ui_quiet_since)<2||ticks>=seqdeadline||syncpending))return;
+ link_ui_hold=0;seqdrawvalid=0;seqviewtrack=255;previewshape=255;pad_names_valid=0;mx.padcache=0;
+ if(page==8)roll_clear_transition();dirty=1;
+}
 void link_service(void) BANKED {uint8_t now=(uint8_t)link_frames(),i;
  if(link_alive){__critical {link_alive=0;}lastseen=link_frames();}
  if(linkcollision&&seqplaying){seq_transport();link_reset();linkstate=4;dirty=1;return;}
  if(link_rx_ready){accept();link_rx_ready=rxsize=rxread=0;}
  if(now==serviceframe)return;serviceframe=now;
+ if(link_ui_hold)ui_release();
  if(syncmode!=1)return;
  if(!syncslave&&!waiting&&nextfield<6){uint8_t field=nextfield;nextfield=255;if(nextepoch==linkmirror.epoch)link_command(nexttrack,field,nextvalue);}
  if(syncslave&&name_pending<8&&(int16_t)(link_frames()-name_deadline)>=0){link_names_dirty|=1<<name_pending;name_pending=255;}

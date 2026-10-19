@@ -34,7 +34,7 @@ void mixer_link_render(void) BANKED {uint8_t c,n=0,col=0,selected=mx.focus>=38&&
 void mixer_link_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
  if(mx.focus<2){if(edge&(J_LEFT|J_RIGHT))mx.focus=mx.focus?0:1;if(edge&J_DOWN)mx.focus=first_strip();if(edge&J_UP)mx.focus=pad();
   if(edge&(J_A|J_B)){if(!mx.focus)seq_transport();else if(mx.focus==1)link_command(0,5,linkmirror.quant>=4?1:linkmirror.quant+1);}dirty=1;return;}
- if(mx.focus>=30&&mx.focus<38){if(edge&(J_LEFT|J_RIGHT))for(c=0;c<8;c++){mx.focus=30+((mx.focus-30+(edge&J_LEFT?7:1))&7);if(shown(mx.focus-10))break;}
+ if(mx.focus>=30&&mx.focus<38){if(edge&(J_LEFT|J_RIGHT))mixer_pads_move(edge&J_LEFT?-1:1);
   if(edge&J_UP)mx.focus=first_strip();else if(edge&J_A){if(!seqplaying){seq_transport();if(syncmode==1&&!syncslave&&seqplaying)mx.browser=128+mx.focus-30;}else link_command(mx.focus-30,4,0);}dirty=1;return;}
  c=mx.focus>=38?7+(mx.focus-38)/2:(mx.focus-2)/4;f=mx.focus>=38?(mx.focus-38)%2:(mx.focus-2)%4;
  if(c<7&&f>=2&&(p&(J_A|J_B))){int16_t v=link_target(c,f);if(!(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)))return;if(edge&J_UP)v++;if(edge&J_DOWN)v--;if(edge&J_LEFT)v-=10;if(edge&J_RIGHT)v+=10;link_command(c,f,v<0?0:v>(f==2?127:3)?(f==2?127:3):v);dirty=1;return;}

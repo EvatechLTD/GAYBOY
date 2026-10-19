@@ -4,6 +4,7 @@
 #include "link_control.h"
 #include "tones.h"
 #include "mixer_shared.h"
+extern uint8_t link_ui_hold;
 #include "sparse_store.h"
 extern uint16_t seqcachedbpm,seqstepunits,seqgateunits[7],seqdeadline;
 extern uint8_t seqgate[7],seqbeats,seqdenom;
@@ -353,8 +354,8 @@ static void prepare_once(void){uint8_t v,c,result,header[16];uint16_t n,total;ui
  mx.checking=0;
 }
 void mixer_prepare_service(void) BANKED {uint8_t i;if(!prep.phase){
- if(page!=18)return;
+ if(page!=18&&!link_ui_hold)return;
  if(mx.pending!=255){if(mx.pending==mx.slot||!pattern_dirty||(mx.protectedslots&(1<<mx.slot)))return;prep.target=mx.pending;prep.source=mx.slot;prep.pad=mx.cachevalid&&mx.cacheslot==mx.pending?2:0;prep.phase=1;}
  else mixer_prepare_focus(mx.focus>=30&&mx.focus<38?mx.focus-30:255);
  if(!prep.phase)return;
-}if(page!=18&&prep.phase!=18){mixer_prepare_cancel();mx.pending=255;return;}for(i=0;i<1&&prep.phase;i++){prepare_once();mixfill();}}
+}if(page!=18&&!link_ui_hold&&prep.phase!=18){mixer_prepare_cancel();mx.pending=255;return;}for(i=0;i<1&&prep.phase;i++){prepare_once();mixfill();}}

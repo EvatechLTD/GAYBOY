@@ -8,6 +8,7 @@ from sparse_image import SparseImage
 import random,json,shutil,time
 # Reuse input acknowledgement and Finder navigation, without running its tests.
 exec(Path('tools/test_mixer_settings.py').read_text().split('try:\n')[0])
+titles={'LEFT':['SINE','LUNAR','TIDAL','ORBIT','PLUME','GLIDE','VAPOR','COMET'],'RIGHT':['BRICK','DUST','PUNCH','SWING','CLAP','STOMP','FUNK','ROLL']}
 reports=[]
 try:
  for side,seed,kit in [('LEFT',104729,1),('RIGHT',130363,2)]:
@@ -25,6 +26,11 @@ try:
    for step in hats:tracks[6].append([step,3,rng.randint(55,88),1])
    tracks[6].append([(2+slot*2)%16,6 if side=='LEFT' else 7,70+slot*3,2])
    tracks[6].sort(key=lambda e:(e[0],e[1]))
+   if side=='LEFT':
+    tracks=[[] for _ in range(7)];root=[49,52,56,59,61,64,68,71][slot]
+    tracks[2]=[[step,root+interval,95+slot*3,3] for step,interval in zip([0,4,8,12],[0,7,12,7])]
+    p.memory[S['_param']+2*26+15]=1;p.memory[S['_param']+2*26+9]=0;p.memory[S['_param']+2*26+21]=3
+
    write_tracks(p,S,tracks);p.memory[S['_seqeventcache']]=0
    for c in range(7):
     write_word(p,S['_seqlength']+c*2,16);p.memory[S['_mx']+12+c]=127;p.memory[S['_mx']+19+c]=3
@@ -32,7 +38,7 @@ try:
    write_word(p,S['_drummutemask'],0);write_word(p,S['_drumsolomask'],0)
    write_word(p,S['_seqbpm'],120);write_word(p,S['_seqglobalbpm'],120);write_word(p,S['_seqcachedbpm'],0)
    p.memory[S['_drumkit']]=kit
-   title=f'{side[0]}{slot+1:02} GROOVE'.encode().ljust(17,b'\0');p.memory[S['_mx']+26:S['_mx']+43]=list(title)
+   title=titles[side][slot].encode().ljust(17,b'\0');p.memory[S['_mx']+26:S['_mx']+43]=list(title)
    choose(20);p.memory[S['_mx']+6]=v('sparse_patterns');tap('b')
    assert v('page')==18 and not v('seqplaying')
   choose(18);p.memory[S['_mx']+4]=30;tap('b');p.tick(80)
@@ -50,8 +56,9 @@ try:
   image=SparseImage(bytes(battery));patterns=[]
   for slot in range(8):
    obj=image.object(image.word(image.root,16+slot*2),'P')
-   assert obj[:16].split(b'\0')[0].decode()==f'{side[0]}{slot+1:02} GROOVE'
-   patterns.append({'name':obj[:16].split(b'\0')[0].decode(),'events':list(obj[102:]),'kit':kit})
+   assert obj[:16].split(b'\0')[0].decode()==titles[side][slot]
+   counts=[image.word(obj,16+c*2) for c in range(7)];assert counts[2 if side=='LEFT' else 6]>0 and sum(n for c,n in enumerate(counts) if c!=(2 if side=='LEFT' else 6))==0
+   patterns.append({'name':obj[:16].split(b'\0')[0].decode(),'events':list(obj[102:]),'kit':kit,'channel':'W1' if side=='LEFT' else 'D1'})
   reports.append({'side':side,'seed':seed,'patterns':patterns})
   folder=Path('build/linked-test')/side;folder.mkdir(parents=True,exist_ok=True)
   dest=folder/(side+'.sav')
@@ -61,6 +68,7 @@ try:
   if side=='LEFT':
    p=PyBoy('build/GAYBOY.gb',window='null',sound_emulated=True,ram_file=BytesIO(bytes(32768)));p.set_emulation_speed(0)
  assert len({bytes(pat['events']) for side in reports for pat in side['patterns']})==16
+ assert len({pat['name'] for side in reports for pat in side['patterns']})==16
  Path('build/linked-test/beat-fixtures.json').write_text(json.dumps(reports,indent=2)+'\n')
- print('PASS: 16 distinct simple beats saved through ROM UI; LEFT TR-808, RIGHT TR-909, eight named pads each')
+ print('PASS: 16 unique names and patterns; LEFT wave-only, RIGHT drum-only; saved through ROM UI')
 finally:p.stop(save=False)

@@ -19,6 +19,7 @@ static unsigned id(GB_gameboy_t *gb);
 static unsigned trace_count;
 static struct {unsigned cycle,value;} trace[32768];
 static unsigned event_count,watch_boundary,watch_launch,watch_positions,watch_ticks,watch_clock;
+static unsigned ui_hold_address,ui_page_address,ui_hold_count[2],ui_vram_count[2],ui_page_count[2];
 static unsigned min_sp[2]={0xffff,0xffff};
 static unsigned watch_drum_on,watch_mix_read,watch_mix_write,watch_drum_mix;
 static unsigned pcm_pending[2],pcm_buffer[2][2];
@@ -32,6 +33,14 @@ static void event(GB_gameboy_t *gb,unsigned tag,unsigned value){
  events[i].ticks=GB_safe_read_memory(gb,watch_ticks)|(GB_safe_read_memory(gb,watch_ticks+1)<<8);
 }
 static bool writes(GB_gameboy_t *gb,uint16_t addr,uint8_t value){
+ if(ui_hold_address){unsigned side=id(gb);
+  if(addr==ui_hold_address&&value)ui_hold_count[side]++;
+  if(GB_safe_read_memory(gb,ui_hold_address)){
+   if(addr>=0x8000&&addr<0xa000)ui_vram_count[side]++;
+   if(addr==ui_page_address&&value!=GB_safe_read_memory(gb,ui_page_address))ui_page_count[side]++;
+  }
+ }
+
  if(rx_base&&addr==rx_base+258&&value)event(gb,0x600,(gb->mbc_rom_bank<<16)|gb->pc);
  if(id(gb)==1&&addr==0xffc5)event(gb,0x702,value);
  if(id(gb)==1&&addr==0xffdf)event(gb,0x704,value|(GB_safe_read_memory(gb,0xffe1)<<8));
@@ -139,3 +148,8 @@ EMSCRIPTEN_KEEPALIVE unsigned link_trace_value(unsigned i){return trace[i].value
 
 EMSCRIPTEN_KEEPALIVE void link_profile_start(void){memset(profile,0,sizeof(profile));profiling=true;}
 EMSCRIPTEN_KEEPALIVE unsigned link_profile(unsigned index){profiling=false;return profile[index];}
+
+EMSCRIPTEN_KEEPALIVE void link_watch_ui(unsigned hold,unsigned page){ui_hold_address=hold;ui_page_address=page;memset(ui_hold_count,0,sizeof(ui_hold_count));memset(ui_vram_count,0,sizeof(ui_vram_count));memset(ui_page_count,0,sizeof(ui_page_count));}
+EMSCRIPTEN_KEEPALIVE unsigned link_ui_holds(unsigned i){return ui_hold_count[i];}
+EMSCRIPTEN_KEEPALIVE unsigned link_ui_vram_writes(unsigned i){return ui_vram_count[i];}
+EMSCRIPTEN_KEEPALIVE unsigned link_ui_page_changes(unsigned i){return ui_page_count[i];}

@@ -5,7 +5,10 @@
 GAYBOY sync defaults to AUTO. Both stopped machines listen; the first local
 Play becomes master and starts its peer. Stop returns AUTO machines to listening.
 MASTER and SLAVE overrides remain available. Other sync modes retain manual roles.
-The native start claim runs before arming the musical clock. A local AUTO Play
+The native start claim runs before arming the musical clock. A local AUTO start
+first leaves time for an in-flight external claim to finish. An eight-byte
+zero guard distinguishes overlapping internal claimants from an idle high wire;
+it runs only at transport startup and does not change the serial ISR. A local AUTO Play
 press in the six video frames following an incoming Start is coalesced with
 that start, preventing near-simultaneous presses from stopping only the slave. A detected start
 collision cancels playback and shows START CLASH - RETRY; press Play again.
@@ -14,7 +17,10 @@ Open Start ? PAGE ? MIXER SETTINGS. MIXER VIEW selects LOCAL or LINK;
 PAIR PATTERNS, SYNC TYPE, SYNC ROLE and both layout editors live here.
 B returns to the mixer. Sync configuration edits require stopped transport.
 The mixer header has no configuration controls and SELECT does not open a menu.
-LOCAL/LINK switches between this machine and its connected peer. LINK offers pattern selection, track volume/pan/mute/solo and
+The pad-bank heading reads LOCAL for this machine and LINKED for the peer.
+Horizontal pad navigation crosses into the linked bank after the local pages
+and wraps back. Without a negotiated peer only local pads are available, even
+if a song saved LINK as its preferred view. LINK offers pattern selection, track volume/pan/mute/solo and
 individual drum mute/solo. Hold A with arrows to change volume/pan. The master
 shows acknowledged remote values; COMMAND PENDING means an edit is in flight.
 Edits are absolute and guarded by the remote pattern generation. A stale edit is
@@ -31,7 +37,12 @@ number above its five-character name. The focus outline is independent of
 playing inversion and queued flashing. The external number row is removed;
 PAN uses the reclaimed mixer row. A stopped pad press starts transport.
 A linked pad press starts AUTO transport, then sends its selection after
-discovery without adding live serial transfers.
+discovery without adding live serial transfers. A remote launch preserves the
+receiver's page and open menu. Drawing and ordinary UI input pause during
+preparation/installation and resume after two quiet video frames with playback
+caught up. Audio and serial service continue throughout; SELECT+START panic
+remains available. If clocks disappear, an uncommitted request is cancelled
+after two seconds so the UI cannot remain frozen behind a disconnected launch.
 
 Opening Start on a local pad captures its highlighted slot for Edit and File
 actions, independently of the active/playing slot. Inactive Load/Save and
@@ -143,14 +154,14 @@ layout power cycles/redundancy, incremental/full pixel equivalence and queued-pa
 flash cancellation.
 
 The current 300 BPM IRQ/audio fixture passes delivery, note rate, startup and
-subdivision budgets with zero measured underruns; longest measured IRQ is 7024
+subdivision budgets with zero measured underruns; longest measured IRQ is 7100
 cycles. The pinned main baseline's corresponding historical startup budget fails
 with corrected native hardware-write instrumentation; its other budgets pass.
 The candidate adds bounded CPU work (approximately one percentage point in this
 fixture). Zero extra transfers is a wire guarantee, not zero CPU overhead or a
 proof that all hardware note-latency distributions are identical. Actual console,
 cable and hot-plug checks remain necessary before a release timing-parity claim.
-WRAM reserve is 1041 bytes and reserved stack is 512 bytes; adding globals needs
+WRAM reserve is 1035 bytes and reserved stack is 512 bytes; adding globals needs
 another memory audit. Test ROM, symbols and JSON traces live under build/.
 
 The older standalone test_mixer_live.py is not a passing acceptance gate: it
@@ -173,6 +184,9 @@ node tools/test_linked_mixer_faults.cjs
 node tools/test_linked_pair_timeout.cjs --bpm 120
 node tools/test_linked_mixer_reconnect.cjs
 node tools/test_sync_auto_start.cjs
+node tools/test_mixer_linked_paging.cjs
+node tools/test_linked_frozen_ui.cjs
+node tools/test_linked_frozen_ui.cjs --wave --disconnect
 node tools/test_sync_link.cjs --bpm 300 --stress
 node tools/test_linked_mixer_legacy.cjs --reference-rom <pinned-main.gb>
 python tools/test_sync_irq_budget.py
@@ -195,7 +209,17 @@ checkout's Quick Menu assignments at 100..109 untouched on integration.
 
 
 For distinct emulator test content, run `python tools/prepare_linked_beats.py`
-then `tools/launch_linked_mixer.ps1`. LEFT uses eight L01..L08 TR-808 beats;
-RIGHT uses eight different R01..R08 TR-909 beats. The generated test batteries
+then `tools/launch_linked_mixer.ps1`. LEFT uses eight wave-only patterns:
+SINE, LUNAR, TIDAL, ORBIT, PLUME, GLIDE, VAPOR, COMET. RIGHT uses eight drum-only
+TR-909 patterns: BRICK, DUST, PUNCH, SWING, CLAP, STOMP, FUNK, ROLL. All sixteen
+names and event contents are distinct. The generated test batteries
 live in build/linked-test, preserve earlier batteries as backups and never
 modify saves/*.gbsong. Keys: Shift Start, Space Select, Z B, X A.
+
+Current build SHA256: `e37966aeab764c97059b91f52e14c09968c7a48c7c31c29585add7971e73c0b8`.
+The 300 BPM storage/paired-launch test measured zero extra metadata transfers,
+zero aborted transfers, zero unarmed edges and no added audio underruns.
+Both PCM and wave receiver tests recorded zero VRAM writes or page changes
+during handoff on nine pages/menu contexts. Repeated AUTO competing starts,
+cable loss during preparation and reconnect passed. These emulator results
+do not resolve the hardware quantization observations described above.

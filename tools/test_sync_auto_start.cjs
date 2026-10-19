@@ -17,7 +17,7 @@ const fs=require('fs'),assert=require('assert');
  until(()=>v(0,'introready')&&v(1,'introready'));
  core._link_key(0,7,1);core._link_key(1,7,1);until(()=>[0,1].every(i=>!v(i,'introactive')&&v(i,'page')===8));core._link_key(0,7,0);core._link_key(1,7,0);run(60);
 
- for(const offset of [0,1,2]){
+ for(const offset of [0,1,2,0,1,2,2,1,0]){
   choose(0,27);choose(1,27);
   assert(v(0,'syncslave')&&v(1,'syncslave'));
   core._link_key(0,7,0);core._link_key(1,7,0);
@@ -32,5 +32,5 @@ const fs=require('fs'),assert=require('assert');
   assert(!v(0,'seqplaying')&&!v(1,'seqplaying'));
   assert(v(0,'syncslave')&&v(1,'syncslave'));
  }
- console.log('PASS AUTO competing starts at 0/1/2 frame offsets, clean retry and return to listening');
+ console.log('PASS repeated AUTO competing starts at 0/1/2 frame offsets, clean retry and return to listening');
 })().catch(e=>{console.error(e);process.exitCode=1;});

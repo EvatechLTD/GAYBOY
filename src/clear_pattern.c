@@ -1,6 +1,7 @@
 #pragma bank 45
 #include "api.h"
 #include "mixer_shared.h"
+#include "link_control.h"
 #include "clear_pattern.h"
 #include "ui_startup_font.h"
 static uint8_t origin,slot,track,clear_choice,operation;
@@ -97,7 +98,7 @@ void seq_clear_notes(uint8_t track) BANKED {uint8_t c,busy=seqservicing;seqservi
 static uint8_t edit_pad(void){return origin==18?slot:(origin==19||origin==20)?mixer_file_pad():mx.slot;}
 static uint8_t edit_grid(void){return page==8;}
 uint8_t finder_edit_allowed(uint8_t item) BANKED {
- if(page==18&&mixer_device)return 0;
+ if(page==18&&MIXER_LINK_VIEW)return 0;
  if(item==26)return page==18;
  if(item==39)return page==18&&sparse_enabled==1;
  if(item==40)return page==18&&sparse_enabled==1&&(edit_pad()==mx.slot||sparse_slots[edit_pad()]!=POOL_NONE);

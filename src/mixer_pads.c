@@ -20,8 +20,8 @@ __at (0xACC2) uint8_t padflash_off;
 __at (0xACC3) uint8_t padflash_slot;
 static uint8_t padtile(uint8_t tile,uint8_t bank){return bank?(tile<24?168+tile:180+tile):(tile<32?64+tile:128+tile);}
 static uint8_t column(uint8_t slot){uint8_t i;if(slot>=8)return 255;for(i=0;i<4;i++)if(slots[i]==slot)return i*5;return 255;}
-static uint8_t hidden(void){uint8_t *p=mixer_hidden+mixer_device*4;return (p[2]>>4)|(p[3]<<4);}
-static uint8_t queued(void){return mixer_device?linkmirror.pending:mx.pending;}
+static uint8_t hidden(void){uint8_t *p=mixer_hidden+(MIXER_LINK_VIEW?4:0);return (p[2]>>4)|(p[3]<<4);}
+static uint8_t queued(void){return MIXER_LINK_VIEW?linkmirror.pending:mx.pending;}
 static void text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+(uint16_t)y*20+x;while(*s&&x++<20)*d++=*s++-32+(inv?96:0);}
 static void padmap(uint8_t slot,uint8_t bank){uint8_t row,x,col=column(slot),ids[5];uint16_t at;if(col==255)return;
  for(row=0;row<2;row++){at=(uint16_t)(14+row)*20+col;for(x=0;x<5;x++){ids[x]=padtile(row*20+col+x,bank);visible[at+x]=canvas[at+x]=ids[x];}ui_upload_map(0x9800U+(uint16_t)(14+row)*32+col,ids,5);mixfill();}
@@ -41,16 +41,16 @@ static void changed(uint8_t slot,uint8_t *columns){uint8_t x,col=column(slot);if
 static void upload(uint8_t bank,uint8_t *columns){uint8_t k,tx,y,buf[16],*src,*dst,*rows=(uint8_t *)0xAD00;
  for(k=0;k<2;k++)for(tx=0;tx<20;tx++)if(columns[tx]){src=rows+(k?160:0)+tx;dst=buf;for(y=0;y<8;y++){*dst++=*src;*dst++=*src;src+=20;}ui_upload_tile(padtile(k*20+tx,bank),buf,0);mixfill();}
 }
-void mixer_pads_render(void) BANKED {uint8_t i,j,n=0,pg=0,mask=hidden(),active=mixer_device?linkmirror.slot:mx.slot,play=seqplaying?active:255,q=queued(),focus=mx.focus>=30&&mx.focus<38?mx.focus-30:255,rebuild=0,columns[20],*rows=(uint8_t *)0xAD00;char name[17];
+void mixer_pads_render(void) BANKED {uint8_t i,j,n=0,pg=0,mask=hidden(),active=MIXER_LINK_VIEW?linkmirror.slot:mx.slot,play=seqplaying?active:255,q=queued(),focus=mx.focus>=30&&mx.focus<38?mx.focus-30:255,rebuild=0,columns[20],*rows=(uint8_t *)0xAD00;char name[17];
  /* Determine the page from the focused logical pad after visibility filters. */
  for(i=0;i<8;i++)if(!(mask&(1<<i))){if(mx.focus==30+i)pg=n/4;n++;}
  if(mx.focus<30||mx.focus>=38)pg=pad_names_valid?cachedpage:0;
  if(pg>=(n+3)/4)pg=0;
- if(!pad_names_valid||cachedpage!=pg||cachedmask!=mask||cacheddevice!=mixer_device)rebuild=1;
- if(!mixer_device&&pad_names_valid&&mx.name[0]&&memcmp(pad_names[active],mx.name,5)){pad_names_valid=0;rebuild=1;}
- if(!pad_names_valid||cacheddevice!=mixer_device){for(i=0;i<8;i++){
-  memset(name,0,17);if(mixer_device){if(linkmirror.namesvalid&(1<<i))memcpy(name,linkmirror.names[i],16);}else {getname(i,name);if(i==active&&mx.name[0])memcpy(name,mx.name,17);}
-  if(!name[0])strcpy(name,mixer_device&&!(linkmirror.namesvalid&(1<<i))?"WAIT":"EMPTY");memcpy(pad_names[i],name,5);mixfill();}
+ if(!pad_names_valid||cachedpage!=pg||cachedmask!=mask||cacheddevice!=!!MIXER_LINK_VIEW)rebuild=1;
+ if(!MIXER_LINK_VIEW&&pad_names_valid&&mx.name[0]&&memcmp(pad_names[active],mx.name,5)){pad_names_valid=0;rebuild=1;}
+ if(!pad_names_valid||cacheddevice!=!!MIXER_LINK_VIEW){for(i=0;i<8;i++){
+  memset(name,0,17);if(MIXER_LINK_VIEW){if(linkmirror.namesvalid&(1<<i))memcpy(name,linkmirror.names[i],16);}else {getname(i,name);if(i==active&&mx.name[0])memcpy(name,mx.name,17);}
+  if(!name[0])strcpy(name,MIXER_LINK_VIEW&&!(linkmirror.namesvalid&(1<<i))?"WAIT":"EMPTY");memcpy(pad_names[i],name,5);mixfill();}
  }
  if(!rebuild&&mx.padcache&&pad_image_playing==play&&pad_image_queued==q&&cachedfocus==focus)goto publish;
  mixer_pad_restore();memset(columns,0,20);
@@ -72,12 +72,20 @@ void mixer_pads_render(void) BANKED {uint8_t i,j,n=0,pg=0,mask=hidden(),active=m
  toggle(play);if(q!=play)toggle(q);if(ui_font_upload_pending)ui_transition_begin();upload(padbank,columns);
  if(q<8&&column(q)!=255){toggle(q);memset(columns,0,20);changed(q,columns);upload(padbank^1,columns);toggle(q);}
  if(q!=play)toggle(q);toggle(play);
- pad_names_valid=1;cachedpage=pg;cachedmask=mask;cacheddevice=mixer_device;cachedfocus=focus;pad_image_playing=play;pad_image_queued=q;padflash_slot=q;padflash_started=sys_time;mx.padcache=mixer_device?(linkmirror.slot==active&&linkmirror.pending==q):(mx.slot==active&&mx.pending==q);if(!mx.padcache)dirty=1;
+ pad_names_valid=1;cachedpage=pg;cachedmask=mask;cacheddevice=!!MIXER_LINK_VIEW;cachedfocus=focus;pad_image_playing=play;pad_image_queued=q;padflash_slot=q;padflash_started=sys_time;mx.padcache=MIXER_LINK_VIEW?(linkmirror.slot==active&&linkmirror.pending==q):(mx.slot==active&&mx.pending==q);if(!mx.padcache)dirty=1;
  publish:
- memset(canvas+13*20,0,20);text(0,13,"PATTERNS",0);canvas[13*20+10]=('0'+(n?pg+1:0))-32;text(11,13,"/",0);canvas[13*20+12]=('0'+((n+3)/4))-32;
+ memset(canvas+13*20,0,20);text(0,13,MIXER_LINK_VIEW?"LINKED":"LOCAL",0);canvas[13*20+10]=('0'+(n?pg+1:0))-32;text(11,13,"/",0);canvas[13*20+12]=('0'+((n+3)/4))-32;
  if(play<8&&column(play)==255)text(14,13,"P>",0);if(q<8&&column(q)==255)text(17,13,"Q>",0);
  for(i=0;i<40;i++)canvas[14*20+i]=padtile(i,padbank);
  if(padflash_off&&q<8){uint8_t col=column(q);if(col!=255)for(i=0;i<2;i++)for(j=0;j<5;j++)canvas[(uint16_t)(14+i)*20+col+j]=padtile(i*20+col+j,padbank^1);}
- memset(canvas+20,0,20);if(mx.focus>=30&&mx.focus<38){i=mx.focus-30;memset(name,0,17);if(mixer_device)memcpy(name,linkmirror.names[i],16);else getname(i,name);name[16]=0;text(0,1,name,0);}
+ memset(canvas+20,0,20);if(mx.focus>=30&&mx.focus<38){i=mx.focus-30;memset(name,0,17);if(MIXER_LINK_VIEW)memcpy(name,linkmirror.names[i],16);else getname(i,name);name[16]=0;text(0,1,name,0);}
  if(!n)text(0,16,"ALL PADS HIDDEN",0);
+}
+
+/* One horizontal pad sequence: local pads, then a negotiated peer's pads.
+   Visibility filtering never changes the logical launch slot. */
+void mixer_pads_move(int8_t delta) BANKED {uint8_t n,total=MIXER_LINK_AVAILABLE?16:8,id=(MIXER_LINK_VIEW?8:0)+mx.focus-30;
+ for(n=0;n<total;n++){uint8_t device,slot,bit;id=(id+(delta<0?total-1:1))%total;device=id>>3;slot=id&7;bit=20+slot;
+  if(!(mixer_hidden[device*4+(bit>>3)]&(1U<<(bit&7)))){if(device!=!!MIXER_LINK_VIEW){mixer_device=device;pad_names_valid=0;mx.padcache=0;}mx.focus=30+slot;return;}
+ }
 }

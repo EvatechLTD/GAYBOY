@@ -37,7 +37,7 @@ void mixer_layout_load(void) BANKED;
 void mixer_layout_render(void) BANKED;
 void mixer_link_render(void) BANKED;
 void mixer_link_input(uint8_t p,uint8_t edge) BANKED;
-static uint8_t layout_hidden(uint8_t id){return mixer_hidden[mixer_device*4+(id>>3)]&(1U<<(id&7));}
+static uint8_t layout_hidden(uint8_t id){return mixer_hidden[(MIXER_LINK_VIEW?4:0)+(id>>3)]&(1U<<(id&7));}
 static uint8_t strip_visible(uint8_t c){return !layout_hidden(c)&&(experimental_mode||(c!=4&&c!=5));}
 static uint8_t firststrip(void){uint8_t c;for(c=0;c<20;c++)if(strip_visible(c))return c;return 255;}
 static uint8_t firstpad(void){uint8_t c;for(c=0;c<8;c++)if(!layout_hidden(20+c))return 30+c;return 0;}
@@ -167,15 +167,15 @@ static uint8_t retrigger(uint8_t quantized){uint8_t busy=seqservicing;seqservici
 }
 static uint8_t switchslot(uint8_t s){uint8_t run=seqplaying,busy=seqservicing,primed,handoff;uint16_t oldbpm,residual,generation;
  if(sparse_enabled)return sparse_activate(s);
- if(!mx.cachevalid||mx.cacheslot!=s||page!=18)prefetch(s);if(mx.cachevalid==3){mx.pending=255;mx.presaved=0;mx.error=1;dirty=1;return 0;}
+ if(!mx.cachevalid||mx.cacheslot!=s||(page!=18&&!link_ui_hold))prefetch(s);if(mx.cachevalid==3){mx.pending=255;mx.presaved=0;mx.error=1;dirty=1;return 0;}
  /* Save while the outgoing pattern still plays, including quantize OFF.
     Compute eligibility after prefetch so immediate launches use the cache. */
- mx.pending=255;if(!mx.presaved||page!=18)autosnapshot(mx.slot);mx.presaved=0;
+ mx.pending=255;if(!mx.presaved||(page!=18&&!link_ui_hold))autosnapshot(mx.slot);mx.presaved=0;
  primed=run&&mx.cachevalid==1;handoff=(run&&syncmode&&syncslave)||(primed&&seqmode==(experimental_mode?CACHE[META+74]:0));oldbpm=seqbpm;residual=seqclock;
  generation=pattern_generation;if(handoff){seqservicing=1;}else if(run)seq_transport();mx.slot=s;if(primed)prime();else restore(s,1);if(!syncmode||!syncslave)mx.boundary=0;seqdeadline=1;memset(seqcursor,0,7);seqdrawvalid=0;mx.padcache=0;
  if(handoff){seq_pattern_release();if(oldbpm!=seqbpm)seqclock=((uint32_t)residual*seqbpm)/oldbpm;seq_pattern_handoff();}else {memset(seqposition,0,7);if(run)seq_transport();}
  if(primed){seqservicing=1;install_events();seqeventcache=0;mx.cachevalid=0;seqservicing=busy;if(generation==pattern_generation)mixer_pattern_clean();}
- if(mx.openempty){mx.openempty=0;page=8;seq_open();}dirty=1;return 1;}
+ if(mx.openempty){mx.openempty=0;if(!link_ui_hold){page=8;seq_open();}}dirty=1;return 1;}
 void mixer_clock_reset(void) BANKED {if(mx.magic==0xD3)mx.boundary=0;}
 uint8_t mixer_boundary(void) BANKED {uint8_t interval;if(mx.magic!=0xD3)return 0;mx.boundary=(mx.boundary+1)&15;if(mx.pending==255||mixer_prepare_busy())return 0;if(link_pair_hold)return 0;interval=mx.quant?1U<<mx.quant:1;if(!(mx.boundary&(interval-1))){
  /* Both sides are prepared. Publish this boundary before installing the
@@ -248,7 +248,7 @@ static void pattern_library_render(void){uint8_t i,start=mx.browser>3?mx.browser
 }
 static char *pad_hint(void){uint8_t state;if(mx.error)return sparse_enabled?(pool_error==2?"SAVE DATA DAMAGED":"NOT ENOUGH SPACE"):"PATTERN >512 EVENTS";if(link_pair_phase)return "PAIR PREPARING...";if(linkpair&&linkstate!=2)return "PAIR NEEDS LINK";if(mx.focus==64)return "A+ARROWS B OFF";if(mx.focus>=38)return "A/B TOGGLE";if(mx.focus<30)return "A PICK B EDIT";state=mixer_prepare_status(mx.focus-30);return state==1?"READY A/B":state==2?"PREPARING...":state==3?"QUEUED":"A PICK B EDIT";}
 void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_init();rendering_slot=mx.slot;
- if(page==18&&mixer_device){mixer_link_render();return;}
+ if(page==18&&MIXER_LINK_VIEW){mixer_image.valid=0;mixer_link_render();return;}
  /* Pad navigation changes only the two pattern rows and their footer. Reuse
     the published strip image when every value that affects it is unchanged. */
  if(page==18&&!navopen&&mixer_image.valid&&mx.focus>=30&&mx.focus<38&&mixer_image.focus>=30&&mixer_image.focus<38&&mixer_image.tempo==seqglobalbpm&&mixer_image.quant==mx.quant&&mixer_image.playing==seqplaying&&mixer_image.edit==mx.edit&&mixer_image.mode==experimental_mode&&mixer_image.muted==seqmuted&&mixer_image.solo==seqsolo&&mixer_image.drummute==drummutemask&&mixer_image.drumsolo==drumsolomask&&!memcmp(mixer_image.strips,mx.level,14))goto pattern_controls;
@@ -303,7 +303,7 @@ void mixer_remote_apply(uint8_t c,uint8_t field,uint8_t value) BANKED {
 void mixer_tempo_edit(int16_t delta) BANKED {int16_t bpm;if(syncmode&&syncslave&&(syncmode!=1||syncrole||seqplaying))return;if(!syncmode){seqirqready=0;seqirqdirty=1;}if(seqplaying)seq_frame();bpm=(int16_t)seqbpm+delta;seqbpm=bpm<30?30:bpm>300?300:bpm;if(seqglobalbpm)seqglobalbpm=seqbpm;seqcachedbpm=0;seqdeadline=1;dirty=1;}
 static void warmfocus(void){mixer_prepare_focus(mx.focus>=30&&mx.focus<38?mx.focus-30:255);}
 void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mixer_init();if(page==18&&padflash_off&&(edge&(J_A|J_B)))mixer_pad_restore();
- if(page==18&&mixer_device){mixer_link_input(p,edge);return;}
+ if(page==18&&MIXER_LINK_VIEW){mixer_link_input(p,edge);return;}
  if((page==20||page==25)&&mx.naming){nameinput(edge);dirty=1;return;}
  if(page==24||page==25){if(sparse_enabled!=1)return;if(edge&J_UP)mx.browser=mx.browser?mx.browser-1:POOL_SONGS-1;if(edge&J_DOWN)mx.browser=(mx.browser+1)%POOL_SONGS;
   if(edge&J_A){if(page==25)nameopen();else if(sparse_load_song(mx.browser)){page=18;mx.focus=0;pad_names_valid=0;}else mx.error=1;}
@@ -332,7 +332,7 @@ void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mix
   stripnav(edge);warmfocus();
   dirty=1;return;
  }
- if(mx.focus>=30){if(edge&(J_LEFT|J_RIGHT)){for(c=0;c<8;c++){mx.focus=30+((mx.focus-30+(edge&J_LEFT?7:1))&7);if(!layout_hidden(20+mx.focus-30))break;}}if(edge&J_UP){c=firststrip();mx.focus=c<20?stripfocus(c,3):0;}else {if(edge&J_A){uint8_t start=!seqplaying,target=mx.focus-30;mx.error=0;mixer_launch_request(target,0);if(start&&mx.slot==target&&!mx.error&&!mixer_prepare_busy()){mx.openempty=0;page=18;seq_transport();}}if(edge&J_B)mixer_launch_request(mx.focus-30,1);}warmfocus();dirty=1;return;}
+ if(mx.focus>=30){if(edge&(J_LEFT|J_RIGHT))mixer_pads_move(edge&J_LEFT?-1:1);if(edge&J_UP){c=firststrip();mx.focus=c<20?stripfocus(c,3):0;}else {if(edge&J_A){uint8_t start=!seqplaying,target=mx.focus-30;mx.error=0;mixer_launch_request(target,0);if(start&&mx.slot==target&&!mx.error&&!mixer_prepare_busy()){mx.openempty=0;page=18;seq_transport();}}if(edge&J_B)mixer_launch_request(mx.focus-30,1);}warmfocus();dirty=1;return;}
  if(mx.focus>=2){c=(mx.focus-2)/4;f=(mx.focus-2)%4;if(f>=2){mx.edit=0;if(p&(J_A|J_B)){int8_t delta=0;if(edge&J_UP)delta++;if(edge&J_DOWN)delta--;if(edge&J_LEFT)delta-=10;if(edge&J_RIGHT)delta+=10;if(delta)change(c,f,delta);dirty=1;return;}}else if(edge&(J_A|J_B)){mutechange(c,f);dirty=1;return;}}
  if(mx.focus>=2){if(!mx.edit&&!(p&J_B))stripnav(edge);}
  else {if(edge&J_LEFT)mx.focus=mx.focus?0:1;if(edge&J_RIGHT)mx.focus=mx.focus?0:1;if(edge&J_UP)mx.focus=firstpad();if(edge&J_DOWN)mx.focus=64;}

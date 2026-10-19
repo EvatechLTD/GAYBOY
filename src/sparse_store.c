@@ -166,7 +166,7 @@ uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t run=seqplaying,busy=seqser
  seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.presaved=0;if(!syncmode||!syncslave)mx.boundary=0;mx.padcache=0;seqdrawvalid=0;memset(seqcursor,0,7);
  if(run&&(mode==seqmode||(syncmode&&syncslave))){seq_pattern_release();if(bpm!=seqbpm)seqclock=((uint32_t)residual*seqbpm)/bpm;seq_pattern_handoff();}
  else {if(run){seqplaying=1;seq_transport();seq_transport();}else {memset(seqposition,0,7);seqclock=seqticks=seqfraction=0;seqdeadline=1;}}
- seqservicing=busy;if(mx.openempty)mx.openempty=2;dirty=1;return 1;
+ seqservicing=busy;if(mx.openempty&&!link_ui_hold)mx.openempty=2;else mx.openempty=0;dirty=1;return 1;
 }
 void sparse_prepare_now(uint8_t slot) BANKED;
 void sparse_request(uint8_t slot,uint8_t edit) BANKED {

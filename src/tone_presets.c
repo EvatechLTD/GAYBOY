@@ -2,6 +2,7 @@
 #include "api.h"
 #include "tones.h"
 #include "mixer_shared.h"
+#include "link_control.h"
 uint8_t tonepresetopen,w2program;
 static uint8_t presetchoice;
 extern uint8_t w2row,w2tablemode,w2tablelen,w2tablespeed;
@@ -53,7 +54,7 @@ const uint8_t findercount[5]={7,12,8,14,4};
 const char * const findertracks[]={"P1","P2","WAVE1","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
 uint8_t pageconfig;
 static uint8_t pageslot;
-uint8_t finder_allowed(uint8_t item){if(item==255)return 0;if(page==18&&mixer_device&&(item==19||item==20))return 0;if(item==45)return pageconfig!=2;if(pageconfig==2)return item!=18&&item!=8&&item!=16&&item!=27;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
+uint8_t finder_allowed(uint8_t item){if(item==255)return 0;if(page==18&&MIXER_LINK_VIEW&&(item==19||item==20))return 0;if(item==45)return pageconfig!=2;if(pageconfig==2)return item!=18&&item!=8&&item!=16&&item!=27;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
 static void page_defaults(void);
 static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?13:findercount[navcategory];}
 static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==2?45:i==11?16:i==12?27:pool_root[100+i-3];}
