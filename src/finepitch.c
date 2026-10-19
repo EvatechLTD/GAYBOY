@@ -1,5 +1,6 @@
 #pragma bank 14
 #include "api.h"
+void seq_native_touch(void) NONBANKED;
 int16_t finepitch[5],finelo[5],finehi[5];
 uint16_t finebase[5];
 uint8_t finemode[5],finevalid[5];
@@ -21,11 +22,21 @@ uint16_t fine_apply(uint16_t base,uint8_t c,uint8_t direct) BANKED {
  fine_bounds(c,base,direct,0);if(value<finelo[c])value=finelo[c];if(value>finehi[c])value=finehi[c];
  if(value!=finepitch[c]){finepitch[c]=value;dirty=1;}return base+value;
 }
-void fine_edit(uint8_t c,int8_t delta) BANKED {
+/* Preview a future hardware pitch without changing the live editor cache. */
+uint16_t fine_preview_value(uint16_t base,int16_t value) BANKED {int16_t lo,hi;uint16_t distance=2048-base;
+ /* Both exact semitone bounds exceed distance/32. Small offsets need no
+    wide multiplies and never modify the editor cache. */
+ if(value>=0){if((uint16_t)value<=(distance>>5))return base+value;}
+ else if((uint16_t)-value<=(distance>>5)&&(uint16_t)-value<=base)return base+value;
+ lo=-(int16_t)fine_up(distance);hi=fine_down(distance);if(lo<-(int16_t)base)lo=-(int16_t)base;if(hi>2047-base)hi=2047-base;
+ if(value<lo)value=lo;if(value>hi)value=hi;return base+value;
+}
+uint16_t fine_preview(uint16_t base,uint8_t c) BANKED {return fine_preview_value(base,finepitch[c]);}
+void fine_edit(uint8_t c,int8_t delta) BANKED {seq_native_touch();if(!syncmode)seqirqdirty=1;
  uint8_t direct=c==4||(c==2&&waveengine==2),note;uint16_t base=finebase[c];int16_t value;
  if(!base||finemode[c]!=direct){note=c==4?36:c<4&&held[c]!=255?held[c]:60;base=direct?ddsnotes[note>107?107:note]:notes[note+(c==2?12:0)];finevalid[c]=0;}
  fine_bounds(c,base,direct,1);value=finepitch[c]+delta;if(value<finelo[c])value=finelo[c];if(value>finehi[c])value=finehi[c];finepitch[c]=value;
- if(c<3)updatepitch(c);dirty=1;
+ if(c<3)updatepitch(c);if(!syncmode)seq_irq_refresh(c);dirty=1;
 }
 
 const uint8_t fxmodmax[6]={15,4,3,7,16,63};

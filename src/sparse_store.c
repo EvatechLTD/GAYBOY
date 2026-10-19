@@ -136,12 +136,14 @@ uint8_t sparse_restore(uint8_t slot) BANKED {uint8_t busy=seqservicing;
    for(c=0;c<7;c++){seqlength[c]=16;seqdefaultvel[c]=100;seqdefaultdur[c]=c==6?0:c==5?4:1;seqgate[c]=(c<2||c>=5)?100:80;seqcachedgate[c]=seqgate[c];seqgateunits[c]=(c<2||c>=5)?128:102;mx.level[c]=127;mx.pan[c]=3;}
    drummutemask=drumsolomask=0;seqmuted=seqsolo=seqmode=0;seqbpm=seqglobalbpm?seqglobalbpm:120;seqcachedbpm=0;seqstepunits=128;seqbeats=seqdenom=4;memset(mx.name,0,17);seqeventfull=0;seqeventcache=2;install_position=0;sparse_install_slot=slot;*(uint8_t *)0xACCF=64;
   mx.slot=slot;seqservicing=busy;return 1;}
+ if(!sparse_prepared_apply(slot)){
  if(!pattern_read(sparse_slots[slot],0,PREFIX,POOL_PATTERN_BYTES)){seqservicing=busy;return 0;}
  expand_meta(META_BUFFER,PREFIX+16);applymeta(META_BUFFER);memcpy(mx.name,PREFIX,16);mx.name[16]=0;
  seqstepunits=word(PREFIX+97);memcpy(seqgateunits,PREFIX+83,14);memcpy(seqcachedgate,seqgate,7);seqcachedbpm=seqglobalbpm?0:seqbpm;*(uint8_t *)0xACCF=PREFIX[99];
+ }
  if(sparse_tones[slot]==SPARSE_JOURNAL_REF){sparse_journal_tones(0,TONE_RAW,POOL_TONE_BYTES);memcpy(TONE_KICK_RAW,TONE_RAW+TONE_RAW_BYTES,8);tones_apply();}
- else if(!tones_apply_object(sparse_tones[slot])){seqservicing=busy;return 0;}
- mx.slot=slot;seqeventcache=2;install_position=0;if(sparse_slots[slot]!=SPARSE_JOURNAL_REF)pool_stream_seek(&install_stream,sparse_slots[slot],POOL_EVENTS_OFFSET);sparse_install_slot=slot;seqservicing=busy;mixer_pattern_clean();return 1;
+ else if(!sparse_prepared_tones(slot)&&!tones_apply_object(sparse_tones[slot])){seqservicing=busy;return 0;}
+ mx.slot=slot;seqeventcache=2;install_position=0;if(sparse_slots[slot]!=SPARSE_JOURNAL_REF&&!sparse_prepared_stream(slot,&install_stream))pool_stream_seek(&install_stream,sparse_slots[slot],POOL_EVENTS_OFFSET);sparse_install_slot=slot;seqservicing=busy;mixer_pattern_clean();return 1;
 }
 uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t run=seqplaying,busy=seqservicing,mode=seqmode;uint16_t bpm=seqbpm,residual=seqclock;
  seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.presaved=0;mx.boundary=0;mx.padcache=0;seqdrawvalid=0;memset(seqcursor,0,7);
@@ -149,6 +151,7 @@ uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t run=seqplaying,busy=seqser
  else {if(run){seqplaying=1;seq_transport();seq_transport();}else {memset(seqposition,0,7);seqclock=seqticks=seqfraction=0;seqdeadline=1;}}
  seqservicing=busy;if(mx.openempty)mx.openempty=2;dirty=1;return 1;
 }
+void sparse_prepare_now(uint8_t slot) BANKED;
 void sparse_request(uint8_t slot,uint8_t edit) BANKED {
  if(slot>=8||sparse_enabled!=1)return;
  if(edit&&slot==mx.slot){mx.pending=255;mx.openempty=0;sparse_finish_install();page=8;seq_open();dirty=1;return;}
@@ -158,7 +161,7 @@ void sparse_request(uint8_t slot,uint8_t edit) BANKED {
  mx.pending=255;
  if(slot!=mx.slot&&pattern_dirty&&!retain_outgoing()){mx.error=1;dirty=1;return;}
  mx.openempty=edit||sparse_slots[slot]==POOL_NONE;mx.pending=slot;mx.padcache=0;dirty=1;
- if(!seqplaying||!mx.quant){mx.pending=255;mixer_activate(slot,edit);}
+ if(!seqplaying||!mx.quant){mx.pending=255;if(seqplaying)sparse_prepare_now(slot);mixer_activate(slot,edit);}
 }
 uint8_t sparse_event(uint16_t index,uint8_t *event) BANKED {return pattern_read(sparse_slots[mx.slot],POOL_EVENTS_OFFSET+index*4,event,4);}
 static uint8_t journal_scan(uint8_t track,uint8_t step,uint16_t *cursor,uint8_t *event){uint16_t index=*cursor,count=seqeventcounts[track];uint8_t data[16],n,i;
@@ -181,13 +184,14 @@ uint8_t sparse_scan(uint8_t track,uint8_t step,uint16_t *cursor,uint8_t *event) 
 }
 void sparse_service(void) BANKED {uint16_t size;uint8_t n,buf[16],busy,i;
  if(sparse_enabled!=1)return;
+ if(!seqplaying||seqticks<seqdeadline)sparse_prepare_service();
  /* Editor setup is foreground UI work. The timed callback only requests it;
     wait until its actual-note installation is complete before opening. */
  if(!seqservicing&&mx.openempty==2&&sparse_install_slot==255){mx.openempty=0;page=8;seq_open();}
  for(i=0;i<4&&sparse_journal_busy();i++){sparse_journal_service();mixfill();}if(sparse_journal_retaining()||sparse_install_slot==255)return;
  if(sparse_install_slot!=mx.slot){sparse_install_slot=255;return;}size=total()*4;
  busy=seqservicing;seqservicing=1;
- for(i=0;i<4&&install_position<size;i++){n=size-install_position>16?16:size-install_position;
+ if(install_position<size){n=size-install_position>16?16:size-install_position;
   if(sparse_slots[mx.slot]==SPARSE_JOURNAL_REF)sparse_journal_read(POOL_EVENTS_OFFSET+install_position,buf,n);
   else if(!pool_stream_read(&install_stream,buf,n)){seqservicing=busy;mx.error=3;return;}memcpy(live(install_position),buf,n);install_position+=n;
  }seqservicing=busy;

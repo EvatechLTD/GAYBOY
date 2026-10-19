@@ -22,9 +22,10 @@ extern void mixer_pattern_changed(void) BANKED;
 extern void seq_clear_release(uint8_t track) BANKED;
 static uint8_t random8(void){rng=(rng>>1)^((rng&1)?0xB400U:0);return rng^(rng>>8);}
 void gen_cancel(void) BANKED {if(!genopen)return;if(genpreview){seq_paste();}genopen=genpreview=0;seqdrawvalid=0;dirty=1;}
+static void generate(void);
 void gen_open(void) BANKED {
  if(seq_event_total()>512){seqeventfull=1;dirty=1;return;}
- seqgrouptrack=255;seq_copy();gentype=genstyle=0;genroot=9;genscale=1;gendensity=5;genmovement=genregister=3;genseed=1;genopen=1;genrow=generror=genpreview=0;dirty=1;
+ seqgrouptrack=255;seq_copy();gentype=genstyle=0;genroot=9;genscale=1;gendensity=5;genmovement=genregister=3;genseed=1;genopen=1;genrow=generror=genpreview=0;generate();dirty=1;
 }
 static uint8_t candidate(uint16_t step,uint8_t *e){
  uint8_t r=random8(),beat=step&15,degree,note,dur=1,c=seqtrack;
@@ -63,25 +64,26 @@ static void generate(void){uint16_t i,n,needed=0,outside=0;uint8_t e[4],busy;
     transport position and clock intact, then service the elapsed time. */
  seqservicing=busy;if(seqplaying)seq_frame();genpreview=1;generror=0;seqdrawvalid=0;mixer_pattern_changed();
 }
-void gen_input(uint8_t p,uint8_t edge) BANKED {int16_t value;uint8_t *cell=0,max=0;
+void gen_input(uint8_t p,uint8_t edge) BANKED {int16_t value;uint8_t *cell=0,max=0,changed=0;
  if(edge&J_B){gen_cancel();return;}
  if(edge&J_SELECT){seq_transport();dirty=1;return;}
- if(edge&J_UP)genrow=genrow?genrow-1:10;if(edge&J_DOWN)genrow=(genrow+1)%11;
+ if(edge&J_UP)genrow=genrow?genrow-1:9;if(edge&J_DOWN)genrow=(genrow+1)%10;
  switch(genrow){case 0:cell=&gentype;max=3;break;case 1:cell=&genstyle;max=2;break;case 2:cell=&genroot;max=11;break;case 3:cell=&genscale;max=3;break;case 4:cell=&gendensity;max=10;break;case 5:cell=&genmovement;max=6;break;case 6:cell=&genregister;max=7;break;}
- if(cell&&(edge&(J_LEFT|J_RIGHT))){value=*cell+((edge&J_RIGHT)?1:-1);*cell=value<0?max:value>max?0:value;}
- if(genrow==7&&(edge&(J_LEFT|J_RIGHT)))genseed=(genseed+((edge&J_RIGHT)?1:999))%1000;
- if(edge&J_A){if(genrow==8)generate();else if(genrow==9){if(genpreview){genopen=genpreview=0;seqdrawvalid=0;}}else if(genrow==10)gen_cancel();}
+ if(cell&&(edge&(J_LEFT|J_RIGHT))){value=*cell+((edge&J_RIGHT)?1:-1);*cell=value<0?max:value>max?0:value;changed=1;}
+ if(genrow==7&&(edge&(J_LEFT|J_RIGHT))){genseed=(genseed+((edge&J_RIGHT)?1:999))%1000;changed=1;}
+ if(changed)generate();
+ if(edge&J_A){if(genrow==8){if(genpreview&&!generror){genopen=genpreview=0;seqdrawvalid=0;}}else if(genrow==9)gen_cancel();}
  dirty=1;(void)p;
 }
 void gen_render(void) BANKED {
- uint8_t i;const char *labels[]={"TYPE","STYLE","ROOT","SCALE","DENSITY","MOVEMENT","OCTAVE","SEED","TRY","KEEP","BACK"};
+ uint8_t i;const char *labels[]={"TYPE","STYLE","ROOT","SCALE","DENSITY","MOVEMENT","OCTAVE","SEED","KEEP","CANCEL"};
  const char *types[]={"MELODY","BASS","ARP","EUCLID"},*styles[]={"HOUSE","HIPHOP","CHIP"},*names[]={"MAJOR","MINOR","DORIAN","MIN PENT"},*roots[]={"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
  memset(canvas,0,360);memset(canvas,96,20);gen_text(0,0,"GEN CURRENT TRACK",1);
- for(i=0;i<11;i++)gen_text(1,i+2,labels[i],genrow==i);
+ for(i=0;i<10;i++)gen_text(1,i+2,labels[i],genrow==i);
  gen_text(11,2,seqtrack==6?"DRUMS":types[gentype],0);gen_text(11,3,styles[genstyle],0);gen_text(11,4,roots[genroot],0);gen_text(11,5,names[genscale],0);
  gen_number(14,6,gendensity,2,0);gen_number(14,7,genmovement,2,0);gen_number(14,8,genregister,2,0);gen_number(12,9,genseed%1000,3,0);
- gen_text(0,14,generror?"FULL: NO CHANGE":genpreview?"PREVIEW - KEEP/BACK":"USES COPY CLIPBOARD",0);
- gen_text(0,16,"L/R EDIT A ACTION",0);gen_text(0,17,"SELECT PLAY B CANCEL",0);seqflushpending=1;HIDE_SPRITES;
+ gen_text(0,14,generror?"FULL: NO CHANGE":genpreview?"LIVE PREVIEW":"USES COPY CLIPBOARD",0);
+ gen_text(0,16,"L/R PREVIEW A KEEP",0);gen_text(0,17,"SELECT PLAY B CANCEL",0);seqflushpending=1;HIDE_SPRITES;
 }
 
 

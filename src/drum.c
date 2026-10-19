@@ -1,6 +1,7 @@
 #pragma bank 17
 #pragma opt_code_speed
 #include "api.h"
+void seq_native_touch(void) NONBANKED;
 #include "drum_samples.h"
 extern const uint16_t notes[140];
 /* Protected bank-zero control gap; keep the 1024-byte WRAM reserve. */
@@ -89,6 +90,17 @@ void drum_start(uint8_t sample,uint8_t vel,uint8_t dur){uint8_t c,pan;
 /* PCM stores two samples per byte. Cap the source at the plotted gate;
    longer notes still stop naturally at the end of the sample. */
 uint16_t drum_play_length(uint8_t sample,uint8_t duration){uint32_t bytes=(uint32_t)drum_step_samples()*(duration?duration:256U)/2;return bytes<drumlength[sample]?(uint16_t)bytes:drumlength[sample];}
+/* Precompute source addresses outside the attack deadline. Flat six-byte
+   record: sample, ROM bank, start LE16, end LE16. */
+void seq_native_sample_value(const uint8_t *e,uint8_t *out,uint8_t kit,uint16_t bpm) BANKED {
+ uint8_t sample=e[1]-1;uint16_t start=(kit?kitoffset[kit-1]:amenoffset)[sample],length=(kit?kitlength[kit-1]:amenlength)[sample],samples,q;uint32_t bytes;
+ if(bpm>=30&&bpm<=300)samples=drumstepsamples[bpm-30];else{q=17190U/bpm;samples=q*10+((17190U-q*bpm)*10)/bpm;}
+ if(e[3]==1)bytes=samples>>1;else if(e[3]==2)bytes=samples;else if(e[3]==4)bytes=(uint32_t)samples<<1;else if(e[3]==8)bytes=(uint32_t)samples<<2;else bytes=(uint32_t)samples*(e[3]?e[3]:256U)/2;
+ length=start+(bytes<length?(uint16_t)bytes:length);
+ out[0]=sample;out[1]=(kit?kitbank[kit-1]:amenbank)[sample];out[2]=start;out[3]=start>>8;out[4]=length;out[5]=length>>8;
+}
+void seq_native_sample(const uint8_t *e,uint8_t *out) BANKED {seq_native_sample_value(e,out,drumkit,seqbpm);}
+
 void drum_fire(uint8_t step) BANKED {
  uint8_t e[4],sample,c,pending=0,ons,last,changed=0,banks[2],samples[2];uint16_t cursor=0,starts[2],ends[2],step_samples=0,step_units;uint32_t bytes;
  extern uint16_t seqstepunits,seqcachedbpm;
@@ -363,9 +375,24 @@ drum_pack_pair$:
 void streamblock(void);
 void drum_timer(void) BANKED __naked { __asm
  push bc
+ ; Allow only fixed-bank serial completion to preempt PCM work. This rearms
+ ; external-clock reception before the peer next byte; audio/timer work
+ ; cannot recursively enter the mixer.
+ ldh a,(#0xff)
+ push af
+ and #8
+ ldh (#0xff),a
+ ei
  ld a,(_seqplaying)
  or a
  jr z,drum_timer_clocked$
+ ld a,(_syncmode)
+ or a
+ jr z,drum_timer_local_clock$
+ ld a,(_syncslave)
+ or a
+ jr nz,drum_timer_clocked$
+drum_timer_local_clock$:
  ld a,(_seqfraction)
  add a,#183
  ld b,a
@@ -382,6 +409,7 @@ void drum_timer(void) BANKED __naked { __asm
  jr nc,drum_timer_clocked$
  inc (hl)
 drum_timer_clocked$:
+ call _seq_native_pcm_tick
  ld a,(_power)
  or a
  jp z,drum_timer_done$
@@ -457,6 +485,9 @@ drum_timer_upload$:
 drum_timer_counted$:
  call _drum_irq
 drum_timer_done$:
+ di
+ pop af
+ ldh (#0xff),a
  pop bc
  ret
  __endasm; }
@@ -779,20 +810,23 @@ void drum_velocity_render(void) BANKED {uint8_t t,scan,i,vel,e[4],saved[5],chang
 extern uint8_t seqbeats,seqdenom;
 void roll_clear_transition(void) BANKED;
 __at (0xAFD8) uint8_t drumselectcache[24];
+uint8_t roll_navigation_abort(void) BANKED;
+void roll_render_begin(void) BANKED;
 void drum_render(void) BANKED {
  uint8_t t,row,i,left,boundary,color,scan,last,target,retried=0,e[4];
  uint16_t a,b,event,visible=0,k,s,count,viewend;
+ roll_render_begin();if(roll_navigation_abort())return;
  redraw:
- visible=0;viewend=(uint16_t)seqbase+seqcols;count=seq_event_count(6);memset(drumselectcache,0,24);HIDE_SPRITES;drum_init();if(seqfontdirty)roll_retain();else roll_begin();mixfill();memset(rollbackground,0,320);mixfill();memset(rollrow,0,320);mixfill();
- for(i=0;i<=seqcols;i++){rollx[i]=24+((uint16_t)i*136)/seqcols;mixfill();}
+ visible=0;viewend=(uint16_t)seqbase+seqcols;count=seq_event_count(6);memset(drumselectcache,0,24);HIDE_SPRITES;drum_init();if(seqfontdirty)roll_retain();else roll_begin();mixfill();if(roll_navigation_abort())return;memset(rollbackground,0,320);mixfill();if(roll_navigation_abort())return;memset(rollrow,0,320);mixfill();if(roll_navigation_abort())return;
+ for(i=0;i<=seqcols;i++){rollx[i]=24+((uint16_t)i*136)/seqcols;mixfill();if(roll_navigation_abort())return;}
  boundary=seqlength[6]<=seqbase?24:seqlength[6]>=viewend?160:rollx[seqlength[6]-seqbase];if(boundary<160)drum_span(0,boundary,160,1);
- for(i=0;i<seqcols;i++){s=seqbase+i;left=rollx[i];color=s>=seqlength[6]?2:(s%(16/seqdenom))?1:((s/(16/seqdenom))%seqbeats)?2:3;drum_span(0,left,left+1,color);mixfill();}
- drum_replicate(0,7);mixfill();
- memcpy(rollbackground,rollrow,320);memset(drumheads,255,13);mixfill();
- for(event=0;event<count;event++){if(!(event&7))mixfill();if(!seq_event_get(6,event,e)||!e[1]||e[1]>13)continue;row=e[1]-1;a=e[0];b=a+drum_duration(e);
+ for(i=0;i<seqcols;i++){s=seqbase+i;left=rollx[i];color=s>=seqlength[6]?2:(s%(16/seqdenom))?1:((s/(16/seqdenom))%seqbeats)?2:3;drum_span(0,left,left+1,color);mixfill();if(roll_navigation_abort())return;}
+ drum_replicate(0,7);mixfill();if(roll_navigation_abort())return;
+ memcpy(rollbackground,rollrow,320);memset(drumheads,255,13);mixfill();if(roll_navigation_abort())return;
+ for(event=0;event<count;event++){if(!(event&7))mixfill();if(roll_navigation_abort())return;if(!seq_event_get(6,event,e)||!e[1]||e[1]>13)continue;row=e[1]-1;a=e[0];b=a+drum_duration(e);
   if(b<=seqbase||a>=viewend||visible>=192)continue;
   if(drum_selected_event(e))drumselectcache[visible>>3]|=1<<(visible&7);
-  drumleft[visible]=rollx[a>seqbase?a-seqbase:0]+1;drumright[visible]=rollx[b<viewend?b-seqbase:seqcols];drumnext[visible]=drumheads[row];drumheads[row]=visible;visible++;mixfill();
+  drumleft[visible]=rollx[a>seqbase?a-seqbase:0]+1;drumright[visible]=rollx[b<viewend?b-seqbase:seqcols];drumnext[visible]=drumheads[row];drumheads[row]=visible;visible++;mixfill();if(roll_navigation_abort())return;
  }
  for(t=0;t<seqgridheight/8;t++){
   memcpy(rollrow,rollbackground,320);drum_label(t,rollrow);
@@ -802,9 +836,9 @@ void drum_render(void) BANKED {
   k=target<13?drumheads[target]:255;while(k!=255){
    if(drumleft[k]<boundary)drum_span(scan,drumleft[k],drumright[k]<boundary?drumright[k]:boundary,3);
    if(drumright[k]>boundary)drum_span(scan,drumleft[k]>boundary?drumleft[k]:boundary,drumright[k],2);
-   mixfill();k=drumnext[k];
+   mixfill();if(roll_navigation_abort())return;k=drumnext[k];
   }
-  drum_replicate(scan,last);if(t<13)drum_span(7,24,160,1);mixfill();
+  drum_replicate(scan,last);if(t<13)drum_span(7,24,160,1);mixfill();if(roll_navigation_abort())return;
   if(seqgrouptrack==6)roll_invert_selection(t);
   roll_upload(t);service();
  }
@@ -814,7 +848,7 @@ void drum_render(void) BANKED {
 }
 void drum_synth_render(void) BANKED {uint8_t i,inv,k=drumsynthvoice==2,count=k?8:5,y;drum_init();memset(canvas,0,360);memset(canvas,96,20);drum_text(0,0,"DRUMSYNTH",1);drum_text(0,2,k?"PULSEKICK / PULSE 1":drumsynthvoice?"SNARE / NOISE 2":"HIHAT / NOISE 1",0);for(i=0;i<count;i++){y=k?4+i+(i>>1):5+i*2;inv=drumsynthrow==i;if(inv)memset(canvas+y*20,96,20);drum_text(0,y,k?kicknames[i]:drumnoisenames[i],inv);if(k&&i==7)drum_text(16,y,pulsekickpatch[7]?"DOWN":"UP",inv);else drum_num(16,y,k?pulsekickpatch[i]:noisepatch[drumsynthvoice][i],inv);}drum_text(0,17,"SELECT: VOICE  B:PLAY",0);}
 extern uint16_t seqdeadline;
-void drum_synth_input(uint8_t p,uint8_t edge) BANKED {uint8_t *cell,k,count,max;int16_t n;drum_init();if(edge&J_SELECT){drumsynthvoice=(drumsynthvoice+1)%3;drumsynthrow=0;}k=drumsynthvoice==2;count=k?8:5;if(edge&J_UP)drumsynthrow=drumsynthrow?drumsynthrow-1:count-1;if(edge&J_DOWN)drumsynthrow=(drumsynthrow+1)%count;cell=k?&pulsekickpatch[drumsynthrow]:&noisepatch[drumsynthvoice][drumsynthrow];max=k?kickmax[drumsynthrow]:noisemax[drumsynthrow];n=*cell;if(edge&J_LEFT)n-=p&J_B?10:1;if(edge&J_RIGHT)n+=p&J_B?10:1;if(edge&J_A)n=k?kickfactory[drumsynthrow]:noisefactory[drumsynthvoice][drumsynthrow];*cell=n<0?0:n>max?max:n;if(edge&J_B){if(seqplaying)seqdeadline=1;if(k)kick_start(127,256);else{noiseleft[drumsynthvoice]=256;noiselevel[drumsynthvoice]=127;drum_noise();}}if((lastpad&J_B)&&!(p&J_B)){if(k)kick_stop();else{noiseleft[drumsynthvoice]=0;drum_noise_release(0);}}dirty=1;}
+void drum_synth_input(uint8_t p,uint8_t edge) BANKED {seq_native_touch();uint8_t *cell,k,count,max;int16_t n;drum_init();if(edge&J_SELECT){drumsynthvoice=(drumsynthvoice+1)%3;drumsynthrow=0;}k=drumsynthvoice==2;count=k?8:5;if(edge&J_UP)drumsynthrow=drumsynthrow?drumsynthrow-1:count-1;if(edge&J_DOWN)drumsynthrow=(drumsynthrow+1)%count;cell=k?&pulsekickpatch[drumsynthrow]:&noisepatch[drumsynthvoice][drumsynthrow];max=k?kickmax[drumsynthrow]:noisemax[drumsynthrow];n=*cell;if(edge&J_LEFT)n-=p&J_B?10:1;if(edge&J_RIGHT)n+=p&J_B?10:1;if(edge&J_A)n=k?kickfactory[drumsynthrow]:noisefactory[drumsynthvoice][drumsynthrow];*cell=n<0?0:n>max?max:n;if(edge&J_B){if(seqplaying)seqdeadline=1;if(k)kick_start(127,256);else{noiseleft[drumsynthvoice]=256;noiselevel[drumsynthvoice]=127;drum_noise();}}if((lastpad&J_B)&&!(p&J_B)){if(k)kick_stop();else{noiseleft[drumsynthvoice]=0;drum_noise_release(0);}}dirty=1;}
 
 uint16_t drum_clip_plot(uint8_t step,uint8_t row,uint16_t dur,uint8_t vel) BANKED {uint16_t length=seqlength[6],n;seqlength[6]=256;n=drum_plot(step,row,dur,vel,0);seqlength[6]=length;return n;}
 
@@ -833,7 +867,7 @@ void seq_next_deadline(void) BANKED {uint8_t c;uint16_t next,step;
  step=next;
  for(c=0;c<SEQ_TRACKS;c++)if(seqgateleft[c]&&seqgateleft[c]<next){
   /* Full pulse gates rounded one unit short still occupy their whole step. */
-  if(c<2&&!monomode&&seqgate[c]==100&&seqgateleft[c]+1==step)continue;
+  if(c<4&&!experimental_mode&&!monomode&&seqgate[c]==100&&seqgateleft[c]+1==step)continue;
   next=seqgateleft[c];
  }
  if(drumnoiseowned)for(c=0;c<2;c++)if(noiseleft[c]&&noiseleft[c]<next)next=noiseleft[c];

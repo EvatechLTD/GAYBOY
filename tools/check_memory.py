@@ -24,6 +24,9 @@ def audit(rom):
     assert symbols['_pulsekickleft'] == 0xAC59
     assert symbols['_drumnoisetail'] == 0xAC58
     assert symbols['_expdelay'] == 0xA000
+    if '_seqnativestep' in symbols:
+        assert symbols['_seqnativestep'] == 0xA000
+        assert symbols['_seqlaunchstep'] == 0xA200
     assert symbols['_mx'] == 0xAC80
     assert symbols['_prep'] == 0xACB4
     assert symbols['_ui_loading_active'] == 0xACFE
@@ -39,7 +42,7 @@ def audit(rom):
 
     # Entire engine bank is protected, including holes and page-local overlays.
     bank_zero = [
-        (0xA000, 0xA800, 'audio delay'),
+        (0xA000, 0xA800, 'audio delay / native step and launch lookahead overlays'),
         (0xA800, 0xAC00, 'upper live event pool'),
         (0xAC00, 0xAD00, 'PCM, mixer, preparation and UI control state'),
         (0xAD00, 0xB000, 'renderer, mixer preview and drum edit overlays'),

@@ -874,6 +874,8 @@ void tones_capture(void) BANKED {const ToneDestination *field=tonedest;uint8_t *
 }
 static void apply_prepared(void) __naked { __asm
  ld de,#0xba00
+ .globl _tones_apply_source
+_tones_apply_source::
  ld hl,#_param
  .rept 26
  ld a,(de)
@@ -1542,10 +1544,14 @@ static void finalize_prepared(void) {uint8_t c,i;
  memcpy(monoeffective,monoset,sizeof(monoeffective));
  route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}
  /* Native live launches keep the established timer phase and PCM owner. */
- if(!monomode&&(!seqplaying||experimental_mode||(waveengine&&waveengine!=3))){TAC_REG=0;enginestop();waveengine=experimental_mode?savedengine:0;w2enabled=0;TMA_REG=TIMA_REG=waveengine==1?252:240;IF_REG&=~TIM_IFLAG;TAC_REG=(seqplaying||waveengine)?4:0;}
+ if(!monomode&&(!seqplaying||experimental_mode||(waveengine&&waveengine!=3))){TAC_REG=0;enginestop();waveengine=experimental_mode?savedengine:0;w2enabled=0;TMA_REG=TIMA_REG=waveengine==1?252:240;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;TAC_REG=(seqplaying||waveengine)?4:0;}
  if(experimental_mode&&!monomode){expwaveon=expconfig[0]||expconfig[1]||exprelease[2]||expconfig[6]!=15||expconfig[7]||expconfig[8]||expconfig[10];expactive=expwaveon||exprelease[0]||exprelease[1];for(i=0;i<EXP_COUNT;i++)if(i!=4&&i!=6&&i!=21&&expconfig[i])expactive=1;}
  wavepending=1;pitchdirty=1;choice=selected<4?program[selected]:0;globals();if(experimental_mode&&monomode)exp_changed();dirty=1;
 }
 
 void tones_finalize(void) BANKED {finalize_prepared();}
 void tones_apply(void) BANKED {apply_prepared();memcpy(pulsekickpatch,KICK_RAW,8);finalize_prepared();}
+
+/* Same validated state copy with a caller-supplied bank-zero cache source. */
+void tones_apply_source(const uint8_t *source);
+void tones_apply_cached(void) BANKED {tones_apply_source(TONE_CACHED_RAW);memcpy(pulsekickpatch,TONE_CACHED_RAW+TONE_RAW_BYTES,8);finalize_prepared();}

@@ -1,0 +1,79 @@
+CONTROLLED PULSE IRQ A/B RESULTS - 2026-10-19
+
+Completed first step: preserve the current build, disable independent pulse
+packet preparation and firing (including launch packets), and compare matched
+demo/navigation/quantized-launch workloads. Launch/cache fixes retained.
+No scheduler rewrite or final timing fix is claimed. No hardware validation.
+
+BUILDS
+A / IRQ-on:  build/timing-ab-irq-on.gb
+  SHA256 6b5b0aab43c75b3dde1365ddeb2b6198480ce6b5de44d86722bfb2475d03a710
+B / IRQ-off: build/timing-ab-irq-off.gb
+  SHA256 a6aecdfa814e28fe026c1598fdd3ef6f8e2f00771f910f599d63cf2251d637de
+Each has matching .noi/.map/.ihx artifacts. GAYBOY.gb currently equals B.
+The sole production source change in this turn is src/seq_irq.c:
+SEQ_PULSE_IRQ_ENABLED=0, disabling prepare/refresh and making tick return.
+Original source preserved in build/timing-ab-irq-on-source.c.
+
+MATCHED RESULTS AT 300 BPM (hardware writes / PCM delivery, not audible onset)
+
+Unedited built-in demo
+  IRQ on: idle spread median 3.792 ms, max 16.932 ms; full workload complete
+  IRQ off: idle spread median 3.654 ms, max 5.362 ms; full workload complete
+
+Aligned P1/P2/wave/noise
+  IRQ on: idle spread median 26.155 ms, max 28.788 ms; full workload incomplete at navigate
+  IRQ off: idle spread median 15.821 ms, max 16.671 ms; full workload complete
+
+Aligned P1/P2/noise with PCM; wave reserved by PCM
+  IRQ on: idle spread median 26.645 ms, max 31.991 ms; full workload incomplete at navigate
+  IRQ off: idle spread median 11.841 ms, max 15.448 ms; full workload incomplete at navigate
+
+WHAT REMAINS AFTER DISABLING PULSE IRQ
+The last voice is still roughly 26-27 ms after the estimated shared musical
+deadline in the aligned four-channel idle fixture. Earlier pulses have moved
+back into the foreground group; later voices have not become punctual.
+Deadline estimates have one timer period of uncertainty.
+At 300 BPM, native-four foreground dispatch spans are approximately:
+  P1 work before P2 dispatch: 4.04 ms median
+  P2 work before wave dispatch: 3.96 ms median
+  Wave work before noise dispatch: 8.02 ms median
+These spans include interrupt time. P1/P2 still perform bookkeeping/pitch
+work after a step is due, and wave adds a further substantial serial stage.
+With PCM, P1 and P2 spans each rise to about 5.85 ms; the mixed PCM+native-noise
+fixture still fails navigation at 300 BPM. This is the next preparation/commit
+workload to move BEFORE the deadline, rather than optimizing pulse punctuality.
+
+VALIDATION
+PASS: ROM layout, 1064-byte WRAM reserve and 512-byte stack.
+PASS: all recorded IRQ-off cases have ZERO seq_irq_tick APU attacks.
+PASS: 540 production onset/gate CPU cases; real-button pattern edit handoff.
+PASS: native bit-cable 300 BPM PCM stress, continuous clock and pattern resync;
+1593 completed and received clock bytes, zero restarted transfers.
+Demo 300 BPM: both builds complete navigation and all pad-launch quantizations.
+Native-four 300 BPM: A fails navigation; B completes navigation and launches.
+PCM+native-noise 300 BPM: both fail navigation. Main timing bug remains.
+
+BOUNDED TRACE LIMITS
+12 matched runs were attempted with a 25-second host timeout per run.
+3 runs timed out: IRQ-on demo 120, IRQ-off native-four 120, IRQ-on PCM 120.
+Timeouts are excluded from timing comparisons; their cause is unestablished.
+Three further 300 BPM runs fail the explicit navigation limit and preserve
+partial traces; their idle/navigation measurements are still available.
+No ignored hook exceptions are present in accepted traces. An initial PCM
+probe used a nonexistent macro symbol; it was corrected to the actual kit/
+amen offset tables, and those invalid traces are outside build/timing-ab/.
+
+REPRODUCE
+python tools/compare_timing_ab.py
+Uses preserved ROMs and matching symbols; no rebuild needed.
+Full timing/status summary: build/timing-ab/summary.json
+Per-build/case raw traces, logs and stderr: build/timing-ab/
+Gate/edit/link logs: build/timing-ab-{gates,edit,link}.log
+
+NEXT IMPLEMENTATION TARGET
+Prepare one complete native step (note-offs, all voice attacks, drum source
+starts) before its deadline, then publish and commit it together. Preserve
+continuous elapsed time and explicit late-step recovery. The A/B baseline
+now separates the pulse shortcut regression from remaining common dispatch
+latency. The hardware external-clock recovery is still not fully explained.

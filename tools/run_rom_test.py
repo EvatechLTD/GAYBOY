@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse,builtins,io,runpy,sys
 import pyboy
-ap=argparse.ArgumentParser();ap.add_argument('--rom',required=True);ap.add_argument('test');ap.add_argument('test_args',nargs=argparse.REMAINDER);args=ap.parse_args()
+ap=argparse.ArgumentParser();ap.add_argument('--rom',required=True);ap.add_argument('--legacy',action='store_true',help='Start fresh batteries in the legacy fixed-record format');ap.add_argument('test');ap.add_argument('test_args',nargs=argparse.REMAINDER);args=ap.parse_args()
 test_path=Path(args.test)
 if not test_path.exists():test_path=Path('tools')/args.test
 if not test_path.exists():ap.error('Test file not found: '+args.test)
@@ -28,6 +28,14 @@ def redirected_pyboy(*a,**kw):
  if a and canonical(a[0],'.gb'):a[0]=rom
  for key in ('gamerom','rom_path'):
   if key in kw and canonical(kw[key],'.gb'):kw[key]=rom
+ target=a[0] if a else kw.get('gamerom',kw.get('rom_path'))
+ try:isolated=canonical(target,'.gb') or Path(target).resolve()==Path(rom).resolve()
+ except (TypeError,ValueError):isolated=False
+ if isolated and 'ram_file' not in kw:kw['ram_file']=io.BytesIO(bytes(32768))
+ if isolated and args.legacy and isinstance(kw.get('ram_file'),io.BytesIO):
+  battery=kw['ram_file'].getvalue()
+  if len(battery)==32768 and not any(battery):
+   battery=bytearray(battery);battery[8192+2500:8192+2504]=b'GBM2';kw['ram_file']=io.BytesIO(battery)
  return original_pyboy(*a,**kw)
 builtins.open=redirected_open;Path.read_text=redirected_read_text;Path.read_bytes=redirected_read_bytes;pyboy.PyBoy=redirected_pyboy
 sys.argv=[str(test_path)]+args.test_args

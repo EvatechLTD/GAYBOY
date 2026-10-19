@@ -1,12 +1,17 @@
 #pragma bank 15
 #include "api.h"
+void seq_native_touch(void) NONBANKED;
 #include "tones.h"
+void seq_native_cancel_voice(uint8_t c) NONBANKED;
 /* Musical release keeps the pulse DAC bias steady. NRx2 writes alone do not
    latch zero volume on DMG (and may invoke zombie mode): trigger immediately
    after writing zero volume, increasing direction, disabled envelope pace.
    No deferred release can silence a newer owner. Panic and DAC OFF retain
    explicit shutdown. Bank this control path to leave the fixed bank room. */
 void stop(uint8_t c) BANKED {
+ seq_native_cancel_voice(c);
+ /* A newly committed IRQ attack already replaced this sequencer release. */
+ if(!syncmode&&c<2&&seqplaying&&seqservicing&&(seqirqfired&(1<<c)))return;
  if(c==0&&pulsekickleft)return;
  if(c==2&&waveengine==3)return;
  active[c]=0;
@@ -34,7 +39,7 @@ const uint8_t native_counts[]={18,15,12,15};
 void global_text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+y*20+x;while(*s&&x++<20)*d++=*s++-32+(inv?96:0);}
 void global_number(uint8_t x,uint8_t y,uint16_t n,uint8_t digits,uint8_t inv){uint16_t place=digits==3?100:10;uint8_t d;while(digits--){d=0;while(n>=place){n-=place;d++;}canvas[y*20+x++]=16+d+(inv?96:0);place/=10;}}
 uint8_t native_value(uint8_t id){if(id==26)return seqgate[selected];if(id==10)return master&7;if(id==12)return(master>>4)&7;if(id==11)return !!(vin&8);if(id==13)return !!(vin&128);if(id==21)return ((route>>selected)&1)|(((route>>(selected+4))&1)<<1);return param[selected][id];}
-void native_edit(int8_t delta,uint8_t reset){uint8_t id=native_ids[selected][cursor[1]],max=id==26?100:limits[id],v=native_value(id);if(id==26){seqgate[selected]=reset?100:delta<0?(v>1?v-1:1):(v<100?v+1:100);seqcachedbpm=0;dirty=1;return;}if(reset)v=patch(program[selected])->v[id];else if(delta<0)v=v?v-1:max;else v=v>=max?0:v+1;cc(selected,41+id,((uint16_t)v*128+max)/(max+1));if(id==16)param[selected][id]=v;dirty=1;}
+void native_edit(int8_t delta,uint8_t reset){uint8_t id=native_ids[selected][cursor[1]],max=id==26?100:limits[id],v=native_value(id);if(id==26){seqgate[selected]=reset?100:delta<0?(v>1?v-1:1):(v<100?v+1:100);seqcachedbpm=0;seq_native_touch();dirty=1;return;}if(reset)v=patch(program[selected])->v[id];else if(delta<0)v=v?v-1:max;else v=v>=max?0:v+1;cc(selected,41+id,((uint16_t)v*128+max)/(max+1));if(id==16)param[selected][id]=v;dirty=1;}
 
 void global_set(uint8_t enabled) BANKED {
  uint8_t c;enabled=!!enabled;if(enabled==experimental_mode)return;
@@ -81,7 +86,7 @@ void native_render(void) BANKED {
  if(page==0){global_text(0,3,"HARDWARE CHANNEL",0);global_text(0,5,native_voices[selected],0);global_text(0,8,"A: TONE",0);global_text(0,10,"B: AUDITION",0);return;}
  start=cursor[1]<native_counts[selected]?cursor[1]/9*9:0;
  for(i=0;i<9&&start+i<native_counts[selected];i++){
-  id=native_ids[selected][start+i];row=3+i;inv=cursor[1]==start+i;if(inv)memset(canvas+row*20,96,20);
+  mixfill();id=native_ids[selected][start+i];row=3+i;inv=cursor[1]==start+i;if(inv)memset(canvas+row*20,96,20);
   global_text(0,row,id==26?"GATE %":id==2?"ENV DIRECTION":id==3?"ENV PERIOD":native_names[id],inv);
   if(page==4&&id!=26)global_number(16,row,41+id,3,inv);
   else if(id==2)global_text(15,row,param[selected][2]?"RISE":"FALL",inv);
@@ -101,6 +106,6 @@ void native_input(uint8_t p,uint8_t edge) BANKED {
  if(edge&J_B){play(selected,60,110);auditionvoice=selected;}p;
 }
 
-uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==26)return clear_available();if(item==24||item==25)return sparse_enabled==1;if(item==23)return 1;if(item>=21)return page==8;if(!experimental_mode&&(item==2||item==5||item==6||item==7||item==9||item==14))return 0;return item&&(!(item>=1&&item<=6)||page<7);}
+uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==27)return 1;if(item==26)return clear_available();if(item==24||item==25)return sparse_enabled==1;if(item==23)return 1;if(item>=21)return page==8;if(!experimental_mode&&(item==2||item==5||item==6||item==7||item==9||item==14))return 0;return item&&(!(item>=1&&item<=6)||page<7);}
 
-void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint16_t magnitude=wheel<0?-wheel:wheel,result;uint8_t range=param[c][25];result=(magnitude>>6)*range+(((magnitude&63)*range)>>6);bend[c]=wheel<0?-(int16_t)result:result;updatepitch(c);}
+void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint16_t magnitude=wheel<0?-wheel:wheel,result;uint8_t range=param[c][25];result=(magnitude>>6)*range+(((magnitude&63)*range)>>6);bend[c]=wheel<0?-(int16_t)result:result;updatepitch(c);if(!syncmode)seq_irq_refresh(c);}

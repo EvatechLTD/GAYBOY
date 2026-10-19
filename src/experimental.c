@@ -102,7 +102,7 @@ void exp_service(void) BANKED {uint8_t ticks=exppending,shift;if(!ticks)return;_
 uint8_t expoldengine,expoldcontrol,expoldzombie,expolddelay;
 void exp_changed(void) BANKED {uint8_t i,on=0,wasactive=expactive,restart=expoldengine!=expconfig[0]||expoldcontrol!=expconfig[20]||expoldzombie!=expconfig[19];exprelease[2]=expconfig[5];expwaveon=expconfig[0]||expconfig[1]||exprelease[2]||expconfig[6]!=15||expconfig[7]||expconfig[8]||expconfig[10];
  for(i=0;i<EXP_COUNT;i++)if(i!=4&&i!=6&&i!=21&&expconfig[i])on=1;expactive=on||expwaveon||exprelease[0]||exprelease[1];
- if(restart||wasactive!=expactive){TAC_REG=0;exp_reset();TMA_REG=expconfig[0]?192:expconfig[20]==1?224:240;TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;if(monomode&&expactive&&(expconfig[0]||expconfig[20]))TAC_REG=4;}
+ if(restart||wasactive!=expactive){TAC_REG=0;exp_reset();TMA_REG=expconfig[0]?192:expconfig[20]==1?224:240;TIMA_REG=TMA_REG;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;if(monomode&&expactive&&(expconfig[0]||expconfig[20]))TAC_REG=4;}
  if(expconfig[0]&&!expoldengine){ENABLE_RAM_MBC5;SWITCH_RAM_MBC5(0);memset(expdelay,0,2048);NR12_REG=NR22_REG=0;}
  if(expconfig[15]!=expolddelay){memset(expechoon,0,16);expecho=0;monovol[1]=0;stop(1);expolddelay=expconfig[15];}
  if(expconfig[0])exp_tables();

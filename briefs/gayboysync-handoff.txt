@@ -1,0 +1,31 @@
+GAYBOY sync follow-up branch
+
+Baseline: hardware-tested whole-step timing build gayboyinterrupt.gb, SHA256
+0a370de2f10bbd3a68d6a859ec0a12825c45c44caa0419a81c4af2b6a85de8da.
+User reports pattern launching is dramatically improved on physical hardware.
+
+Known issue from the user's hardware test:
+GAYBOY native sync works well until a new pattern is launched locally on the
+SLAVE. Characterize and fix that interaction first; do not assume the failure
+is the old pulse-note problem or change the master oscillator as a first step.
+Normal master/slave clock and transport already work well in the user's test.
+
+Current native mode sends BPM, start/stop, numbered24PPQN clocks and F2 phase
+markers on master pattern launch. F2 aligns the slave's own current pattern at
+beat one; it does not remotely select the same pad. The slave normally advances
+from incoming clocks. Inspect launch/reset handling and pending clock/phase
+state when a local slave launch occurs. Relevant files: src/sync.c,
+src/sync_clock.c, src/sequencer.c, src/mixer.c, src/sparse_store.c.
+
+Discussed future ideas, not implemented:
+- Master Mixer launches local and remote pad banks independently or together.
+- Slave replies with its eight pattern names and active/queued status.
+- Names/status are cached and refreshed in bounded background messages, with
+  clock traffic retaining priority. The current protocol has no name replies.
+
+Audio-to-master-clock deadline work was explicitly deferred until after the
+hardware test. Preserve the successful whole-step timing baseline and the PCM
+source/publication race fix. Do not re-enable the pulse-only advance IRQ path.
+
+Verification/history: briefs/native-step-launch-results.txt and
+build/gayboyinterrupt-build.json. No website/network edits belong to this task.

@@ -1,5 +1,6 @@
 #pragma bank 2
 #include "api.h"
+void seq_native_touch(void) NONBANKED;
 #include "presets.h"
 void stocktable(uint8_t c,uint8_t n) BANKED {uint8_t i,b=stocktables[n];int8_t *dst=&tables[c][0][0];const int8_t *p=stockpitch[b&3],*s=stockshape[(b>>2)&15],*pan=stockpan[b>>6];for(i=0;i<8;i++){*dst++=*p++;*dst++=(*s+i)&s[1];*dst++=*pan++;}}
 /* Neutral APU instruments at boot. Browsing still loads the stock library. */
@@ -33,7 +34,7 @@ void engineoff(uint8_t note) BANKED {uint8_t i;if(waveengine==3)return;if(waveen
 void enginesustain(uint8_t on) BANKED {uint8_t i;if(waveengine==3)return;sustain[2]=on;if(!on){if(waveengine==1){for(i=0;i<8;i++)if(!fastdown[i])faston[i]=0;fastbuild();}else for(i=0;i<2;i++)if(!softheld[i]&&softowned[i]!=2)softon[i]=0;}enginesync();}
 void engineframe(void) BANKED {uint8_t i;if(waveengine==3){if(!mixrunning)active[2]=0;return;}w2_frame();if(waveengine==2){for(i=0;i<2;i++)if(softon[i]){if(softage[i]<255)softage[i]=((uint16_t)softage[i]+frameadvance)>255?255:softage[i]+frameadvance;if(!monomode&&softowned[i]!=2&&mods[2][5]&&softage[i]>=mods[2][5])softon[i]=0;}enginesync();}}
 void engineset(uint8_t mode) BANKED {if(mode>2)mode=2;if(waveengine==mode)return;panic();monomode=0;TAC_REG=0;waveengine=mode;w2enabled=0;engineblocks=mixunderruns=0;fastpos=fastclock=0;softnext=0;
- TMA_REG=mode==1?252:240;TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;if(mode)TAC_REG=4;dirty=1;
+ TMA_REG=mode==1?252:240;TIMA_REG=TMA_REG;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;if(mode)TAC_REG=4;dirty=1;
 }
 void mixrender(void) __naked {
  __asm
@@ -487,15 +488,15 @@ void wave(void) BANKED {uint8_t i,a,b,s=param[2][14];if(waveengine==3)return;NR3
  switch(s&3){case 0:a=a<16?a:31-a;b=b<16?b:31-b;break;case 1:a>>=1;b>>=1;break;case 2:a=a<16?15:0;b=b<16?15:0;break;default:a=(a*7^(a>>1))&15;b=(b*7^(b>>1))&15;}
  REG(0xff30+i)=custom?customwave[i]:(a<<4)|b;}}
 /* MIDI waveform edits are staged in RAM until the next real note trigger. */
-void stagewave(void) BANKED {uint8_t i,a,b,s=param[2][14];for(i=0;i<16;i++){a=(i*2+s)&31;b=(a+1)&31;
+void stagewave(void) BANKED {seq_native_touch();uint8_t i,a,b,s=param[2][14];for(i=0;i<16;i++){a=(i*2+s)&31;b=(a+1)&31;
  switch(s&3){case 0:a=a<16?a:31-a;b=b<16?b:31-b;break;case 1:a>>=1;b>>=1;break;case 2:a=a<16?15:0;b=b<16?15:0;break;default:a=(a*7^(a>>1))&15;b=(b*7^(b>>1))&15;}
  customwave[i]=(a<<4)|b;}}
 
 void w2_start(uint8_t note,uint8_t vel) BANKED {
  uint8_t was=active[2],oldnote=held[2],oldvel=velocity[2];if(waveengine==3)return;
- if(waveengine!=2){enginestop();waveengine=2;TMA_REG=240;TIMA_REG=240;IF_REG&=~TIM_IFLAG;TAC_REG=4;param[2][15]=1;}
+ if(waveengine!=2){enginestop();waveengine=2;TMA_REG=240;TIMA_REG=240;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;TAC_REG=4;param[2][15]=1;}
  if(!w2enabled){w2enabled=1;if(was&&oldnote!=255)enginenote(oldnote,oldvel,0);}
  softon[1]=softheld[1]=1;softowned[1]=2;softnote[1]=note;softvel[1]=vel;softage[1]=0;softphase[1]=0;softstep[1]=ddsfine(note,4);mixrunning=1;active[2]=1;
 }
 
-void drum_enable(void) BANKED {uint8_t pan=mixer_pan(6),level=mixer_velocity(6,127);pcmoutlevel=level?level>84?1:level>42?2:3:0;route&=~0x44;if(pan&1)route|=4;if(pan&2)route|=0x40;NR51_REG=route;drumtail=0;if(waveengine==3)return;TAC_REG=0;enginestop();waveengine=3;w2enabled=0;drumsub=0;TMA_REG=TIMA_REG=73;IF_REG&=~TIM_IFLAG;TAC_REG=6;NR32_REG=0x20;}
+void drum_enable(void) BANKED {uint8_t pan=mixer_pan(6),level=mixer_velocity(6,127);pcmoutlevel=level?level>84?1:level>42?2:3:0;route&=~0x44;if(pan&1)route|=4;if(pan&2)route|=0x40;NR51_REG=route;drumtail=0;if(waveengine==3)return;TAC_REG=0;enginestop();waveengine=3;w2enabled=0;drumsub=0;TMA_REG=TIMA_REG=73;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;TAC_REG=6;NR32_REG=0x20;}

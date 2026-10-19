@@ -60,7 +60,7 @@ def generate():
  map_pointer();out.extend([' ld d,h',' ld e,l',' ld hl,#_noisepatch',' .rept 10',' ld a,(de)',' inc de',' ld (hl+),a',' .endm',' add sp,#3',' ret',' __endasm;}'])
  out.extend(['uint8_t tones_scatter_object(uint16_t object) BANKED {uint8_t map[24];',
  ' if(monomode||experimental_mode||(waveengine&&waveengine!=3))return 0;',
- ' if(!pool_native_map(object,map))return 0;',
+ ' if(!sparse_prepared_map(object,map)&&!pool_native_map(object,map))return 0;',
  ' /* Mapping can service queued MIDI that changes the active engine. */',
  ' if(monomode||experimental_mode||(waveengine&&waveengine!=3))return 0;',
  ' native_scatter(map);return 1;',

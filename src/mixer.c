@@ -341,7 +341,7 @@ void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_i
 }
 extern void seq_mixer_mute(uint8_t c,uint8_t solo) BANKED;
 extern void seq_mixer_refresh(void) BANKED;
-static void mutechange(uint8_t c,uint8_t solo){mixer_pattern_changed();seq_mixer_mute(c,solo);}
+static void mutechange(uint8_t c,uint8_t solo){if(!syncmode){seqirqready=0;seqirqdirty=1;}mixer_pattern_changed();seq_mixer_mute(c,solo);}
 /* Focus IDs stay stable for pattern storage and external tools. */
 static uint8_t stripfocus(uint8_t c,uint8_t field){return c<7?2+c*4+field:38+(c-7)*2+(field>1?1:field);}
 static void stripnav(uint8_t edge){uint8_t c=mx.focus>=38?7+(mx.focus-38)/2:(mx.focus-2)/4,field=mx.focus>=38?(mx.focus-38)%2:(mx.focus-2)%4;
@@ -353,9 +353,9 @@ static void stripnav(uint8_t edge){uint8_t c=mx.focus>=38?7+(mx.focus-38)/2:(mx.
 }
 extern uint8_t drumnoiseowned;
 static void livepan(uint8_t c){uint8_t pan=mx.pan[c],mask,bit;if(c==4)return;if(c==5)c=2;if(c==6){mask=(waveengine==3?0x44:0)|(drumnoiseowned?0x88:0)|(pulsekickleft?0x11:0);route&=~mask;if(pan&1)route|=mask&15;if(pan&2)route|=mask&240;NR51_REG=route;return;}if(c==0&&pulsekickleft){param[0][21]=pan;return;}if(c==2&&waveengine==3)return;bit=1<<c;mask=bit|(bit<<4);route&=~mask;if(pan&1)route|=bit;if(pan&2)route|=bit<<4;param[c][21]=pan;NR51_REG=route;}
-static void change(uint8_t c,uint8_t field,int8_t delta){int16_t n=(int16_t)(field==2?mx.level[c]:mx.pan[c])+delta;mixer_pattern_changed();if(field==2){mx.level[c]=n<0?0:n>127?127:n;if(c==6&&waveengine==3){uint8_t v=mx.level[6];pcmoutlevel=!v?0:v<=42?3:v<=84?2:1;NR32_REG=pcmoutlevel<<5;}}else {mx.pan[c]=n<0?0:n>3?3:n;livepan(c);}}
+static void change(uint8_t c,uint8_t field,int8_t delta){int16_t n=(int16_t)(field==2?mx.level[c]:mx.pan[c])+delta;mixer_pattern_changed();if(field==2){mx.level[c]=n<0?0:n>127?127:n;if(c==6&&waveengine==3){uint8_t v=mx.level[6];pcmoutlevel=!v?0:v<=42?3:v<=84?2:1;NR32_REG=pcmoutlevel<<5;}}else {mx.pan[c]=n<0?0:n>3?3:n;livepan(c);}if(!syncmode&&field==2)seq_irq_refresh(c);}
 
-void mixer_tempo_edit(int16_t delta) BANKED {int16_t bpm;if(seqplaying)seq_frame();bpm=(int16_t)seqbpm+delta;seqbpm=bpm<30?30:bpm>300?300:bpm;if(seqglobalbpm)seqglobalbpm=seqbpm;seqcachedbpm=0;seqdeadline=1;dirty=1;}
+void mixer_tempo_edit(int16_t delta) BANKED {int16_t bpm;if(syncmode&&syncslave)return;if(!syncmode){seqirqready=0;seqirqdirty=1;}if(seqplaying)seq_frame();bpm=(int16_t)seqbpm+delta;seqbpm=bpm<30?30:bpm>300?300:bpm;if(seqglobalbpm)seqglobalbpm=seqbpm;seqcachedbpm=0;seqdeadline=1;dirty=1;}
 static void warmfocus(void){mixer_prepare_focus(mx.focus>=30&&mx.focus<38?mx.focus-30:255);}
 void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mixer_init();if(page==18&&padflash_off&&(edge&(J_A|J_B)))padrestore();
  if((page==20||page==25)&&mx.naming){if(page==20)mixer_pattern_changed();nameinput(edge);dirty=1;return;}
@@ -373,8 +373,9 @@ void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mix
  if(page==20&&(edge&J_B)){namesave();}dirty=1;return;}
  /* Tempo is a separate header control; keep existing strip IDs stable. */
  if(mx.focus==64){
+  if(syncmode&&syncslave&&((p&J_A)||(edge&J_B)))return;
   if(p&J_A){if(!seqglobalbpm){seqglobalbpm=seqbpm;}else {int16_t bpm=seqglobalbpm;if(edge&J_UP)bpm++;if(edge&J_DOWN)bpm--;if(edge&J_LEFT)bpm-=10;if(edge&J_RIGHT)bpm+=10;if(seqplaying)seq_frame();seqglobalbpm=seqbpm=bpm<30?30:bpm>300?300:bpm;seqcachedbpm=0;seqdeadline=1;}}
-  else if(edge&J_B)seqglobalbpm=0;
+  else if((edge&J_B)&&!syncmode)seqglobalbpm=0;
   else if(edge&J_UP)mx.focus=1;
   else if(edge&J_DOWN)mx.focus=2;
   else if(edge&(J_LEFT|J_RIGHT))mx.focus=0;

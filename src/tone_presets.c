@@ -26,7 +26,7 @@ void tone_preset_input(uint8_t edge) BANKED {
  if(edge&J_DOWN)presetchoice=(presetchoice+1)%100;
  if(edge&J_LEFT)presetchoice=(presetchoice+90)%100;
  if(edge&J_RIGHT)presetchoice=(presetchoice+10)%100;
- if(edge&J_A){if(selected<4){load(selected,presetchoice);finepitch[selected]=0;choice=presetchoice;}else{w2_preset(presetchoice);finepitch[4]=0;}tonepresetopen=0;}
+ if(edge&J_A){if(selected<4){load(selected,presetchoice);finepitch[selected]=0;choice=presetchoice;}else{w2_preset(presetchoice);finepitch[4]=0;}if(!syncmode)seq_irq_refresh(selected);tonepresetopen=0;}
  dirty=1;
 }
 

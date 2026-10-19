@@ -119,10 +119,15 @@ void streamblock(void) __naked {
 void drum_timer(void) BANKED;
 void input_vblank(void);
 void engine_timer(void){uint8_t n;uint16_t f;
+ sync_clock_isr();
+ if(syncarmed){
+  if(waveengine!=3&&seqplaying)seqticks++;
+  syncsub++;if(syncsub<syncdivider)return;syncsub=0;
+ }
  /* Sample after the PCM upload. Delayed VBlank sampling alone can miss a
     one-frame tap; both interrupt producers run without nesting. */
- if(waveengine==3){drum_timer();input_vblank();return;}
- if(seqplaying)seqticks+=64-(TMA_REG>>2);if(!power)return;
+ if(waveengine==3){if(!syncmode&&seqplaying)seq_irq_tick(((uint16_t)seqfraction+183U)>>6);drum_timer();input_vblank();return;}
+ if(seqplaying&&!syncarmed&&(!syncmode||!syncslave)){n=64-(TMA_REG>>2);if(!syncmode)seq_irq_tick(n);seqticks+=n;}if(!power)return;
  if(monomode&&expactive){if(exppending<32)exppending++;if(expconfig[0]&&mixrunning){if(!mixready[mixread]){expdrops++;return;}NR30_REG=0;streamblock();NR30_REG=0x80;NR32_REG=expoutlevel?0x20:0;NR33_REG=0;NR34_REG=0x84;mixready[mixread]=0;mixread^=1;expblocks++;}return;}
  if(waveengine==1){if(++fastclock<(1<<arprate))return;fastclock=0;n=fastcount[fastbank];if(!n)return;if(fastpos>=n)fastpos=0;f=fastfreq[fastbank][fastpos++];NR33_REG=f;NR34_REG=f>>8;engineblocks++;}
  else if(waveengine==2&&mixrunning){if(!mixready[mixread]){mixunderruns++;return;}NR30_REG=0;

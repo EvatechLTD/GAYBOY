@@ -1,0 +1,150 @@
+WHOLE-ENGINE TIMING INVESTIGATION, 2026-10-19
+
+STATUS: NOT SOLVED. No final gayboyinterrupt artifact was replaced.
+Read alongside interrupt-clock-handoff.txt. Do not call the partial cache
+changes below a complete timing fix. No physical hardware validation.
+
+USER'S REPRODUCTION AND SCOPE
+Two DMG-01s, physical link cable, LSDj as external clock. Correct notes but
+bad timing. Untouched patterns appear stable for ordinary listening periods.
+Page navigation worsens it; different Mixer pad launches are worst, especially
+small launch quantizations. Voices can sound individually shifted; recovery
+can take a bar or require stop/restart. External clock recovers on next pulse.
+Use the built-in demo and 1/1, 1/4, 1/8 launches. Predates pulse IRQ work.
+
+BASELINES AND CURRENT BUILD
+build/whole-step-baseline.gb / .noi is the EXACT handoff baseline:
+2917f4d28b3749ecdf27b6529d9d4af8b3e0b3aa53d50f246dd972360dd1901e
+It was reconstructed by reversing ONLY this investigation's three source
+changes; hash matches handoff. Original user/previous-agent edits preserved.
+build/standalone-before.gb / .noi predates the pulse IRQ implementation:
+46ff2dc1c5d896979e30d8d636cfd125ac57486765c286a0581f1f6c5dc5beda
+Current experimental build/GAYBOY.gb:
+6b5b0aab43c75b3dde1365ddeb2b6198480ce6b5de44d86722bfb2475d03a710
+Layout passes, 1064 bytes WRAM reserve, 512-byte stack. NOT a final test ROM.
+
+MEASURED FINDINGS
+1. Built-in demo, 300 BPM global tempo, navigation then launches at quant
+   values 4,2,1 (1/1,1/4,1/8): handoff baseline shows some logical step gaps
+   near 100 ms versus nominal 50 ms. Timer entry gaps remain around 2.79 ms,
+   maximum about 3.31 ms in this run, with average musical rate preserved.
+   This reproduction establishes delayed foreground service, not lost timer
+   interrupts or persistent logical channel drift. Dispatch spread at launches
+   also exceeds 30 ms. Function-entry timing is NOT audible-onset timing.
+   Data: build/whole-step-300.json (handoff baseline).
+
+2. Controlled four-channel fixture, 120 BPM, all four native melodic voices
+   attacking each step. ACTUAL NRx4 writes from play/seq_irq_tick:
+     older pre-IRQ ROM: P1 -> noise spread 15.234..16.091 ms, mean 15.624
+     current ROM:       P1 -> noise spread 24.948..26.885 ms, mean 25.944
+   Data: build/whole-four-old-120.json and whole-four-current-120.json.
+   This directly validates the user's objection: pulse-only punctuality can
+   worsen relative voice alignment. It does NOT establish the original bug's
+   complete cause. The new partial sparse changes do not remove this skew.
+
+3. At 300 BPM, four-channel and PCM+pulses+native-noise fixtures can fail the
+   real-button navigation liveness limit, while notes continue. The older
+   pre-IRQ four-channel ROM completes the same navigation workload. Existing
+   PCM/pulse tests omit this load and cannot serve as whole-engine acceptance.
+   Data: whole-native-four-failure.json, whole-pcm-current-300.json,
+   whole-native-four-old.json. Incomplete profile dumps are explicitly marked.
+
+4. Real LSDj ROM comparison now exists using SameBoy bit-level cable wiring.
+   tools/profile_lsdj_clock.cjs loads reference/01_LSDJ.gb into side 0 and
+   GAYBOY into side 1, configures LSDj via buttons, creates chain/phrase 00,
+   and starts it. LSDj mode, not synthetic RX writes. --slave selects external
+   clock; default runs GAYBOY internally. The fixture uses LSDj default 128 BPM.
+   LSDj navigation requires holding SELECT/A for several frames BEFORE the
+   direction press; simultaneous presses were unreliable in this harness.
+   New core APIs support different ROMs and raw trigger/serial/step traces.
+   Comparison runs completed but do NOT yet establish why hardware slave
+   mode recovers better. Do not claim that observation is explained.
+   Data: build/lsdj-comparison-{internal,slave}.json. Early files lack hashes;
+   tool now records both ROM hashes. The slave file was overwritten by the
+   latest partial-source run. PCM NRx4 writes include block uploads; raw
+   trigger traces are NOT automatically equivalent to audible note attacks.
+   SameBoy may expose the same PC twice when preempted before its instruction;
+   duplicate boundary observations with identical state under 1 ms are not
+   separate musical steps. Preserve raw traces when filtering summaries.
+
+RETAINED PARTIAL SOURCE CHANGES
+src/sparse_prepare.c:
+  - Extend beat-one preparation from P1/P2 to all six melodic tracks and the
+    entire drum batch, with conservative source-scan fallback after 16 cached
+    drum events. Cache rests too. Scratch B7D0..B7DF other melodies, B7E0..B81F
+    drums; ends BEFORE metadata B820. Existing tone cache ends B7C2.
+  - Prepare effective-tempo gate units incrementally before a launch, rather
+    than forcing seven recalculations at boundary with global tempo enabled.
+    Ready-cache identity now includes effective BPM.
+  - Tone streaming quantum reduced from 64 to 16 bytes.
+src/storage.c:
+  - Use prepared beat-one drum and all-track lookups while cache==2.
+  - Avoid cartridge scans for tracks with zero events.
+src/sparse_store.c:
+  - Skip upcoming-pad preparation when a musical service deadline is due.
+  - Install one 16-byte source chunk per service call instead of four.
+  - Existing FOUR journal-service iterations retained (see failed experiment).
+No other production source changes from this investigation remain.
+
+These changes reduce some dispatch/launch latency, not whole-engine skew.
+In the latest demo trace worst launch logical gaps are still around 72 ms at
+300 BPM. In the existing launch acceptance fixture, different-pattern
+seq_pattern_start -> actual P2 attack is roughly 4 ms, but preparation,
+input responsiveness and boundary-to-sound checks still fail.
+Data: whole-step-300-current.json, whole-step-launches-current.json.
+
+FAILED / REVERTED EXPERIMENTS (DO NOT MISTAKE FOR CURRENT SOURCE)
+- Reducing journal service and deferring it whenever overdue caused native
+  cable regression: clock bytes lost and launch resync several steps apart.
+  Exact handoff baseline passes. Isolated cache-only and preparation-priority
+  variants pass; single-chunk installation plus original journal loop passes.
+  Journal change was reverted, and final selected variant passes cable stress.
+- Disabling early pulse packets when native wave/noise tracks contain notes
+  got beyond the 300 BPM navigation failure, but a longer launch profile
+  stopped making progress. This attempted guard was REMOVED. No new guard or
+  changed pulse IRQ policy remains in seq_irq.c. Investigate using a bounded
+  trace / emulator-state capture rather than assuming this experiment passes.
+- Off-Mixer ready-cache blocking looked suspicious from source, but real
+  navigation explicitly cancels pending launches in ui.h. A proposed off-page
+  fallback and its test option were removed; no behavior changed there.
+
+TOOLS ADDED / EXTENDED
+tools/profile_whole_step.py: untouched built-in demo by default; --bpm,
+--rom, --output; --fixture native-four or pcm adds aligned-note fixtures;
+--slave is explicitly SYNTHETIC diagnostic RX injection, NOT cable evidence;
+--no-pulse-irq suppresses advance packets at timer entry for diagnosis, not
+launch packets. Tracks function entries, timer service and actual melodic
+hardware writes. Does not measure audible PCM onsets. Writes incomplete dumps
+on failure; choose fresh output paths for independent comparisons.
+tools/profile_lsdj_clock.cjs: actual LSDj cable comparison described above.
+tools/sync_link_core.c: mixed-ROM loading, framebuffer access and separate
+raw event buffer. Existing cable-test trace/API retained.
+
+VALIDATION FOR CURRENT SELECTED SOURCE
+PASS: build_rom layout/reserve checks; 540 onset gate CPU cases;
+test_pattern_edit_live.py; test_sync.py; test_sync_pair.py;
+test_standalone_timing.py five original PCM/pulse loads, no audio underruns;
+node tools/test_sync_link.cjs --bpm 300 --stress (after journal revert),
+clock generation and launch resync, no serial aborts, no lost counted clocks.
+Cable pass log: build/whole-step-isolate-install.log (same selected source).
+Actual LSDj cable profile completes; this is measurement, not a timing gate.
+
+FAIL: test_launch_acceptance.py --quick: 17 checks fail in selected source,
+including missed eligible boundaries, UI ACK limits and extended intervals.
+FAIL: aligned native-four and PCM+native-noise navigation at 300 BPM.
+FAIL: test_sparse_journal_rom.py assumes pad 2 is empty, but built-in seed
+occupies it. Exact handoff baseline fails the same assertion. Its --rom path
+also calls enter_app without custom symbols; baseline comparison patched
+that call in memory only, then confirmed the same pad-2 assertion failure.
+Do not claim the suite passes. stderr SDL warnings also make PowerShell mark
+otherwise-passing Python commands exit 1; inspect actual assertions/logs.
+
+NEXT WORK
+Measure and bound complete step preparation/commit, especially native wave,
+noise and PCM source-start paths, with shared APU ownership respected. The
+current pulse queue is NOT a whole-step queue and demonstrably increases
+relative skew in a four-channel test. Compare a coherent shared-dispatch
+strategy with existing code, keeping input/render work bounded. Do not turn
+this into another pulse-only optimization. Explain the actual hardware
+external-clock recovery before claiming root cause. Existing data does not
+yet reproduce the persistent hardware offset that requires stop/restart.

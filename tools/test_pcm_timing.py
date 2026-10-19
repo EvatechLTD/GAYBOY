@@ -14,17 +14,31 @@ def pulse_write_sites(symbols):
  rom=ROM.read_bytes()
  tree=ast.parse((Path(pyboy.__file__).parent/"core/opcodes.py").read_text())
  lengths=next(ast.literal_eval(n.value.args[1]) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="OPCODE_LENGTHS" for t in n.targets))
- sites=[];pc=symbols["_play"]
- while pc<symbols["_load"]:
-  op=rom[pc];length=2 if op==0xcb else lengths[op]
-  if op in (0x02,0x12,0x22,0x32,0x36,0x77,0xe0,0xe2,0xea):
-   extra=rom[pc+1] if length>1 else 0
-   if op==0xea:extra|=rom[pc+2]<<8
-   cycles=16 if op==0xea else 12 if op in (0x36,0xe0) else 8
-   sites.append((pc,op,extra,cycles))
-  assert length>0,(pc,op)
-  pc+=length
+ sites=[]
+ for name in ('_play','_seq_irq_tick'):
+  if name not in symbols:continue
+  pc=symbols[name]
+  end=min(v for k,v in symbols.items() if k.startswith("_") and pc<v<0x4000)
+  while pc<end:
+   op=rom[pc];length=2 if op==0xcb else lengths[op]
+   if op in (0x02,0x12,0x22,0x32,0x36,0x77,0xe0,0xe2,0xea):
+    extra=rom[pc+1] if length>1 else 0
+    if op==0xea:extra|=rom[pc+2]<<8
+    cycles=16 if op==0xea else 12 if op in (0x36,0xe0) else 8
+    sites.append((pc,op,extra,cycles))
+   assert length>0,(pc,op)
+   pc+=length
  return sites
+
+def pulse_position(p,symbols,channel):
+ # IRQ attacks can precede foreground cursor bookkeeping. Attribute the
+ # actual hardware write to its published target step in that path only.
+ start=symbols.get('_seq_irq_tick')
+ if start is not None:
+  end=min(v for k,v in symbols.items() if k.startswith('_') and start<v<0x4000)
+  if start<=p.register_file.PC<end:
+   return p.memory[symbols['_seqirqstep']+channel]
+ return p.memory[symbols['_seqposition']+channel]
 
 CPU_HZ=4194304
 BLOCK_CYCLES=11712
@@ -48,7 +62,7 @@ def run(scroll,frames=360,view="sequencer",control=None):
    p.hook_register(bank,addr,lambda k:[f(c) for f,c in list(callbacks[k])],key)
   callbacks[key].append((fn,ctx))
  irqs=[];irqstack=[];starts=[];eligible_uploads=[];idle_periods=[];priming_periods=[];tail_periods=[];p1=[];p2=[];first=[None,None];measurement=[None]
- entry_first=[None,None];startup=[]
+ entry_first=[None,None];startup=[];irq_onsets=[0,0]
  def irq_return(_):
   if irqstack and irqstack[-1][1]==p.register_file.SP:
    start,_,two=irqstack.pop()
@@ -75,12 +89,16 @@ def run(scroll,frames=360,view="sequencer",control=None):
   value=extra if op==0x36 else r.A
   if target not in (0xff14,0xff19) or not value&128:return
   c=target==0xff19;when=p._cycles()+cycles
+  start=S.get('_seq_irq_tick')
+  if measurement[0] is not None and start is not None:
+   end=min(x for k,x in S.items() if k.startswith('_') and start<x<0x4000)
+   if start<=p.register_file.PC<end:irq_onsets[c]+=1
   if c==0:
    if first[0] is None:first[0]=when
-   if measurement[0] is not None:p1.append((when,v('seqposition')))
+   if measurement[0] is not None:p1.append((when,pulse_position(p,S,0)))
   else:
-   if first[1] is None and v('seqposition',1)==1:first[1]=when
-   if measurement[0] is not None:p2.append((when,v('seqposition',1)))
+   if first[1] is None and pulse_position(p,S,1)==1:first[1]=when
+   if measurement[0] is not None:p2.append((when,pulse_position(p,S,1)))
  def startup_seen(name):
   if first[1] is None:startup.append((name,p.register_file.A,p._cycles(),word('seqticks'),word('seqclock'),v('waveengine')))
  try:
@@ -145,7 +163,7 @@ def run(scroll,frames=360,view="sequencer",control=None):
    if scroll:p.button_release('right')
   elapsed=p._cycles()-measurement[0]
   assert len(p1)>=frames//4 and len(irqs)>frames
-  for i,(_,pos) in enumerate(p1):assert pos==(p1[0][1]+i)%16,('skipped pulse step',i,pos)
+  for i,(_,pos) in enumerate(p1):assert pos==(p1[0][1]+i)%16,('skipped pulse step',i,pos,p1[max(0,i-3):i+2])
   residual=[t-(p1[0][0]+i*CPU_HZ/20) for i,(t,_) in enumerate(p1)]
   mean=statistics.mean(residual)
   samples=[cost for cost,_ in irqs];two=[cost for cost,both in irqs if both]
@@ -158,7 +176,9 @@ def run(scroll,frames=360,view="sequencer",control=None):
    'first_p1_to_p2_step1_ms':first_interval,
    'first_play_entry_interval_ms':(entry_first[1]-entry_first[0])*1000/CPU_HZ,
    'startup_trace_ms':[(n,c,(t-first[0])*1000/CPU_HZ,ticks,clock,engine) for n,c,t,ticks,clock,engine in startup],
-   'pulse1_onsets':len(p1),'expected_pulse1_onsets':elapsed/(CPU_HZ/20),
+   'pulse1_onsets':len(p1),
+    'irq_pulse1_onsets':irq_onsets[0],
+    'irq_pulse2_onsets':irq_onsets[1],'expected_pulse1_onsets':elapsed/(CPU_HZ/20),
    'pulse1_interval_ms_min':min(intervals)*1000/CPU_HZ,
    'pulse1_interval_ms_max':max(intervals)*1000/CPU_HZ,
    'pulse1_phase_jitter_ms_peak_to_peak':(max(residual)-min(residual))*1000/CPU_HZ,

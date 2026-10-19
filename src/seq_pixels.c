@@ -91,6 +91,18 @@ const uint8_t rollmasks[9]={255,127,63,31,15,7,3,1,0};
 const uint8_t rolldigits[11][7]={{14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},{30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},{14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},{14,17,17,15,1,1,14},{0,0,0,14,0,0,0}};
 const uint8_t rollqx[20]={0,8,16,24,32,0,8,16,24,32,0,8,16,24,32,0,8,16,24,32};
 const uint8_t rollqy[20]={0,0,0,0,0,8,8,8,8,8,16,16,16,16,16,24,24,24,24,24};
+void roll_clear_transition(void) BANKED;
+extern volatile uint8_t padsampled;
+uint8_t rollcancelled;
+/* A new page request must not wait behind a full roll repaint. Leave the
+   captured input queued for normal UI handling; discard only unuploaded work. */
+uint8_t roll_navigation_abort(void) BANKED {
+ if(!(padsampled&J_START)||(lastpad&J_START))return 0;
+ rollcancelled=1;seqdrawvalid=0;rollcache[0]=0;rollbuilding=rollreplace=0;memset(rollpending,0,15);HIDE_SPRITES;return 1;
+}
+void roll_render_begin(void) BANKED {
+ if(rollcancelled){roll_clear_transition();seqfontdirty=0;rollcancelled=0;}
+}
 void roll_audio(void){mixfill();if(monomode&&expconfig[0])exp_fill();}
 void seq_dimensions(void) BANKED {
  seqcols=(seqzoom+1)*8;
@@ -472,6 +484,7 @@ uint8_t roll_selection_update(void) BANKED {
 void seq_pixels(uint8_t navigation) BANKED {
  uint8_t c=seqtrack,i,x,t,y,gy,within,left,right,color,style,firstcol,lastcol,built=0,retained,velocitydirty=0,selectiondirty=0,oldy,oldnote,kind,event[4],lastnote=0,beatsteps=16/seqdenom,retried=0;
  int16_t note_y,scroll;uint16_t at,s,last=256,lastdur=0,e,count;
+ roll_render_begin();if(roll_navigation_abort())return;
  redraw:
  built=0;velocitydirty=selectiondirty=0;scroll=0;last=256;lastdur=0;lastnote=0;
  ENABLE_RAM_MBC5;SWITCH_RAM_MBC5(0);seqtileoverflow=0;rollbuilding=1;rollreplace=rollpinslazy=0;memset(rollpending,0,15);HIDE_SPRITES;
@@ -480,7 +493,7 @@ void seq_pixels(uint8_t navigation) BANKED {
  if(retained){if(scroll&&navigation){rollpinslazy=1;memset(rollpins,0,128);}else roll_pinmaps();memcpy(canvas,seqscreen,360);memset(rollrowsdirty,0,17);built=3;
   /* Pitch scrolling moves immutable tile references, not their pixels.
      Dirty value 2 marks newly exposed rows that also need a piano label. */
-  if(scroll)for(t=0;t<seqgridheight/8;t++){note_y=(int16_t)t-scroll;if(note_y>=0&&note_y<seqgridheight/8)memcpy(canvas+(uint16_t)(t+1)*20,seqscreen+(uint16_t)(note_y+1)*20,20);else rollrowsdirty[t]=2;}
+  if(scroll)for(t=0;t<seqgridheight/8;t++){if(roll_navigation_abort())return;note_y=(int16_t)t-scroll;if(note_y>=0&&note_y<seqgridheight/8)memcpy(canvas+(uint16_t)(t+1)*20,seqscreen+(uint16_t)(note_y+1)*20,20);else rollrowsdirty[t]=2;}
  }
  else{if(seqfontdirty)roll_retain();else roll_begin();memset(rollrowsdirty,1,17);velocitydirty=1;roll_audio();memset(rollbackground,0,320);roll_audio();
   /* Coordinates and the underlying grid do not change during note edits. */
@@ -495,7 +508,7 @@ void seq_pixels(uint8_t navigation) BANKED {
  /* Cache each visible onset once; insertion order need not match step order.
     The nearest prior onset supplies any sustained body crossing the left edge. */
  memset(rollonsets,0,sizeof(rollonsets));count=seq_event_count(c);
- for(e=0;e<count;e++){seq_event_get(c,e,event);
+ for(e=0;e<count;e++){if(roll_navigation_abort())return;seq_event_get(c,e,event);
   if(event[1]){s=event[0];if(s<seqbase){if(last==256||s>last){last=s;lastnote=event[1];lastdur=event[3]?event[3]:256;}}
    else if(s<(uint16_t)seqbase+seqcols)memcpy(rollonsets[s-seqbase],event,4);
   }if(!(e&3))roll_audio();
@@ -514,7 +527,7 @@ void seq_pixels(uint8_t navigation) BANKED {
  }
  if(!retained)for(x=0;x<20;x++){at=(uint16_t)x*16;for(y=1;y<8;y++){rollbackground[at+y*2]=rollbackground[at];rollbackground[at+y*2+1]=rollbackground[at+1];}roll_audio();}
  paint_rows:
- for(t=0;t<seqgridheight/8;t++){
+ for(t=0;t<seqgridheight/8;t++){if(roll_navigation_abort())return;
   if(!rollrowsdirty[t])continue;service();
   style=seqheight>8?(((t+1)*8)&(seqheight-1))==0:0;
   if(!(built&(1<<style))){
@@ -546,7 +559,7 @@ void seq_pixels(uint8_t navigation) BANKED {
  }
  if(seqcols==16&&!seqvelocityhidden&&!(scroll&&navigation)){
   for(i=0;i<16;i++){s=(uint16_t)seqbase+i;rollkind[i]=0;if(s<256&&rollonsets[i][1]){rollkind[i]=1+((uint16_t)rollonsets[i][2]*20)/127;}if(rolloldvel[i]!=rollkind[i])velocitydirty=1;rolloldvel[i]=rollkind[i];roll_audio();}
-  if(velocitydirty)for(t=0;t<3;t++){roll_audio();memset(rollrow,0,320);
+  if(velocitydirty)for(t=0;t<3;t++){if(roll_navigation_abort())return;roll_audio();memset(rollrow,0,320);
    for(y=0;y<8;y++){gy=t*8+y;if(!gy)roll_span(rollrow,y,0,160,2);
     for(i=0;i<16;i++){s=seqbase+i;left=rollx[i];right=rollx[i+1];
      if(rollkind[i]){

@@ -1,0 +1,81 @@
+Historical prototype. Superseded by briefs/native-step-launch-results.txt.
+
+Native complete-step prototype status, 2026-10-19
+
+NOT A RELEASE CANDIDATE. Whole original timing problem is not solved.
+ROM: build/native-step-prototype.gb
+SHA256: b997ebc6b2b055ec2f42c3ebec4639e34450ca8d57a16af6941ea58d36c61b63
+
+Implementation
+- src/seq_native.c, ROM bank 61: native pulse1/pulse2/wave/noise plus
+  PCM source selection and drum noise/kick preparation as a whole step.
+- Protected experimental-delay overlay: A000 packet <=512 bytes,
+  A400 hardware image. Native-only eligibility; unsupported/live-key cases
+  return to the original dispatcher. Pulse-only IRQ path remains disabled.
+- Bounded fixed-bank register writer: four native triggers span 344 DMG
+  cycles (0.082016 ms). New PCM source blocks delay the other attacks
+  until the upload carrying that source; no PCM producer order change.
+- Configuration cache, with CC/fine/pitch/load/UI/drum-edit invalidation,
+  preserves step generation/BPM/slot/mute/solo/kit checks. Constant-channel
+  expansion reduces SDCC dynamic addressing overhead. Common durations
+  avoid general 32-bit multiplication. Cold transport preparation now
+  occurs before establishing the musical clock epoch.
+- No complete-step IRQ deadline scheduling yet: except PCM alignment,
+  publication is still initiated by foreground sequencer dispatch.
+
+Validation
+- tools/test_native_step_cpu.py PASS on actual emulated DMG CPU. Validates
+  all four attack writes, logical ownership and keys, waveform contents,
+  stale prepared-volume invalidation, gate80/100 with durations 0/1/3/4,
+  PCM takeover and cancellation, and precomputed cold start.
+- Preparation (cold): 12.931 ms at120, 14.164 ms at300.
+  Unchanged-config preparation: about12.1 ms; dispatch2.827/3.006 ms.
+  Prior prototype was about24ms preparation +9ms dispatch at300.
+- Existing onset/gate CPU suite: all540 cases PASS.
+- SameBoy real-cable300BPM stress: PASS after specialization/priming,
+  build/native-final-cable.log;1948 wire clocks sent/received, zero aborted
+  transfers. Final source also passes the same cable stress test:
+  build/native-verify-final-cable.log.
+- Earlier cache revision completes native-four300 through all navigation
+  and1/1,1/4,1/8 launches; all measured same-step spreads0.082016ms.
+  Raw evidence build/native-cache-native-four-300.json. Latest full-hook
+  native-four run hit host timeout and is NOT a pass for final revision.
+- Earlier cache built-in-demo300 completes all navigation and launches:
+  build/native-cache-demo-300.json. Common deadline jitter remains large.
+
+Remaining failures / next work
+1. PCM300 navigation fails opening the menu after entering roll page8.
+   Latest build/native-pcm-state.json: pad sampled START but lastpad0,
+   pending queue item, rollbuilding1, seqservicing1, no native fallback,
+   clock/ticks not far behind. Foreground roll rendering delays input.
+   Earlier long full-hook runs hit host timeouts. Do not count them as
+   evidence of a hardware deadlock. Removing APU hooks changes host cost.
+2. tools/test_pattern_audio_handoff.py was updated to observe native fixed
+   writer P1 triggers, since play() is deliberately bypassed. It now finds
+   a real26.4816ms release-to-attack gap on quantize1. The complete packet
+   is still calculated after the incoming pattern is installed, at the
+   boundary. Incoming complete-step preparation must move into the existing
+   sparse_prepare phase6 cache, before activation, without modifying the
+   outgoing live state. It must include PCM/drum noise/kick, waveform,
+   fine/bend/gates and ownership. Do not "fix" this by moving release later
+   or counting the release call as the musical deadline.
+3. Whole-packet deadlines still need bounded fixed IRQ delivery. Atomic
+   attacks remove inter-channel register staggering but do not by themselves
+   remove common late steps. Keep gate cancellation and source ownership
+   consistent if moving hardware publication ahead of logical foreground
+   adoption. Do not resurrect pulse-only independent attacks.
+4. tools/test_seq_edit_timing.py is stale: fails missing _seqnotes (old dense
+   storage symbol). That failure is a harness incompatibility, not measured
+   input latency. A real B/edit regression test is still required.
+
+Build/check commands
+python tools/build_rom.py
+python tools/test_native_step_cpu.py
+python tools/test_onset_gates_cpu.py
+node tools/test_sync_link.cjs --rom build/GAYBOY.gb --bpm 300 --stress
+python tools/profile_whole_step.py --bpm 300 --fixture pcm --output ...
+  (bounded subprocess timeout required)
+python tools/test_pattern_audio_handoff.py
+
+Current build/GAYBOY.gb contains this prototype. Do not overwrite the prior
+IRQ-off A/B baseline artifacts or label this gayboyinterrupt.gb as fixed.

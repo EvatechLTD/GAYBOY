@@ -1,0 +1,116 @@
+Native whole-step launch test build ? 2026-10-19
+
+Hardware test ROM: build/gayboyinterrupt.gb (1 MiB)
+SHA256: 0a370de2f10bbd3a68d6a859ec0a12825c45c44caa0419a81c4af2b6a85de8da
+Source-linked snapshot: build/native-launch-candidate.gb/.noi/.map
+Earlier pre-IRQ ROM preserved: build/gayboyinterrupt-before-whole-step-46ff2dc1.gb
+Build manifest: build/gayboyinterrupt-build.json
+
+USER DIRECTION: Test this build on two physical DMG-01s first. Audio-to-master-
+clock deadline work is explicitly deferred until that feedback. Do not restart
+master-clock architecture work merely because it remains listed below.
+
+What changed
+- A separate native incoming packet is calculated during sparse_prepare phase14
+  before the incoming pad is declared ready. Native P1/P2/wave/noise, waveform,
+  tuning, gates, PCM source addresses, merged drum noise and kick share the same
+  packet calculations (seq_native_calc.h) as ordinary step lookahead.
+- Preparation does not apply the incoming patch or mutate the outgoing notes,
+  APU state, fine cache, live lookahead or PCM source records.
+- A validated cached-tone installation grants a single-use packet ticket.
+  Activation keeps identity/BPM/mute/solo/kit/tuning/gate guards. A stopped pad
+  selection or repeated same-pad launch cannot reuse an old install ticket.
+- Quantize OFF can finish preparation while the outgoing pattern keeps running,
+  before releasing outgoing voices. The demand loop services musical time and
+  has a finite budget. It does not reset the timer to hide the preparation cost.
+- Fixed-ROM hardware writer commits complete native attacks together.
+- IMPORTANT PCM RACE FIX: source records previously became visible to the IRQ
+  while the hardware image was still being copied. PCM could therefore start
+  one or two blocks early. The final bounded critical window now installs at
+  most two source records AND arms the complete packet together. Other native
+  steps while the PCM engine runs use the same block pipeline as sample steps.
+- Native fine snapshots follow fine_apply clamping for subsequent notes.
+- Roll repaint can discard its unuploaded work when a new START press arrives.
+  Normal main-loop input handling still consumes the queued press. The next
+  roll render rebuilds its discarded cache. No recursive input processing.
+- Pure preview helpers accept incoming tuning, sample kit and tempo explicitly.
+  Shared bank-zero overlays: A000 live packet, A200 incoming packet, A400 HW,
+  A600 incoming build/identity/ticket state. Native-only use of the existing
+  protected experimental-delay allocation. No saved-song format change.
+- PCM producer/upload order, serial clock service, and pulse-only IRQ disable
+  remain intact. Unsupported modes/batches retain the original dispatcher.
+
+Validation of the exact SHA above
+- ROM/bank/RAM audit PASS: 1050 bytes WRAM reserve, 512-byte stack reserve,
+  complete engine bank0 excluded from song storage.
+- tools/test_native_step_cpu.py PASS on actual emulated DMG CPU: all four
+  trigger stores, keys/ownership/gates, waveform, live edit invalidation,
+  durations0/1/3/4 at gates80/100, cold prime, incoming packet isolation,
+  incoming tuning, immutable identity rejection, kit2 PCM/noise/kick ownership,
+  regular native steps using the PCM pipeline, overflow fallback and stop
+  cancellation. tools/test_onset_gates_cpu.py: all540 existing cases PASS.
+- Real Save/pad-control handoff tests at120 and300 BPM PASS: 1/1,1/4,1/8,OFF;
+  correct incoming duty, sounding voice, retained transport, no premature native
+  release. Candidate300 release-to-attack gaps12.3?13.3ms. Request-to-attack
+  latency is also recorded, rather than hidden by measuring release alone.
+- Real SameBoy cable300BPM stress PASS: build/candidate-cable.log.
+- Independent SameBoy full UI matrices PASS at300BPM: built-in demo, aligned
+  native-four, and PCM fixture, each navigating11/12/13/15/8/10/17/18, then
+  launching pads at1/1,1/4,1/8. Correct slots, continued transport, no pool error.
+- build/candidate-four300.json:1080 unambiguous four-voice groups; maximum
+  first-to-last trigger spread0.082015991ms across all phases.
+- build/candidate-pcm300.json:371 unambiguous groups including the actual first
+  uploaded PCM buffer rendered from newly assigned sources; maximum spread
+  0.224113464ms across every phase. Before atomic source publication the same
+  SameBoy instrumentation measured median2.77ms and worst5.6ms.
+- build/candidate-demo300.json: untouched built-in demo full navigation/launch
+  matrix completes. Its notes are not arranged as four-voice alignment groups;
+  zero such groups is NOT reported as a perfect timing measurement.
+- SameBoy final Mixer screenshot inspected: build/candidate-pcm300.png.
+
+Evidence/tool corrections
+- tools/profile_native_steps.cjs uses SameBoy C memory-write callbacks; it does
+  not patch emulated instructions. tools/sync_link_core.c additionally tracks
+  source assignment -> rendered buffer -> first upload, separating PCM source
+  onset from the ordinary continuous block retriggers. All raw events remain
+  in JSON. Duplicate/missing-channel epoch groups are excluded explicitly.
+- The older handoff harness copied a legacy2560-byte physical SRAM record over
+  the current sparse pool. Its second launch produced pool_error2. It now builds
+  the two patterns with current Save/pad controls. --rom passes matching symbols
+  to boot_helpers; --bpm/--output permit repeatable comparisons.
+- Several Python full-APU-hook PCM traces hit host timeouts; these are excluded
+  from validation. Do not equate those timeouts with a demonstrated ROM deadlock.
+  The independent SameBoy full traces complete, and isolated PyBoy CPU tests pass.
+
+Remaining scope ? deferred pending hardware feedback
+- Actual DMG audio has not been measured. These numbers are trigger stores and
+  first source-buffer upload timing, not waveform-detected audible attacks.
+- Inter-channel coherence does not prove alignment with outgoing master clock.
+  Foreground work can still make a complete step late. The hardware clock keeps
+  running and sequencer catch-up remains; a late launch does not imply permanent
+  phase error. Incoming preparation may defer a launch to a later boundary.
+- Uncached pad request latency can remain hundreds of milliseconds under load
+  (see candidate-handoff120/300.json). This is still material even with coherent
+  attacks. Do not market the shorter release gap as zero pad-launch latency.
+- Full timer-deadline delivery of a prepared whole packet (with ownership/gate
+  cancellation and deterministic late-launch policy) remains future work.
+  Wire clock stress passes, but audible alignment to that wire is not yet proven.
+
+Useful commands
+python tools/build_rom.py
+python tools/test_native_step_cpu.py
+python tools/test_onset_gates_cpu.py
+python tools/test_pattern_audio_handoff.py --bpm 300 --output build/handoff.json
+python tools/build_sync_link.py
+node tools/test_sync_link.cjs --rom build/gayboyinterrupt.gb --bpm 300 --stress
+node tools/profile_native_steps.cjs --rom build/gayboyinterrupt.gb --fixture pcm --bpm 300 --output build/pcm.json
+node tools/profile_native_steps.cjs --rom build/gayboyinterrupt.gb --fixture native-four --bpm 300 --output build/four.json
+node tools/profile_native_steps.cjs --rom build/gayboyinterrupt.gb --bpm 300 --output build/demo.json
+
+Workspace was already dirty; prior unrelated work and baseline artifacts remain.
+No commits or deployments were made. Current build/GAYBOY.gb matches this build.
+
+Hardware follow-up: the user reports pattern launches are dramatically improved
+and GAYBOY sync works well except when launching a new pattern locally on the
+slave. That issue and future linked-Mixer ideas move to branch gayboysync; see
+briefs/gayboysync-handoff.txt.

@@ -5,6 +5,7 @@
 #include <string.h>
 #include "experimental.h"
 #include "sequencer.h"
+#include "sync.h"
 #include "storage.h"
 #include "sparse_store.h"
 #include "clear_pattern.h"
@@ -77,7 +78,7 @@ extern uint8_t previewshape,previewwidth;
 extern const uint8_t sourcehi[];
 extern const char graychars[];
 extern const char *voices[];
-extern const char *pages[];
+extern const char * const pages[];
 extern const char *mononames[];
 extern const char *sourcenames[];
 extern const char *lfonames[];

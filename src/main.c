@@ -33,9 +33,15 @@ uint8_t master=0x77,route=0xff,power=1,vin=0;
 const uint8_t limits[26]={3,15,1,7,7,1,7,63,1,1,7,1,7,1,15,3,255,1,15,1,7,3,1,1,1,24};
 #include "engine_state.h"
 #include "mono_state.h"
-void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; SB_REG=0; SC_REG=0x80; if(n==rd) overflow=1; else {rx[wr]=b;wr=n;} }
+void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode&&!syncslave){
+ if(syncstart&&synctxbyte==0xFA)syncstart=0;synctxwait=3;if(waveengine==3&&syncdivider==1)synctxwait=1;
+ if(syncdue){syncdue=0;SB_REG=syncmode==1?(0x80|synctick):0;SC_REG=0x81;}return;
+ } SB_REG=0; SC_REG=0x80; if(n==rd) overflow=1; else {rx[wr]=b;wr=n;} }
 void globals(void) {NR52_REG=power?0x80:0; if(power){NR50_REG=master|(monomode?0:vin);NR51_REG=route;}}
 void panic_audio(void) BANKED;
+void seq_native_prepare(void) BANKED;
+void seq_native_cancel_voice(uint8_t c) NONBANKED;
+void seq_native_touch(void) NONBANKED;
 void panic(void){panic_audio();}
 const int8_t arp[5][4]={{0,0,0,0},{0,4,7,12},{0,3,7,12},{0,7,12,7},{0,12,0,-12}};
 /* This path never writes a trigger, envelope register or macro counter. */
@@ -58,7 +64,7 @@ uint16_t pitchvalue(uint8_t c){uint8_t ph=phase[c]?phase[c]-1:0,n,frac;int16_t p
  if(mods[c][3]){delta=(int16_t)mods[c][3]*((ph&7)<4?(ph&3):3-(ph&3));if(ph&8)delta=-delta;f+=delta;}
  if(mods[c][4])f+=((int16_t)mods[c][4]-8)*(int16_t)age[c];if(f<0)f=0;if(f>2047)f=2047;return fine_apply(f,c,0);
 }
-void updatepitch(uint8_t c){uint16_t f,base;if(c>2||!active[c])return;if(c==2&&monomode&&expconfig[0]){exp_pitch();return;}if(c==2&&waveengine){enginepitch();return;}f=pitchvalue(c);base=c==0?0xff13:c==1?0xff18:0xff1d;REG(base)=f;REG(base+1)=(param[c][8]<<6)|(f>>8);}
+void updatepitch(uint8_t c){uint16_t f,base;seq_native_touch();if(c>2||!active[c])return;if(c==2&&monomode&&expconfig[0]){exp_pitch();return;}if(c==2&&waveengine){enginepitch();return;}f=pitchvalue(c);base=c==0?0xff13:c==1?0xff18:0xff1d;REG(base)=f;REG(base+1)=(param[c][8]<<6)|(f>>8);}
 
 void liveparam(uint8_t c,uint8_t i){uint8_t *v=param[c];if(c==0&&pulsekickleft)return;if(c==2&&waveengine==3)return;
  /* DMG envelope/initial-volume writes are latched only by the next note.
@@ -77,41 +83,21 @@ void liveparam(uint8_t c,uint8_t i){uint8_t *v=param[c];if(c==0&&pulsekickleft)r
  else if(i==25)bendupdate(c);
 }
 void play(uint8_t c,uint8_t note,uint8_t vel){uint8_t *v=param[c],vol;uint16_t f,amplitude;
+ if(!seqservicing)seq_native_cancel_voice(c);
+ if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}
  if(c==0&&pulsekickleft)return;
  if(c==2&&waveengine){if(waveengine!=3)enginenote(note,vel,0);return;}
  if(c<3)polyowner[c]=0;
  if(!power)return;phase[c]=age[c]=stepclock[c]=0;held[c]=note;basepitch[c]=note;velocity[c]=vel;active[c]=1;tablepos[c]=tablemode[c]==3?(notestep[c]++%tablelen[c]):0;livepitch[c]=note;liveduty[c]=v[0];
  tablerow[c]=tablepos[c];if(c<3)f=pitchvalue(c);else f=0;amplitude=(uint16_t)v[1]*vel;/* Exact floor(x/127), x <= 15*127. */vol=(amplitude+1+(amplitude>>7))>>7;
- if(c<2){uint16_t base=c?0xff16:0xff11;if(!c)NR10_REG=(v[4]<<4)|(v[5]<<3)|v[6];
+ if(c<2){uint16_t base;if(!syncmode&&(seqirqsuppress&(1<<c))){if(v[9]||v[22])stop(c);return;}base=c?0xff16:0xff11;if(!c)NR10_REG=(v[4]<<4)|(v[5]<<3)|v[6];
  REG(base)=(v[0]<<6)|v[7];REG(base+1)=!vol&&!v[2]?8:(vol<<4)|(v[2]<<3)|v[3];REG(base+2)=(uint8_t)f;REG(base+3)=0x80|(v[8]<<6)|(f>>8);
  }else if(c==2){wave();wavepending=0;NR30_REG=v[17]?0:0x80;NR31_REG=v[16];NR32_REG=v[15]<<5;NR33_REG=(uint8_t)f;NR34_REG=0x80|(v[8]<<6)|(f>>8);
  }else{NR41_REG=v[7];NR42_REG=(vol<<4)|(v[2]<<3)|v[3];NR43_REG=(v[18]<<4)|(v[19]<<3)|v[20];NR44_REG=0x80|(v[8]<<6);}
  if(v[9]||v[22])stop(c);
 }
-void cc(uint8_t c,uint8_t n,uint8_t x){uint8_t i,v,mask;lastcc=n;lastvalue=x;edited[c]=1;dirty=1;
- if(n==120||n==123){keycount[c]=0;stop(c);held[c]=255;return;}if(n==64){if(c==2&&waveengine){enginesustain(x>=64);return;}sustain[c]=x>=64;if(!sustain[c]&&held[c]==255)stop(c);return;}
- if(!experimental_mode&&((n>=112&&n<=126)||n==118||n==119))return;
- if(n==122){if(waveengine==3)return;engineset(((uint16_t)x*3)>>7);return;}if(n==124){arprate=x>>4;return;}if(n==125||n==126){softshape[n-125]=x>>5;return;}
- if(n>=112&&n<=117){i=n-112;mods[c][i]=((uint16_t)x*(i==0?16:i==1?5:i==2?4:i==3?8:i==4?17:64))>>7;return;}
- if(n==118){tablemode[c]=x>>5;return;}if(n==119){tablelen[c]=(x>>4)+1;return;}
- if(n<41||n>119)return;
- if(n>=70&&n<=101){i=n-70;if(!custom){stagewave();custom=1;}mask=customwave[i>>1];v=x>>3;customwave[i>>1]=(i&1)?((mask&0xf0)|v):((mask&15)|(v<<4));wavepending=1;return;}
- if(n==67||n==68){if(c==2&&waveengine)return;if(c<3){if(n==67)rawfreq[c]=(rawfreq[c]&0x780)|x;else rawfreq[c]=(rawfreq[c]&127)|((uint16_t)(x>>3)<<7);if(c==0){if(!pulsekickleft){NR13_REG=rawfreq[c];NR14_REG=(param[c][8]<<6)|(rawfreq[c]>>8);}}else if(c==1){NR23_REG=rawfreq[c];NR24_REG=(param[c][8]<<6)|(rawfreq[c]>>8);}else{NR33_REG=rawfreq[c];NR34_REG=(param[c][8]<<6)|(rawfreq[c]>>8);}}return;}
- if(n==69){if(x>=64)play(c,held[c]==255?basepitch[c]:held[c],velocity[c]?velocity[c]:127);return;}
- if(n==102){if(x<100)load(c,x);return;}
- if(n==103){panic();return;}
- if(n>=104&&n<=106){v=x>>4;if(n==104)master=(master&0x70)|v;else if(n==105)master=(master&7)|(v<<4);else vin=(x>=64)?0x88:0;globals();return;}
- if(n==107){power=x>=64;globals();return;}
- if(n>=108&&n<=111){c=n-108;mask=(1<<c)|(0x10<<c);route&=~mask;if(x&1)route|=1<<c;if(x&2)route|=0x10<<c;globals();return;}
- if(n>66)return;i=n-41;v=((uint16_t)x*(limits[i]+1))>>7;param[c][i]=v;
- if(i==21){mask=(1<<c)|(0x10<<c);route&=~mask;if(v&1)route|=1<<c;if(v&2)route|=0x10<<c;globals();}
- else if(i>=10&&i<=13){if(i==10)master=(master&0x70)|v;if(i==11)vin=(vin&0x80)|(v?8:0);if(i==12)master=(master&7)|(v<<4);if(i==13)vin=(vin&8)|(v?128:0);globals();}
- else if(i==14){custom=0;wavepending=1;}
- else if(i==23){sustain[c]=v;if(!v&&held[c]==255)stop(c);}
- else if(i==24){if(v)stop(c);}
- else if(i==22){if(v)stop(c);}
- else liveparam(c,i);
-}
+void cc_apply(uint8_t c,uint8_t n,uint8_t x) BANKED;
+void cc(uint8_t c,uint8_t n,uint8_t x){cc_apply(c,n,x);seq_native_touch();if(!syncmode)seq_irq_refresh(c);}
 void polyload(uint8_t n){uint8_t c;for(c=0;c<3;c++)load(c,n);polyprogram=n;polynext=polysustain=0;
  /* A pulse patch uses a square wave for its third oscillator. */
  if(patch(n)->voice!=2){param[2][14]=2;param[2][15]=1;tablemode[2]=0;}polymode=1;dirty=1;
@@ -139,33 +125,36 @@ void polyevent(uint8_t t,uint8_t a,uint8_t b){uint8_t c;if(waveengine==3)return;
 void keyevent(uint8_t c,uint8_t note,uint8_t vel){uint8_t i,j,n=keycount[c],last=n?keystack[c][n-1]:255;for(i=0;i<n;i++)if(keystack[c][i]==note){for(j=i;j+1<n;j++){keystack[c][j]=keystack[c][j+1];keyvel[c][j]=keyvel[c][j+1];}n--;break;}
  if(vel){if(n==8){for(j=0;j<7;j++){keystack[c][j]=keystack[c][j+1];keyvel[c][j]=keyvel[c][j+1];}n--;}keystack[c][n]=note;keyvel[c][n++]=vel;keycount[c]=n;play(c,note,vel);}
  else {keycount[c]=n;if(last!=note)return;if(n)play(c,keystack[c][n-1],keyvel[c][n-1]);else {held[c]=255;if(!sustain[c])stop(c);}}}
-void midi(uint8_t b){midiage=12;if(b>=0xf8)return;if(b&128){count=0;st=b<0xf0?b:0;return;}if(!st)return;
+void midi(uint8_t b){if(syncmode&&sync_receive(b))return;midiage=12;if(b>=0xf8)return;if(b&128){count=0;st=b<0xf0?b:0;return;}if(!st)return;
  if((st&0xe0)==0xc0){event(st,b,0);return;}if(!count){first=b;count=1;}else{event(st,first,b);count=0;}}
 /* Frame-clock macros update pitch/duty without retriggering hardware envelopes. */
-void service(void){uint8_t b;uint16_t now,delta;mixfill();while(rd!=wr){b=rx[rd++];midi(b);mixfill();}__critical {now=sys_time;}if(lastframe!=now){delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;if(experimental_mode)modulate();if(midiage)midiage--;}}
+void service(void){uint8_t b,budget=8;uint16_t now,delta;mixfill();while(rd!=wr&&budget--){b=rx[rd++];midi(b);mixfill();}__critical {now=sys_time;}if(lastframe!=now){delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;if(experimental_mode)modulate();if(midiage)midiage--;}}
 void exp_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) NONBANKED {uint8_t saved=CURRENT_BANK;SWITCH_ROM(bank);memcpy(dst,(const void *)(0x4000+offset),16);SWITCH_ROM(saved);}
 extern uint16_t seqdeadline;
 void mixer_prepare_service(void) BANKED;
-void mixfill(void){if(rd!=wr){uint8_t b=rx[rd++];midi(b);}if(monomode&&expactive){exp_service();if(expconfig[0])exp_fill();}else if(waveengine==2&&mixrunning&&!mixready[mixwrite]){legacyfill();if(!mixready[mixwrite])legacyfill();}
+void mixfill(void){if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(rd!=wr&&!syncbusy&&(!syncmode||!seqservicing)){uint8_t b=rx[rd++];midi(b);}if(monomode&&expactive){exp_service();if(expconfig[0])exp_fill();}else if(waveengine==2&&mixrunning&&!mixready[mixwrite]){legacyfill();if(!mixready[mixwrite])legacyfill();}
  /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */
  if(seqplaying&&!seqservicing&&seqeventcache==2){seqservicing=1;sparse_service();seqservicing=0;}
- if(seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();}
+ if(rd==wr&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
+ if(rd==wr&&seqplaying&&!seqservicing&&seqticks<seqdeadline)seq_native_prepare();}
 /* Intro audio can interrupt graphics in any ROM bank. Restore that bank before
    returning; the normal workstation timer is installed after the intro exits. */
 void intro_audio_tick(void);
 void intro_timer(void){uint8_t saved=CURRENT_BANK;SWITCH_ROM(21);intro_audio_tick();SWITCH_ROM(saved);}
-void main(void){uint8_t p,edge,frame=0;intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();drum_init();startup();ui_loading_begin();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
+void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();drum_init();startup();ui_loading_begin();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
  disable_interrupts();padsampled=lastpad;add_VBL(input_vblank);add_SIO(serial_isr);add_TIM(engine_timer);SB_REG=0;SC_REG=0x80;set_interrupts(VBL_IFLAG|SIO_IFLAG|TIM_IFLAG);enable_interrupts();
  /* Preparation runs on Mixer; its private journal commit (phase18 atACB4)
     also finishes off-page. Avoid an idle bank round-trip on other pages. */
  lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();if(sparse_enabled)sparse_service();else if(page==18||*(volatile uint8_t *)0xACB4==18)mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
- if(padread==end){ui_input(p,0);lastpad=p;}
- else while(padread!=end){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;ui_input(p,edge);lastpad=p;service();}
+ if(syncmode>1&&syncslave&&seqplaying)sync_advance(0);
+ if(padread==end){ui_input(p,0);if(p)seq_native_touch();lastpad=p;}
+ else while(padread!=end){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;ui_input(p,edge);seq_native_touch();lastpad=p;service();}
+ if(!syncmode&&seqplaying&&!seqservicing&&seqirqdirty&&!seqirqready&&!seqirqfired){seqservicing=1;seq_irq_prepare();seqservicing=0;}
  /* Settings pages change on input. Periodic refresh is only for live views. */
- if(dirty||(page<10&&page!=8&&!(++frame&(page>=7?1:3)))){dirty=0;ui_render();}ui_flush();}
+ if(dirty||(!navopen&&page<10&&page!=8&&!(++frame&(page>=7?1:3)))){dirty=0;ui_render();}ui_flush();}
  }
 }
 }

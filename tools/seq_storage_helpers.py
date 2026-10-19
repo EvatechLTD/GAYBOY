@@ -5,6 +5,9 @@ def write_word(p,address,value):p.memory[address]=value&255;p.memory[address+1]=
 
 def mark_pattern_changed(p,symbols):
  # Direct fixture writes bypass the UI/MIDI mutation hooks used by the ROM.
+ if '_seqirqready' in symbols and not p.memory[symbols['_syncmode']]:
+  p.memory[symbols['_seqirqready']]=0
+  p.memory[symbols['_seqirqdirty']]=1
  if '_pattern_dirty' in symbols:
   p.memory[symbols['_pattern_dirty']]=1
   if '_pattern_generation' in symbols:

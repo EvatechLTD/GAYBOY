@@ -1,9 +1,22 @@
 #ifndef GAYBOY_SEQUENCER_H
 #define GAYBOY_SEQUENCER_H
+/* Standalone attack queue shares the inactive link TX buffer in sync OFF. */
+extern __at (0xFF98) volatile uint8_t seqirqready;
+extern __at (0xFF99) volatile uint8_t seqirqfired;
+extern __at (0xFF9A) volatile uint16_t seqirqleft;
+extern __at (0xFF9C) uint8_t seqirqstep[2];
+extern __at (0xFF9E) uint8_t seqirqnote[2];
+extern __at (0xFFA0) uint8_t seqirqregs[9];
+extern __at (0xFFA9) uint8_t seqirqpan;
+extern __at (0xFFAA) uint8_t seqirqsuppress;
+extern __at (0xFFAE) uint8_t seqirqdirty;
+void seq_irq_prepare(void) BANKED;
+void seq_irq_refresh(uint8_t channel) BANKED;
+void seq_irq_tick(uint8_t elapsed) NONBANKED;
 #define SEQ_TRACKS 7
 #define SEQ_NOTE_TRACKS 6
 #define SEQ_STEPS 256
-#define PAGE_COUNT 27
+#define PAGE_COUNT 28
 extern volatile uint16_t seqticks;
 extern uint8_t seqflushpending,seqservicing;
 extern uint8_t seqapending,seqamoved;

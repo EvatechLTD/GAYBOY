@@ -12,6 +12,7 @@ uint8_t seqeventfull;
 /* A quantized Mixer handoff can play the validated prefetched pool while
    copying it into live memory; audio never sees a half-installed pattern. */
 uint8_t seqeventcache;
+uint8_t sparse_first_drum(uint16_t *cursor,uint8_t *event) BANKED;
 static uint8_t *event_address(uint16_t index){if(seqeventcache==1)return (uint8_t *)0xB020+index*4;return index<256?seqevents_lo[index]:seqevents_hi[index-256];}
 static uint16_t event_total(void){return seqeventoffsets[6]+seqeventcounts[6];}
 static void event_offsets(void){uint8_t c;uint16_t offset=0;for(c=0;c<7;c++){seqeventoffsets[c]=offset;offset+=seqeventcounts[c];}}
@@ -72,7 +73,8 @@ uint8_t seq_event_get(uint8_t c,uint16_t index,uint8_t *event) BANKED {
 /* Cursor starts at zero. The scan stays inside this ROM bank instead of
    paying a banked trampoline for every event at every sequencer step. */
 uint8_t seq_event_next_step(uint8_t c,uint8_t step,uint16_t *cursor,uint8_t *event) BANKED {
- if(seqeventcache==2)return c<7&&sparse_scan(c,step,cursor,event);
+ if(c>=7||!seqeventcounts[c])return 0;
+ if(seqeventcache==2){uint8_t first;if(c==6&&!step){first=sparse_first_drum(cursor,event);if(first<2)return first;}return sparse_scan(c,step,cursor,event);}
  uint16_t at,count,span,left,i;if(c>=7)return 0;i=*cursor;if(i>=seqeventcounts[c])return 0;at=seqeventoffsets[c]+i;count=seqeventcounts[c]-i;
  if(at<256){span=256-at;if(span>count)span=count;left=storage_scan_step(event_address(at),span,step);if(left){at+=span-left;goto found;}at+=span;count-=span;}
  if(count){left=storage_scan_step(event_address(at),count,step);if(left){at+=count-left;goto found;}}
@@ -81,11 +83,13 @@ found:memcpy(event,event_address(at),4);*cursor=at-seqeventoffsets[c]+1;return 1
 }
 
 uint8_t seq_note_event(uint8_t c,uint8_t step,uint8_t *event) BANKED {
- if(seqeventcache==2){uint16_t cursor=0;return c<6&&sparse_scan(c,step,&cursor,event);}
+ if(c>=6||!seqeventcounts[c])return 0;
+ if(seqeventcache==2){uint16_t cursor=0;uint8_t first;if(!step){first=sparse_first_note(c,event);if(first<2)return first;}return sparse_scan(c,step,&cursor,event);}
  uint16_t i;if(c>=6)return 0;i=event_find(c,step);if(i==SEQ_EVENT_APPEND)return 0;memcpy(event,event_address(i),4);return 1;
 }
 uint8_t seq_event_put(uint8_t c,uint16_t index,const uint8_t *event) BANKED {
  uint16_t at,i,total;uint8_t busy,copy[4];
+ if(!syncmode){seqirqready=0;seqirqdirty=1;}
  sparse_journal_edit_barrier();
  if(seqeventcache==2)sparse_finish_install();
  if(c>=7||!event[1]||event[1]>(c==6?13:128)||event[2]>127)return 0;
@@ -98,6 +102,7 @@ uint8_t seq_event_put(uint8_t c,uint16_t index,const uint8_t *event) BANKED {
 }
 void seq_event_erase(uint8_t c,uint16_t index) BANKED {
  uint16_t i,total;uint8_t busy;if(c>=7||index>=seqeventcounts[c])return;
+ if(!syncmode){seqirqready=0;seqirqdirty=1;}
  sparse_journal_edit_barrier();
  if(seqeventcache==2)sparse_finish_install();
  busy=seqservicing;seqservicing=1;total=event_total();
@@ -105,16 +110,17 @@ void seq_event_erase(uint8_t c,uint16_t index) BANKED {
  seqeventcounts[c]--;event_offsets();seqeventfull=0;seqservicing=busy;
 }
 void seq_track_clear(uint8_t c) BANKED {uint16_t at,from,end;uint8_t busy;
- if(c>=7||!seqeventcounts[c])return;sparse_journal_edit_barrier();if(seqeventcache==2)sparse_finish_install();busy=seqservicing;seqservicing=1;
+ if(c>=7||!seqeventcounts[c])return;if(!syncmode){seqirqready=0;seqirqdirty=1;}sparse_journal_edit_barrier();if(seqeventcache==2)sparse_finish_install();busy=seqservicing;seqservicing=1;
  at=seqeventoffsets[c];from=at+seqeventcounts[c];end=event_total();
  while(from<end){event_move(at++,from++);event_yield(from);}seqeventcounts[c]=0;event_offsets();seqeventfull=0;seqservicing=busy;
 }
-void seq_storage_clear(void) BANKED {uint16_t i;uint8_t busy=seqservicing;sparse_journal_edit_barrier();if(seqeventcache==2)sparse_finish_install();seqservicing=1;seqeventcache=0;memset(seqeventcounts,0,sizeof(seqeventcounts));memset(seqeventoffsets,0,sizeof(seqeventoffsets));for(i=0;i<512;i+=4){memset(event_address(i),0,16);mixfill();}seqeventfull=0;seqservicing=busy;}
+void seq_storage_clear(void) BANKED {uint16_t i;uint8_t busy=seqservicing;if(!syncmode){seqirqready=0;seqirqdirty=1;}sparse_journal_edit_barrier();if(seqeventcache==2)sparse_finish_install();seqservicing=1;seqeventcache=0;memset(seqeventcounts,0,sizeof(seqeventcounts));memset(seqeventoffsets,0,sizeof(seqeventoffsets));for(i=0;i<512;i+=4){memset(event_address(i),0,16);mixfill();}seqeventfull=0;seqservicing=busy;}
 uint8_t seq_note_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];if(c>=6)return 0;if(seqeventcache==2){i=0;return sparse_scan(c,step,&i,e)?e[1]:0;}i=event_find(c,step);return i==SEQ_EVENT_APPEND?0:event_address(i)[1];}
 uint8_t seq_velocity_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];if(c>=6)return 0;if(seqeventcache==2){i=0;return sparse_scan(c,step,&i,e)?e[2]:0;}i=event_find(c,step);return i==SEQ_EVENT_APPEND?0:event_address(i)[2];}
 uint16_t seq_duration_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t d,e[4];if(c>=6)return 0;if(seqeventcache==2){i=0;if(!sparse_scan(c,step,&i,e))return 0;d=e[3];return d?d:256;}i=event_find(c,step);if(i==SEQ_EVENT_APPEND)return 0;d=event_address(i)[3];return d?d:256;}
 uint8_t seq_note_set(uint8_t c,uint8_t step,uint8_t note,uint8_t velocity,uint16_t duration) BANKED {
  uint16_t i;uint8_t event[4];if(c>=6||note>128||velocity>127)return 0;
+ if(!syncmode){seqirqready=0;seqirqdirty=1;}
  sparse_journal_edit_barrier();
  if(seqeventcache==2)sparse_finish_install();
  i=event_find(c,step);

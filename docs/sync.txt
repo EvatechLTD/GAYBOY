@@ -1,0 +1,76 @@
+SYNC (Start menu)
+
+Choose TYPE with Left/Right. Up/Down selects TYPE or ROLE. Choose MASTER on
+one machine and SLAVE on the other. A starts/stops playback. Configuration
+changes stop playback. Settings are session-only; boot defaults to OFF.
+
+GAYBOY: connect two Game Boys using a compatible Game Boy link cable.
+Choose GAYBOY on both, one MASTER and one SLAVE. Configure the slave first,
+then play on the master. Master mixer GLOBAL TEMPO is sent to the slave;
+slave tempo editing is locked, global tempo stays enabled across pattern loads.
+The slave advances only on incoming clock. Start resets positions; stop is
+explicit. A late-connected slave requires restarting the master.
+Emulators must emulate a connected serial link; independent browser windows
+alone do not provide a link cable.
+
+Hardware feedback for the whole-step timing build: pattern launches are much
+better, and native GAYBOY sync works well until a pattern is launched locally
+on the slave. That interaction is a known issue for the gayboysync branch.
+
+LSDJ: eight serial clock edges per tick, 24 ticks per quarter note. Choose the
+opposite role in LSDj and arm playback. Raw clock modes start on the first
+received byte; they infer stop after two seconds without clock. Song position,
+LSDj keyboard commands and MIDI note output are not implemented.
+
+ARDUINOBOY: same LSDj clock format. For a GAYBOY SLAVE choose Arduinoboy
+LSDJ SLAVE SYNC mode. For a GAYBOY MASTER choose Arduinoboy LSDJ MASTER SYNC
+mode. Do not select mGB mode for this clock format. Raw clock modes measure
+tempo over a quarter note.
+
+POCKET OPERATOR / GATE: adapter profiles for analog input/output.
+A clock adapter must convert a complete eight-bit link transfer to one pulse,
+and convert each incoming pulse to an externally clocked zero byte. Pocket
+Operator uses 2 pulses per quarter; GATE uses 4. Adapters must provide
+appropriate signal conditioning and level conversion. A passive audio cable
+cannot convert analog pulses into Game Boy serial transfers. These profiles
+do not overwrite the audio mix with sync clicks.
+
+Native wire format: internal-clock 8192-bit/s serial master, external-clock
+slave. F1 + BPM high seven bits + BPM low seven bits sets global BPM (30..300),
+FA starts, FB continues, FC stops. Bytes 80..BF carry a modulo-64 clock
+sequence number at 24 PPQN; the slave recovers elapsed clocks from the
+sequence rather than assuming its startup completed before the first pulse.
+F8 remains accepted as an unnumbered input clock. F2 + clock sequence number
++ phase high seven bits + phase low seven bits restarts the slave's current pattern at beat one
+when the master launches/retriggers a pattern. Phase is 0..2559 in musical
+clock units; the next received clock advances only the remaining part of that
+tick. Both machines must run the updated ROM. Clock messages can interleave
+with tempo/phase packet bytes without corrupting those packets.
+This does not select a matching pattern number on the slave. Tempo packets precede
+start and changes. Other bytes on a native slave retain serial MIDI handling.
+Raw modes send zero bytes only while playing. Queue overflow lights RX FULL.
+
+The master oscillator runs from a bounded fixed-ROM timer interrupt, with a
+24-bit fractional accumulator. It continues through rendering, storage and
+pattern changes. The PCM engine clocks directly from its original 11712-cycle block interrupt;
+adding extra PCM interrupts was measurably harmful to navigation under load.
+Other audio engines use timer subdivisions while retaining their original
+update rates. Clock quantization is bounded by the active timer period. The serial ISR gives
+due clocks priority over queued control bytes. The slave accumulates received
+clock time and services actual note/gate deadlines, rather than rescanning the
+whole sequencer for every clock pulse. Receive draining has a bounded budget. Slave pulse conversion caches its
+quotient and remainder at tempo changes; it does not divide on each clock.
+Launch epochs include time accumulated during pattern preparation. The slave
+converts delayed markers pulse by pulse to avoid a 16-bit elapsed-time overflow.
+
+Cable regression: python tools/build_sync_link.py builds a local SameBoy core;
+node tools/test_sync_link.cjs runs two DMG machines with bit-level serial
+callbacks and synchronized CPU clocks. It checks menu latency and both a
+current-pattern retrigger and a different-pattern launch. It does not inject
+bytes into the application's RX queue. Requires the checkout-local SameBoy and
+Emscripten sources also used by tools/build_browser_sameboy.py.
+
+Physical cables, adapters and third-party devices require hardware verification.
+Arduinoboy reference protocol:
+https://github.com/trash80/Arduinoboy/blob/master/Arduinoboy/Mode_LSDJ_SlaveSync.ino
+https://github.com/trash80/Arduinoboy/blob/master/Arduinoboy/Mode_LSDJ_MasterSync.ino

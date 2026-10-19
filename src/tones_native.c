@@ -1265,7 +1265,7 @@ static void native_scatter(uint8_t *map) __naked {__asm
  __endasm;}
 uint8_t tones_scatter_object(uint16_t object) BANKED {uint8_t map[24];
  if(monomode||experimental_mode||(waveengine&&waveengine!=3))return 0;
- if(!pool_native_map(object,map))return 0;
+ if(!sparse_prepared_map(object,map)&&!pool_native_map(object,map))return 0;
  /* Mapping can service queued MIDI that changes the active engine. */
  if(monomode||experimental_mode||(waveengine&&waveengine!=3))return 0;
  native_scatter(map);return 1;

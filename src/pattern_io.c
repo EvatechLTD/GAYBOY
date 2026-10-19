@@ -13,7 +13,7 @@ void mixer_prepare_barrier(void) BANKED;
 uint8_t toneready;
 __at (0xACCC) uint8_t pattern_dirty;
 __at (0xACCD) uint16_t pattern_generation;
-void mixer_pattern_changed(void) BANKED {pattern_dirty=1;pattern_generation++;if(mx.magic==0xD3){mx.presaved=0;
+void mixer_pattern_changed(void) BANKED {if(!syncmode)seqirqdirty=1;pattern_dirty=1;pattern_generation++;if(mx.magic==0xD3){mx.presaved=0;
  /* Editing the playing generation cancels its queued launch. This keeps
     subsequent edits on the visible pattern and never revives an old stage. */
  if(sparse_enabled==1&&sparse_journal_slot==mx.slot&&sparse_journal_busy()){mx.pending=255;mx.padcache=0;dirty=1;}}}
@@ -234,7 +234,7 @@ void mixer_prepare_barrier(void) BANKED {
  mixer_prepare_cancel();while(prep.phase==18){prepare_once();mixfill();}
 }
 uint8_t mixer_prepare_busy(void) BANKED {
- if(sparse_enabled)return 0;
+ if(sparse_enabled)return sparse_prepare_busy();
  if(!prep.phase&&pattern_dirty&&mx.pending!=255&&mx.pending!=mx.slot&&!(mx.protectedslots&(1<<mx.slot)))return 1;
  return mx.pending==mx.slot&&((prep.phase==18&&(prep.pad&8))||(prep.pad&1))?0:prep.phase;
 }
@@ -256,7 +256,7 @@ void mixer_prepare_focus(uint8_t slot) BANKED {
  prep.phase=7;prep.pad=1;prep.target=slot;prep.edit=0;prep.source=mx.slot;prep.position=0;
  mx.cachevalid=0;mx.presaved=0;mx.openempty=0;mx.checking=0;toneready=0;
 }
-void mixer_launch_request(uint8_t slot,uint8_t edit) BANKED {
+void mixer_launch_request(uint8_t slot,uint8_t edit) BANKED {if(!syncmode){seqirqready=0;seqirqdirty=1;}
  if(sparse_enabled){sparse_request(slot,edit);return;}
  if(edit&&slot==mx.slot){mixer_prepare_cancel();page=8;seq_open();dirty=1;return;}
  if(slot==mx.pending)return;

@@ -1,0 +1,291 @@
+GAYBOY: URGENT SEQUENCER CLOCK / WHOLE-STEP TIMING HANDOFF
+Updated 2026-10-19. Read this before continuing implementation.
+
+USER'S ACTUAL BUG AND REQUIRED OUTCOME
+
+User reports that internal/native timing becomes lazy and jitters across ALL
+instruments, sometimes with instruments audibly separating from one another.
+This is NOT a pulse-only problem. Most important control observation:
+the same sequencer is much tighter and recovers better after pattern launches
+when SLAVED TO LSDJ. The fix must explain that difference, not just improve a
+pulse-only benchmark. The user is frustrated with repeated explanations and
+needs the actual fix ASAP.
+
+Work is authorized on a new branch. Once solved and verified, build a hardware
+test ROM named build/gayboyinterrupt.gb and tell the user it is ready.
+Do not call the current implementation solved or the existing named artifact
+the latest build. No physical hardware validation of these changes yet.
+
+Latest user statements, in order:
+  "that doesnt make sense because the problem goes away when slaved to lsdj,
+   so why would external clock make it so much better?"
+  "when it jitters it sounds like all the instruments get lazy, sometimes
+   they even go out of sync with eachother its not just pulse"
+  "I think you need to write a brief for the next instance of codex now,
+   i need this fixed asap"
+
+CORRECT THE PREVIOUS AGENT'S DIAGNOSIS
+
+I over-attributed the problem to pulse note handling. Pulse event lookup,
+pitch/velocity calculation and held-note bookkeeping do delay audible attacks,
+but that does NOT establish why external LSDj sync fixes the whole sequencer.
+The pulse-only IRQ optimization below is partial work, not proof of root cause.
+Its independent attack path could keep pulses on time while other channels
+remain late, accentuating relative separation. Measure the WHOLE STEP.
+
+Confirmed from current source:
+  Internal clock: elapsed musical time comes from local timer/audio accounting.
+  LSDj slave: local musical-time accumulation is bypassed; incoming serial
+  clock pulses are converted into sequencer time. Actual note dispatch is still
+  predominantly shared foreground code in both cases.
+This makes internal elapsed-time accounting, wake-up/catch-up scheduling,
+interrupt latency and preservation of time across launches prime suspects.
+These are hypotheses to test, not established causes.
+
+WORKSPACE / OWNERSHIP / BUILD STATE
+
+Windows PowerShell; cwd G:\DEVELOPMENT\GAYBOY
+Branch: fix/interrupt-clock. No commits from this work.
+Very dirty shared workspace: numerous PREEXISTING user edits in src, tools,
+network, website, hosting, README and research. Do not reset or bulk-revert.
+Use targeted diffs and changes. No subagents unless explicitly authorized by
+the user or applicable instructions. No builds/tests currently running from
+this handoff. Other Python HTTP/licensing processes belong to the user.
+
+Current build/GAYBOY.gb SHA256:
+2917f4d28b3749ecdf27b6529d9d4af8b3e0b3aa53d50f246dd972360dd1901e
+Built 2026-10-19 11:37 local; 1 MiB; layout check passed, WRAM reserve 1069
+bytes and 512-byte stack. Build log: build/interrupt-build.log.
+
+Existing build/gayboyinterrupt.gb is OLD, built around 01:24, sync fixes only:
+46ff2dc1c5d896979e30d8d636cfd125ac57486765c286a0581f1f6c5dc5beda
+Also preserved as build/standalone-before.gb / .noi for baseline comparisons.
+Do not overwrite the requested final filename until justified by validation.
+
+Build: python tools/build_rom.py
+Header edits cause a full rebuild (~3-4 minutes, especially seq_pixels.c).
+Small .c-only changes build in a few seconds. Generated tones_native.c comes
+from tools/generate_native_scatter.py. Frequent unused-argument warnings are
+ordinary; check actual build completion and layout verification.
+
+On Windows PowerShell, a Python SDL UserWarning written to stderr can make
+exec report exit 1 even when Python prints every success message. Inspect logs
+and assertions; distinguish that shell behavior from real test failures.
+
+PRIOR SYNC WORK (MOSTLY VERIFIED; PRESERVE IT)
+
+New start menu SYNC page 27, PAGE_COUNT 28. Modes OFF, GAYBOY, LSDJ,
+ARDUINOBOY, POCKET OPERATOR, GATE; master/slave selection. Slave global tempo
+is enforced in mixer. Native numbered clock bytes 80..BF modulo64 at24PPQN;
+F1/BPM hi7/lo7, FA start, FC stop, FB continue, F2 launch epoch marker.
+LSDj/Arduino24PPQN, PO2PPQN, Gate4PPQN.
+
+src/sync.c bank59 config/protocol; src/sync_clock.c fixed-ROM timer oscillator.
+Master PCM retains 11712-cycle audio IRQ, reload73, increment183*BPM in
+CPUcycles/64 units. Non-PCM clock uses fast4096-cycle IRQ with original audio
+division retained. Extra PCM subdivisions were tried and rejected for UI load.
+Clock generation formerly foreground had ~80ms worst spacing error. New master
+oscillator measured ~2.7-3.3ms worst spacing error at300BPM under stress.
+
+Native launch marker accounts seqclock + seqticks*BPM spent during preparation.
+Receiver pulse-to-ticks conversion has cached quotient/remainder and avoids
+16-bit clocks*2560 overflow. Master control FIFO is paced, clock gets priority.
+PCM IRQ permits fixed-bank serial preemption with IE masked to SIO only; timer
+recursion is forbidden. Longer PCM work still preserves its bank correctly.
+Real two-instance SameBoy virtual BIT cable tests passed before latest sparse
+cache additions, including300BPM PCM/UI stress, retrigger and different slots,
+with no lost wire bytes, SC restarts or audio underruns. Keep this regression.
+
+LSDJ REFERENCE: WHAT WAS ACTUALLY VERIFIED
+
+User supplied reference/01_LSDJ.gb, LSDj9.4.0, SHA1
+3e15734cd6ddd47a9cc14faf70d26195aa9e8e9b.
+Annotations in build/lsdj-clock-reference; research/lsdj-playback-notes.md
+records timer entry0391, accumulator064C, link sender227C, and longer handlers
+re-enabling interrupts (including VBlank path1872).
+The complete LSDj pattern-launch/note-dispatch path has NOT been verified.
+Do not invent claims about its exact launch strategy. No LSDj executable code
+has been copied into GAYBOY. Game Boy interrupt priority is fixed, timer is
+not highest hardware priority; a short IRQ and bounded masked sections matter.
+
+CRITICAL CODE TO TRACE NEXT
+
+src/main.c:
+  serial_isr queues incoming bytes; service/mixfill parses them.
+  mixfill runs seq_frame only when RX drained, !seqservicing and
+  seqticks >= seqdeadline. It also advances sparse installation under a guard.
+  Main loop runs service, sparse_service, input, optional IRQ preparation,
+  rendering and flush. LSDj sync_advance(0) also appears in input service.
+
+src/engine_stream.h engine_timer:
+  sync_clock_isr first; syncarmed fast-divider accounting for master.
+  Native PCM: seq_irq_tick with ((seqfraction+183)>>6), then drum_timer.
+  Native nonPCM: n=64-(TMA>>2), seq_irq_tick(n), seqticks+=n.
+  Slave does not advance musical time from that local timer path.
+
+src/drum.c drum_timer (~line369): naked BANKED, serial-only preemption;
+  if playing and NOT sync slave, seqfraction adds183/64; integer contribution
+  is added to seqticks. Audio then uploads/renders. Inspect timer period,
+  interrupted/masked sections and any clock loss, not just average audio rate.
+  seq_next_deadline (~line847) determines foreground scheduler wake-up.
+
+src/sync.c sync_advance (~line90), receive, sync_receive:
+  Slave pending pulses converted with quotient/remainder into seqticks.
+  LSDj BPM estimate uses a full quarter note of sys_time, not each pulse.
+  sync_receive immediately adds converted pulse time; mixfill later dispatches.
+
+src/sequencer.c seq_frame (~line135):
+  Atomic snapshot seqticks then clears it; processes time slices <=128 units.
+  Advances gates and clock; at step boundary subtracts threshold, updates swing.
+  Publishes remaining local ticks before mixer_boundary callback, subtracts
+  them back if no handoff occurred. New ticks during callback remain global.
+  All track positions advance, then seq_fire(6) drums FIRST, followed by
+  melodic tracks in order. These can do lookup/banked calls/seq_audio/mixfill.
+  seqservicing prevents recursive sequencer dispatch, but audio/serial continue.
+  Finally seq_next_deadline, seq_irq_prepare, clears seqservicing.
+  seq_pattern_start (~line110) resets positions, runs IRQ pulse launch batch,
+  recalculates gates if needed, clock reset, sync marker, drums, then melodies.
+
+src/sparse_store.c sparse_restore/activate/request/service:
+  Native live handoff restores metadata/tones, releases outgoing voices,
+  preserves/rescales seqclock if BPM changed, starts incoming pattern.
+  Notes install in background with seqeventcache==2. Fallback cartridge scans
+  can still be expensive, particularly high-density/long patterns.
+  Quantize values are NOW,1/8,1/4,1/2,1/1 with interval=1<<quant (NOT4/16).
+
+PARTIAL IMPLEMENTATION: PULSE ATTACK IRQ QUEUE
+
+New src/seq_irq.c (bank59 plus fixed naked seq_irq_tick), src/seq_pulse.c,
+src/control.c bank60 (old CC implementation moved to free fixed ROM).
+Only native P1/P2, sync OFF; software/mono/poly/recording/live-owned voices
+fall back. Wave/noise/PCM onsets are still foreground. PCM audio delivery has
+its existing IRQ. Do not describe this as whole-engine interrupt scheduling.
+
+Foreground builds next attacks, timer writes prebuilt5 P1 /4 P2 registers at
+deadline. Foreground later acknowledges without retriggering. Live CC, tuning,
+volume changes atomically refresh packet without moving its deadline.
+Pulse-kick owns P1, so preparation excludes P1 when current/upcoming PK owns it.
+Only pulse-onset measurement was improved; other-channel skew is unmeasured.
+
+Queue aliases idle sync TX HRAM FF98..FFB7 ONLY WHILE syncmode==0:
+FF98ready,FF99fired,FF9Aleft16,FF9Cstep[2],FF9Enote[2],FFA0regs[9],
+FFA9unusedpan,FFAAsuppress,FFABunusedpanmask,FFACbpmcache16,FFAEdirty,
+FFAFvelocity[2]. Sync oscillator phase beginsFFB8. Any queue writes when sync
+enabled would corrupt wire FIFO! Most queue entry points explicitly guard it.
+Do not clear fired flags on generic UI/CC changes: they are attack acknowledgments.
+Do not cancel every pending packet on navigation/mixer_pattern_changed: that
+previously caused ~24ms jitter. Actual source edits invalidate; controls refresh.
+play() still does substantial state/pitch work before skipping hardware writes
+on IRQ acknowledgment. Potential CPU waste remains, not proven main root cause.
+
+PARTIAL IMPLEMENTATION: SPARSE PATTERN PREFETCH
+
+New src/sparse_prepare.c bank60 found newer sparse storage bypassed old preload.
+It incrementally prepares incoming native metadata,450-byte raw tone state,
+event source stream, P1/P2 beat-one notes, step0 PK flag, and zero-bend/untuned
+beat-one pulse register packets. Prepared metadata/tone copies avoid most pool
+lookup at boundary. Source slot identity checked; ready cache requires Mixer18.
+Fallbacks for journal slots, off-page, software modes remain old behavior.
+
+Mixer-only SRAM bank0 scratch:
+  B500 prefix102; B570 map24; B590 first events8; B598kick;
+  B599 PoolStream3; B5A0 expanded metadata81; B5F2 offsets14;
+  B600 raw tones450 endingB7C2; B7C2 prepared attack regs9.
+Font upload endsB500. Roll scratch can reuse B000..B7FF offMixer. Existing
+journal B900, metaB820 and tone decode BA00 must not overlap. Validate cache
+lifetime/reentry when slots change and during background installation.
+
+prepare_phase1 reads header/expands metadata;2 streams64 bytes/call (was16);
+3/4 scan pulse first notes in bounded16-event quanta;5 scans PK;6 ready;7failure.
+Tone raw pulse blocks are60 bytes each (26params+program+edited+6mods+
+tablemode+tablelen+24tablebytes). Cached attack skips finepitch!=0 and then
+uses normal packet builder; incoming tone finalize resets bend to0.
+src/tones.c retains apply_prepared() signature (tools parse its assembly),
+adds global near label tones_apply_source taking DE source, tones_apply_cached
+copies cached442 bytes plus8 PK bytes and runs original finalization.
+Native scatter generator optionally uses prepared map. Straight swing50 now
+has a fast path setting threshold15360.
+Cache completion updates footer but no longer invalidates pad graphics.
+
+VALIDATION: WHAT PASSES AND WHAT DOES NOT
+
+Latest rebuilt ROM above passed these tests in their success messages:
+  python tools/test_seq_irq.py
+    noPCM: both pulse channels80/80 IRQ attacks, jitter3.12ms p-p,
+    variable gates, actual fine/bend frequencies, scrolling, mute/unmute,
+    stop/restart. Frequency registers are write-only; hooks capture writes.
+  python tools/test_standalone_timing.py
+    five DMG300BPM PCM+P1/P2 loads: sequencer idle/scrolling, Mixer idle,
+    volume and pan. ~3.38ms pulse phase jitter p-p, ~0.83msRMS;
+    firstP1->P2step1 ~46ms; no PCM underruns, all attacks use IRQ path.
+    Output build/standalone-final.json, .log, .err.
+  python tools/test_sync.py
+    menu/modes/nativeBPM/start-stop/clock gating/mixer slave lock.
+  python tools/test_sync_pair.py
+    two ROM instances remain within1step through start,200->157BPM,stop.
+
+Baseline build/standalone-before.json: PCM pulse jitter ~6ms idle and10-12ms
+under edits/redraw, cold first interval~62-66ms. This is useful limited evidence,
+NOT a whole-sequencer acceptance gate.
+
+Most important FAILING gate:
+  python tools/test_launch_acceptance.py --quick --output build/standalone-launches.json
+18cases (16/120,32/180,64/220; NOW/1/8/1/4; same/different pattern).
+Multiple failures remain: input ACK50-117ms, missed eligible boundaries after
+50ms prep lead, occasional quantized attack>one frame, extended note interval.
+Different-pattern boundary->P2 often14-17ms after cache, occasionally>20ms;
+same-pattern8-12ms. Old prefetch work had~24-26ms different-pattern attacks.
+Do not relax thresholds to pass. The quantization test's previous4/16-step
+expectation WAS stale and was corrected to1<<quant matching actual UI/code.
+
+IMPORTANT: latest standalone-launches.json/log is from a temporary experiment
+allowing pulse IRQ preparation while pending a launch (23failed checks).
+That experiment WORSENED results and was REVERTED in seq_irq.c; current ROM
+again excludes pending launches in normal IRQ prepare. Rerun the launch test
+before attributing that JSON to current ROM (compare embedded hashes).
+Even before the reverted experiment the launch gate still failed many checks.
+There is no successful whole-channel launch test yet.
+
+Other prior checks, before newest sparse cache changes:
+  test_onset_gates_cpu.py passed540cases.
+  test_pattern_edit_live.py passed real B/current-pad all quantizations.
+  SameBoy cable: node tools/test_sync_link.cjs --bpm 300 --stress
+    (build core if needed: python tools/build_sync_link.py).
+  test_seq_swing.py /test_pulsekick.py failed on baseline too; minor fixture
+    settling fixes were made but not rerun (swing samples Select before A;
+    PK waits for seqservicing before checking initial pitch).
+  test_display_transitions.py fails baseline and new identically in stale
+    Quick Demo expected values. Do not present the whole suite as passing.
+
+NEXT INSTANCE: PRIORITIES / CONCRETE INVESTIGATION
+
+1. Reproduce whole-instrument jitter and relative skew, including launches,
+   with a repeatable fixture and actual hardware-write or audible-onset traces.
+   Compare SAME patterns and SAME UI load under internal clock and actual
+   LSDj external clock. Use user's reference ROM and real virtual cable if
+   possible; existing SameBoy core runs two GAYBOYs, not yet LSDj-vs-GAYBOY.
+   Record logical step deadlines, all channel onsets, seqclock/seqticks,
+   timer entry/masked time, time spent in dispatch/preparation/storage.
+   Distinguish lost elapsed time, delayed service and intra-step channel skew.
+   Respect shared hardware voice ownership (PCM uses wave channel; PK usesP1).
+
+2. Audit the divergent clock paths and launch time accounting above. A true
+   explanation must match the user's LSDj-slave improvement. Do not assume
+   pulse math or timer frequency is the cause merely because a benchmark
+   improves. Compare with the old baseline and consider temporarily disabling
+   pulse IRQ for an apples-to-apples diagnostic.
+
+3. Fix coherent whole-step delivery and preserve continuous elapsed time across
+   pattern changes. Bound foreground preparation and interrupt-disabled work;
+   put only safe bounded work on a timing-critical path. Never call arbitrary
+   banked UI/storage/sequencer stacks inside an IRQ without proving safety.
+   Pulse-only punctuality while other channels lag is not completion.
+
+4. Rerun the meaningful whole-channel/launch tests, standalone tests and real
+   bit-cable regression. Verify tempo locking and menu responsiveness. Only
+   then package fresh gb/noi/map as build/gayboyinterrupt.* with SHA and concise
+   test notes, clearly distinguish emulator evidence from hardware testing.
+
+Communicate actual findings and test limitations, not repeated speculative
+explanations or promises. User explicitly asked for this handoff now; respect
+that and resume from the existing branch/work rather than starting over.

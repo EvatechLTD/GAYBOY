@@ -1,14 +1,15 @@
 #pragma bank 12
 #include "api.h"
+void seq_native_touch(void) NONBANKED;
 #include "tones.h"
 void mixer_pattern_changed(void) BANKED;
 void event(uint8_t s,uint8_t a,uint8_t b) BANKED {uint8_t c=s&15,t=s&0xf0;if(t==0xb0||t==0xc0)mixer_pattern_changed();if(!experimental_mode&&c>3)return;if(waveengine==3&&(c==2||c==5)){
  if(mixrunning||drumon[0]|drumon[1]||t!=0x90||!b)return;
- TAC_REG=0;enginestop();waveengine=0;TMA_REG=TIMA_REG=240;IF_REG&=~TIM_IFLAG;if(seqplaying)TAC_REG=4;
+ TAC_REG=0;enginestop();waveengine=0;TMA_REG=TIMA_REG=240;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;if(seqplaying)TAC_REG=4;
  }if(c==3&&drumnoiseowned&&(t==0x90||t==0x80))return;if(monomode){if(c==4)monoevent(t,a,b);return;}if(c==5){w2_event(t,a,b);return;}if(c==4){polyevent(t,a,b);return;}if(c>3)return;
  if(c==2&&waveengine&&(t==0x90||t==0x80)){if(t==0x90&&b)enginenote(a,b,0);else engineoff(a);return;}
  if(t==0x90||t==0x80)keyevent(c,a,t==0x90?b:0);
- else if(t==0xe0){wheellast[c]=((uint16_t)b<<7)|a;if(c==2&&waveengine==2)pitchdirty=1;else bendupdate(c);}
+ else if(t==0xe0){seq_native_touch();wheellast[c]=((uint16_t)b<<7)|a;if(c==2&&waveengine==2)pitchdirty=1;else bendupdate(c);}
  else if(t==0xb0)cc(c,a,b);else if(t==0xc0&&a<100){load(c,a);if(c==selected)choice=a;}
 }
 
@@ -109,4 +110,4 @@ void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;if(sparse_enabled&&edge)
 static uint32_t gate_multiply(uint32_t value,uint8_t count){uint32_t total=0;while(count){if(count&1)total+=value;count>>=1;if(count)value<<=1;}return total;}
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED {uint32_t total=duration?gate_multiply(units,duration):(uint32_t)units<<8;if(gate!=100)total=gate_multiply(total,gate)/100;return total?total:1;}
 
-void load(uint8_t c,uint8_t n) BANKED {keycount[c]=0;stop(c);if(c<3)polyowner[c]=0;memcpy(param[c],patch(n)->v,26);memcpy(mods[c],patch(n)->mod,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=patch(n)->tconfig&3;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;dirty=1;}
+void load(uint8_t c,uint8_t n) BANKED {seq_native_touch();keycount[c]=0;stop(c);if(c<3)polyowner[c]=0;memcpy(param[c],patch(n)->v,26);memcpy(mods[c],patch(n)->mod,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=patch(n)->tconfig&3;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;if(!syncmode)seq_irq_refresh(c);dirty=1;}

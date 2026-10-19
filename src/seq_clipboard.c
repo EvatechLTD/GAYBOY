@@ -49,9 +49,9 @@ uint8_t seq_region_paste(uint8_t step,uint8_t pitch) BANKED {
  seqdrawvalid=0;dirty=1;return 1;
 }
 
-void seq_swing_step(void) BANKED{uint16_t amount=seqswing-50,first=15360U+amount*307U+(amount*20U)/100U;if(seqswing==66)first=20480U;seqthreshold=seqswingphase?30720U-first:first;}
+void seq_swing_step(void) BANKED{if(seqswing==50){seqthreshold=15360U;return;}uint16_t amount=seqswing-50,first=15360U+amount*307U+(amount*20U)/100U;if(seqswing==66)first=20480U;seqthreshold=seqswingphase?30720U-first:first;}
 
-void seq_swing_edit(int16_t delta) BANKED {int16_t value;if(seqplaying)seq_frame();value=(int16_t)seqswing+delta;seqswing=value<50?50:value>100?100:value;seq_swing_step();if(seqthreshold&&seqclock>=seqthreshold)seqclock=seqthreshold-1;seqdeadline=1;dirty=1;return;}
+void seq_swing_edit(int16_t delta) BANKED {int16_t value;if(seqplaying)seq_frame();value=(int16_t)seqswing+delta;if(!syncmode){seqirqready=0;seqirqdirty=1;}seqswing=value<50?50:value>100?100:value;seq_swing_step();if(seqthreshold&&seqclock>=seqthreshold)seqclock=seqthreshold-1;seqdeadline=1;dirty=1;return;}
 
 
 extern uint8_t seqmeterbeats,seqmeterdenom,seqbeats,seqdenom;
