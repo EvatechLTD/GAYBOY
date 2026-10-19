@@ -50,14 +50,18 @@ void global_set(uint8_t enabled) BANKED {
  cursor[1]=0;seqdrawvalid=0;dirty=1;
 }
 void global_render(void) BANKED {
- uint8_t i;for(i=0;i<18;i++)memset(canvas+i*20,0,20);
+ uint8_t i;if(pageconfig){page_menu_settings_render();return;}for(i=0;i<18;i++)memset(canvas+i*20,0,20);
  memset(canvas,96,20);global_text(0,0,"GLOBAL SETTINGS",1);
- global_text(0,4,"EXPERIMENTAL MODE",0);global_text(1,6,experimental_mode?"[X] ON":"[ ] OFF",0);
- global_text(0,10,experimental_mode?"SOFTWARE AUDIO + FX":"HARDWARE + SAMPLES",0);
- global_text(0,12,"A: TOGGLE",0);
+ global_text(0,4,"EXPERIMENTAL MODE",cursor[0]==0);global_text(1,6,experimental_mode?"[X] ON":"[ ] OFF",0);
+ global_text(0,9,"PAGE MENU",cursor[0]==1);
+ global_text(0,12,cursor[0]?"A: CONFIGURE":"A: TOGGLE",0);
+ global_text(0,15,"MIXER / SEQ FIRST",0);global_text(0,16,"GLOBAL / SYNC LAST",0);
 }
 void global_input(uint8_t p,uint8_t edge) BANKED {
- p;if(edge&J_A)global_set(!experimental_mode);
+ p;if(pageconfig){page_menu_settings_input(edge);return;}
+ if(edge&(J_UP|J_DOWN)){cursor[0]^=1;dirty=1;return;}
+ if(cursor[0]){if(edge&J_A){pageconfig=1;dirty=1;}return;}
+ if(edge&J_A)global_set(!experimental_mode);
  else if(edge&J_LEFT)global_set(0);else if(edge&J_RIGHT)global_set(1);
 }
 void modulate(void) BANKED {

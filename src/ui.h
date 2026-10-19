@@ -2,6 +2,7 @@
 /* Tile UI: 20x18, original 5x7 type, inverted chrome, differential VRAM writes. */
 #include "ui_tiles.h"
 void seq_audition_stop(void) BANKED;
+extern uint8_t seqselectused;
 void mixer_prepare_cancel(void) BANKED;
 uint8_t canvas[360],visible[360],flushrow,page,cursor[8],edited[4],lastcc,lastvalue,midiage;
 __at (0xACF8) uint8_t ui_transition_hidden;
@@ -11,7 +12,8 @@ __at (0xACFF) uint8_t ui_loading_step;
 /* Never switch off the LCD or mask interrupts: only hide its background while
    a different page reuses the same tile graphics. Reveal after map publication. */
 void ui_transition_begin(void) BANKED {if(!ui_transition_hidden){HIDE_BKG;HIDE_SPRITES;ui_transition_hidden=1;}}
-uint8_t auditionvoice=255,navopen,navchoice,navblocked,repeataxis,repeatsteps,monoedit;
+uint8_t auditionvoice=255,navopen,navchoice,navcategory,navblocked,repeataxis,repeatsteps,monoedit;
+uint8_t lastseqtrack=6;
 uint16_t repeatstart,repeatlast;
 uint8_t livepitch[4],liveduty[4],tablefield;
 uint8_t graytiles[64];
@@ -72,12 +74,9 @@ void mono_preview(void){uint8_t shape,width=16,i,j,x,y,previous,a;uint16_t off;c
 uint8_t mono_id(uint8_t id){if(id==(monoosc==2?5:6))return 7;if(monoosc==2&&id>=2)return id+2;return id==5?6:id;}
 uint8_t ui_menu_allowed(uint8_t item) BANKED;
 void ui_menu_step(int8_t delta) BANKED;
-void ui_menu(void){uint8_t i,row,inv,start,rank=0,count=0,n=0;
- for(i=1;i<PAGE_COUNT;i++)if(ui_menu_allowed(i)){if(i<navchoice)rank++;count++;}
- start=rank>5?rank-5:0;if(count<=11)start=0;else if(start>count-11)start=count-11;
- for(i=3;i<16;i++)memset(canvas+i*20,0,20);band(3);textat(1,3,page<7?pages[channelmenu[selected]]:"CHOOSE PAGE",1);
- for(i=1;i<PAGE_COUNT;i++)if(ui_menu_allowed(i)){if(n>=start&&n<start+11){row=5+n-start;inv=navchoice==i;if(inv)band(row);textat(2,row,pages[i],inv);}n++;}
-}
+void finder_first(void) BANKED;
+void finder_step(int8_t delta) BANKED;
+void ui_menu(void) BANKED;
 void ui_channel(uint8_t c){uint8_t i;auditionstop();if(monomode||polymode){panic();monomode=polymode=0;TAC_REG=waveengine?4:0;route=0;for(i=0;i<4;i++)if(!param[i][9]){if(param[i][21]&1)route|=1<<i;if(param[i][21]&2)route|=0x10<<i;}globals();}
  seqtrack=c==4?5:c;selected=c;choice=c<4?program[c]:0;cursor[1]=cursor[2]=cursor[4]=cursor[5]=cursor[6]=0;tablefield=0;
 }
@@ -177,8 +176,23 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {uint8_t max;if(experimental_mode&
  if((lastpad&J_B)&&!(p&J_B))auditionstop();
  if(!(p&J_START))navblocked=0;
  if(page==26){clear_input(edge);return;}
- if((edge&J_START)&&!navblocked){gen_cancel();clear_capture();if(page==18)mixer_prepare_cancel();tonepresetopen=0;monoedit=0;navopen=1;navchoice=page==0&&!polymode?channelmenu[selected]:page;dirty=1;}
- if(navopen){if(edge&J_UP){ui_menu_step(-1);dirty=1;}if(edge&J_DOWN){ui_menu_step(1);dirty=1;}if(!(p&J_START)){if(navchoice==26){navopen=0;clear_open();return;}if(navchoice==21||navchoice==22){navopen=0;if(navchoice==21)seq_copy();else seq_paste();dirty=1;return;}if(page==9&&navchoice!=9)noise_close();if(navchoice>=11&&navchoice<=15){ui_channel(menuchannel[navchoice-11]);page=1;}else page=navchoice;navopen=0;if((page>=18&&page<=20)||page==24||page==25)mixer_open();if(page==7&&!monomode)monoenable();if(page==8||page==10){seq_open();if(page==10)seqfocus=1;}if(page==9&&!noisesaved)noise_open();dirty=1;}return;}
+ if(navopen){
+  if(edge&J_SELECT){navblocked=1;navopen=0;seqselectused=1;seqdrawvalid=0;dirty=1;return;}
+  if(edge&J_LEFT){navcategory=navcategory?navcategory-1:4;finder_first();dirty=1;}
+  if(edge&J_RIGHT){navcategory=(navcategory+1)%5;finder_first();dirty=1;}
+  if(edge&J_UP){finder_step(-1);dirty=1;}if(edge&J_DOWN){finder_step(1);dirty=1;}
+  if(edge&(J_START|J_A)){
+   if(navchoice==255)return;
+   navopen=0;seqdrawvalid=0;
+   if(navchoice==21||navchoice==22||navchoice==26||navchoice>=35){if(!finder_edit_action(navchoice))navopen=1;dirty=1;return;}
+   if(page==9&&navchoice!=9)noise_close();
+   if(navchoice==8||navchoice>=28){uint8_t track=navchoice==8?lastseqtrack:navchoice-28;seqmode=track==4;seqtrack=track;if(track<4||track==5)ui_channel(track==5?4:track);page=8;seq_open();}
+   else {if(navchoice>=11&&navchoice<=15){ui_channel(menuchannel[navchoice-11]);page=1;}else page=navchoice;
+    if((page>=18&&page<=20)||page==24||page==25)mixer_open();if(page==7&&!monomode)monoenable();if(page==8||page==10){seq_open();if(page==10)seqfocus=1;}if(page==9&&!noisesaved)noise_open();}
+   dirty=1;
+  }return;
+ }
+ if((edge&J_START)&&!navblocked){if(page==8||page==10)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();if(page==18)mixer_prepare_cancel();tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
  if(page==1&&tonepresetopen){tone_preset_input(edge);return;}
  if(page==27){sync_input(edge);return;}if(page==23){kits_input(p,edge);return;}if(page>=18){mixer_input(p,edge);return;}if(page==17){drum_synth_input(p,edge);return;}if(page==16){global_input(p,edge);return;}if(page==7){mono_input(p,edge);return;}if(page==8||page==10){seq_input(p,edge);return;}if(page==9){noise_input(p,edge);return;}
  if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%(experimental_mode?5:4);choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}

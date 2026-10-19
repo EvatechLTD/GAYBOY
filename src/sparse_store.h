@@ -44,4 +44,7 @@ uint8_t sparse_clear_slot(uint8_t slot) BANKED;
 uint8_t sparse_load_pattern(uint8_t slot) BANKED;
 uint8_t sparse_save_pattern(uint8_t index) BANKED;
 void sparse_library_name(uint8_t index,char *name) BANKED;
+uint8_t sparse_copy_pad(uint8_t slot) BANKED;
+uint8_t sparse_paste_pad(uint8_t slot) BANKED;
+uint8_t sparse_clear_working_song(void) BANKED;
 #endif
