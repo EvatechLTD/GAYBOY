@@ -256,7 +256,9 @@ void mixer_prepare_focus(uint8_t slot) BANKED {
  prep.phase=7;prep.pad=1;prep.target=slot;prep.edit=0;prep.source=mx.slot;prep.position=0;
  mx.cachevalid=0;mx.presaved=0;mx.openempty=0;mx.checking=0;toneready=0;
 }
-void mixer_launch_request(uint8_t slot,uint8_t edit) BANKED {if(!syncmode){seqirqready=0;seqirqdirty=1;}
+void mixer_launch_request(uint8_t slot,uint8_t edit) BANKED {
+ /* A slave cannot establish a new clock epoch with an immediate launch. */
+ if(syncmode&&syncslave&&!mx.quant){mx.quant=4;dirty=1;}if(!syncmode){seqirqready=0;seqirqdirty=1;}
  if(sparse_enabled){sparse_request(slot,edit);return;}
  if(edit&&slot==mx.slot){mixer_prepare_cancel();page=8;seq_open();dirty=1;return;}
  if(slot==mx.pending)return;

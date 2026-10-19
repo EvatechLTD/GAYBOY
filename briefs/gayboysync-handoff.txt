@@ -29,3 +29,8 @@ source/publication race fix. Do not re-enable the pulse-only advance IRQ path.
 
 Verification/history: briefs/native-step-launch-results.txt and
 build/gayboyinterrupt-build.json. No website/network edits belong to this task.
+
+2026-10-19: Slave launch grid fix implemented on gayboysync. See
+briefs/slave-launch-grid-results.txt for scope, tests and ROM hash. Local pad
+switches/retriggers preserve the transport grid in all five clock modes.
+Hardware confirmation of this new build is pending.

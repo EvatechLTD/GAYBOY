@@ -19,6 +19,7 @@ def generate(battery, output):
         raise ValueError('Demo fixture is too large for seed ROM bank 46')
     for offset in (0, 128):
         pages[offset + 6] = 1
+        pages[offset + 8] = 4  # Fresh demo starts with 1/1 launch quantization.
         pages[offset + 126:offset + 128] = crc_hqx(pages[offset:offset + 126], 65535).to_bytes(2, 'little')
     rows = [','.join(str(v) for v in pages[i:i + 32]) for i in range(0, len(pages), 32)]
     source = '#pragma bank 46\n#include "../src/api.h"\nstatic const uint8_t seed[]={\n' + ',\n'.join(rows) + '\n};\n'

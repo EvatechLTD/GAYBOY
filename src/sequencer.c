@@ -113,11 +113,27 @@ void seq_pattern_release(void) BANKED {uint8_t c,busy=seqservicing;if(!syncmode)
  if(experimental_mode||monomode){for(c=0;c<SEQ_TRACKS;c++)seq_off(c);}
  else{uint8_t onsets=*(uint8_t *)0xACCF;for(c=0;c<SEQ_NOTE_TRACKS;c++,onsets>>=1)if(!seq_enabled(c)||!seq_audible(c)||!(onsets&1))seq_off(c);drum_stop();}
  seqservicing=busy;}
-void seq_pattern_start(void) BANKED {uint8_t c,busy=seqservicing;if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
+static void pattern_start(uint8_t preserve){uint8_t c,busy=seqservicing;if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);if(!preserve)seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
  seq_native_reset();seq_native_launch();
- if(seqcachedbpm!=seqbpm)seq_gates();mixer_clock_reset();if(syncmode)sync_pattern();
+ if(seqcachedbpm!=seqbpm)seq_gates();if(!preserve)mixer_clock_reset();if(syncmode)sync_pattern();
  if(!seq_native_fire(0)){if(seq_enabled(6))seq_fire(6);
  for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);}seqservicing=busy;
+}
+/* Transport and a received native beat-one marker establish a new grid.
+   Local slave launches replace notes without resetting that running grid,
+   its swing half, pending clocks, or the receiver's fractional remainder. */
+void seq_pattern_start(void) BANKED {pattern_start(0);}
+void seq_pattern_handoff(void) BANKED {
+ if(syncmode&&syncslave){
+  if((seqmode&&!monomode)||(!seqmode&&(monomode||polymode))){uint16_t pending=seqticks;
+   /* Engine configuration calls panic(), which clears playback/ticks.
+      Preserve received time without restarting the sync receiver. */
+   if(seqmode)monoenable();
+   else {uint8_t c;panic();monomode=polymode=0;TAC_REG=waveengine?4:0;route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}globals();}
+   seqticks+=pending;seqplaying=1;
+  }
+  pattern_start(1);
+ }else pattern_start(0);
 }
 void seq_next_deadline(void) BANKED;
 void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;if(seqplaying){seq_stop();return;}seq_stop();

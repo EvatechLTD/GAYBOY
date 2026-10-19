@@ -17,6 +17,7 @@ void mixer_pattern_clean(void) BANKED;
 void mixer_pattern_changed(void) BANKED;
 void seq_pattern_release(void) BANKED;
 void seq_pattern_start(void) BANKED;
+void seq_pattern_handoff(void) BANKED;
 void mixer_activate(uint8_t slot,uint8_t edit) BANKED;
 uint8_t sparse_seed_install(void) BANKED;
 /* A fixed-size prefix is prepared before publishing the object. It contains
@@ -146,8 +147,8 @@ uint8_t sparse_restore(uint8_t slot) BANKED {uint8_t busy=seqservicing;
  mx.slot=slot;seqeventcache=2;install_position=0;if(sparse_slots[slot]!=SPARSE_JOURNAL_REF&&!sparse_prepared_stream(slot,&install_stream))pool_stream_seek(&install_stream,sparse_slots[slot],POOL_EVENTS_OFFSET);sparse_install_slot=slot;seqservicing=busy;mixer_pattern_clean();return 1;
 }
 uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t run=seqplaying,busy=seqservicing,mode=seqmode;uint16_t bpm=seqbpm,residual=seqclock;
- seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.presaved=0;mx.boundary=0;mx.padcache=0;seqdrawvalid=0;memset(seqcursor,0,7);
- if(run&&mode==seqmode){seq_pattern_release();if(bpm!=seqbpm)seqclock=((uint32_t)residual*seqbpm)/bpm;seq_pattern_start();}
+ seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.presaved=0;if(!syncmode||!syncslave)mx.boundary=0;mx.padcache=0;seqdrawvalid=0;memset(seqcursor,0,7);
+ if(run&&(mode==seqmode||(syncmode&&syncslave))){seq_pattern_release();if(bpm!=seqbpm)seqclock=((uint32_t)residual*seqbpm)/bpm;seq_pattern_handoff();}
  else {if(run){seqplaying=1;seq_transport();seq_transport();}else {memset(seqposition,0,7);seqclock=seqticks=seqfraction=0;seqdeadline=1;}}
  seqservicing=busy;if(mx.openempty)mx.openempty=2;dirty=1;return 1;
 }

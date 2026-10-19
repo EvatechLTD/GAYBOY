@@ -1,0 +1,57 @@
+Slave launch grid fix - 2026-10-19
+Developed on gayboysync; approved for merge into local main.
+ROM: build/GAYBOY.gb and identical build/gayboysync.gb
+SHA256: 309cb20e48437f552fc009a26cb60a135e505de51ee78d1a262832da6f2f6051
+
+Problem:
+The mixer bar counter was reset by each local pattern start, including slave
+launches. NOW could also reset local elapsed time, and a synth-mode handoff
+could restart the sync receiver. Smaller launches therefore moved later bar
+boundaries even though external clock continued.
+
+Implementation:
+- Fresh mixer/storage/demo launch quantization defaults to 1/1; demo seed CRCs
+  and seed generator updated. Existing rhythmic preferences are preserved.
+- Slave UI cycles 1/8, 1/4, 1/2, 1/1. Entering slave with saved NOW enables
+  1/1, with a second guard on requests. Other quantizations remain selectable.
+- Slave pad switches/retriggers preserve mx.boundary, seqclock, seqticks,
+  swing half, and receiver state. Ready incoming patterns launch at the next
+  selected boundary. Preparation never establishes a new transport origin.
+- Same handling in legacy and sparse pad paths, for every external sync mode.
+- Raw slave preparation no longer restarts immutable pattern I/O whenever
+  estimated BPM changes. Onsets still validate BPM and use complete-step
+  recalculation if a prepared timing packet is stale.
+- Before a raw measured BPM update, consume pending ticks at their original
+  conversion tempo. A CPU burst-clock regression fails without this change
+  (1032 clock phase units lost by pulse 98 at 120 BPM) and passes with it.
+- Synth mode changes retain pending received time instead of restarting sync.
+- Native master markers and transport retain their intentional epoch reset.
+- Standalone/master NOW and launch behavior are retained.
+
+Validation:
+- DMG CPU exact clock/grid conservation in all five modes at 120/300 BPM,
+  repeated handoffs, pending clocks, swing half and synth-mode transitions.
+- Real SameBoy bit-level cable matrix at 120/300 BPM across all five modes,
+  every rhythmic quantization, stale NOW, switches, retriggers, returning to
+  1/1 after smaller launches, and UI quantization availability.
+- Dense pulse/PCM cable workload at 300 BPM across all five modes.
+- Explicit estimated-BPM fault injection in modes 2/3 exercises preparation
+  progress. Before the I/O guard change a pending launch times out; afterward
+  it completes on its selected grid. This injection writes BPM with ticks
+  in flight, so master-phase comparisons are excluded from that test only.
+  CPU tests exercise real measured-tempo updates with buffered clock bursts
+  and assert less than 600 phase-unit error across four bars.
+- Native whole-step CPU tests, 540 onset/gate CPU cases, and 300 BPM standalone
+  incoming-tone/transport handoff tests passed during implementation.
+- Native cable master-side launch/navigation/clock regression passed at
+  300 BPM with PCM stress. No aborted transfers or queue overflow.
+- ROM layout verification passes with original 1050-byte WRAM reserve.
+
+Limits:
+Hardware confirmation is pending. Raw protocols cannot communicate bar
+position; their first received byte establishes local beat one. The cable
+comparison allows their startup pulse offset and foreground service latency;
+CPU tests separately assert exact pulse-to-grid conservation. This does not
+claim sample-accurate common onset delivery. Library/song loading is a separate
+transport-level operation; this change targets Mixer pad launches/retriggers.
+Prior hardware-tested build/gayboyinterrupt.gb is preserved for comparison.

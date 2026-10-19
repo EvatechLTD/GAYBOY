@@ -16,6 +16,7 @@ extern uint8_t seqgate[7],seqbeats,seqdenom,seqcachedgate[7];
 extern uint16_t seqcachedbpm,seqstepunits,seqgateunits[7],seqdeadline,seqclock;
 extern void seq_pattern_release(void) BANKED;
 extern void seq_pattern_start(void) BANKED;
+extern void seq_pattern_handoff(void) BANKED;
 extern uint8_t seqeventcache,seqrecordtrack;
 extern uint16_t seqrecordlength;
 #define PREP_UNITS ((uint16_t *)0xACD0)
@@ -90,7 +91,7 @@ static void offsets(void){uint8_t c;uint16_t n=0;for(c=0;c<7;c++){seqeventoffset
 
 
 
-void mixer_init(void) BANKED {uint8_t magic[4],i;ram(0);if(mx.magic==0xD3)return;memset(&mx,0,sizeof(mx));mx.magic=0xD3;mx.pending=255;mixer_pattern_changed();for(i=0;i<7;i++){mx.level[i]=127;mx.pan[i]=3;}if(sparse_enabled){if(sparse_enabled==1){sparse_restore(pool_root[7]<8?pool_root[7]:0);mx.quant=pool_root[8]<5?pool_root[8]:0;sparse_finish_install();}else {defaults();mx.error=3;}return;}readpart(0,2500,magic,4);if(memcmp(magic,"GBM2",4)){for(i=0;i<8;i++){uint8_t z=0;writepart(i,0,&z,1);}memcpy(magic,"GBM2",4);writepart(0,2500,magic,4);}else if(valid(0))restore(0,0);}
+void mixer_init(void) BANKED {uint8_t magic[4],i;ram(0);if(mx.magic==0xD3)return;memset(&mx,0,sizeof(mx));mx.magic=0xD3;mx.pending=255;mx.quant=4;mixer_pattern_changed();for(i=0;i<7;i++){mx.level[i]=127;mx.pan[i]=3;}if(sparse_enabled){if(sparse_enabled==1){sparse_restore(pool_root[7]<8?pool_root[7]:0);mx.quant=pool_root[8]<5?pool_root[8]:4;sparse_finish_install();}else {defaults();mx.error=3;}return;}readpart(0,2500,magic,4);if(memcmp(magic,"GBM2",4)){for(i=0;i<8;i++){uint8_t z=0;writepart(i,0,&z,1);}memcpy(magic,"GBM2",4);writepart(0,2500,magic,4);}else if(valid(0))restore(0,0);}
 void mixer_boot(void) BANKED {ram(0);mx.magic=0;mixer_prepare_cancel();if(!sparse_boot())mixer_journal_recover();mixer_init();}
 void mixer_open(void) BANKED {mixer_prepare_cancel();mixer_init();mixer_image.valid=0;pad_names_valid=0;memset(fader_image_knob,255,5);mixscroll=0;mx.focus=mx.edit=mx.naming=mx.letter=0;mx.browser=(page==24||page==25)?(sparse_song<POOL_SONGS?sparse_song:0):sparse_enabled&&page==20?sparse_patterns:sparse_enabled&&page==19?0:mx.slot;previewshape=255;mx.cachevalid=0;if(page==19||page==20){mx.pending=255;mx.presaved=mx.openempty=0;}mx.padcache=0;dirty=1;}
 uint8_t mixer_velocity(uint8_t c,uint8_t v) BANKED {if(mx.magic!=0xD3||mx.level[c]==127)return v;if(!mx.level[c])return 0;{uint16_t n=(uint16_t)v*mx.level[c]+63;uint8_t q=n>>7;/* n<=16192: n=127*q+(q+(n&127)), with the remainder sum below254. */return q+((uint8_t)((n&127)+q)>=127);}}
@@ -137,8 +138,8 @@ static void prime(void){applymeta(CACHE+META);if(toneready)tones_apply();seqstep
    Relaunch the live pattern directly: restoring its saved slot would discard
    edits made since the last snapshot and add SRAM work at the boundary. */
 static uint8_t retrigger(uint8_t quantized){uint8_t busy=seqservicing;seqservicing=1;
- mx.pending=255;mx.presaved=mx.openempty=0;mx.boundary=0;mx.padcache=0;
- if(seqplaying){seqrecordtrack=255;seqrecordlength=0;if(!quantized){__critical {seqclock=seqticks=seqfraction=0;}}seq_pattern_start();}
+ mx.pending=255;mx.presaved=mx.openempty=0;if(!syncmode||!syncslave)mx.boundary=0;mx.padcache=0;
+ if(seqplaying){seqrecordtrack=255;seqrecordlength=0;if(!quantized&&(!syncmode||!syncslave)){__critical {seqclock=seqticks=seqfraction=0;}}seq_pattern_handoff();}
  else {memset(seqposition,0,7);seqclock=seqticks=seqfraction=0;seqdeadline=1;}
  seqservicing=busy;dirty=1;return 1;
 }
@@ -148,9 +149,9 @@ static uint8_t switchslot(uint8_t s){uint8_t run=seqplaying,busy=seqservicing,pr
  /* Save while the outgoing pattern still plays, including quantize OFF.
     Compute eligibility after prefetch so immediate launches use the cache. */
  mx.pending=255;if(!mx.presaved||page!=18)autosnapshot(mx.slot);mx.presaved=0;
- primed=run&&mx.cachevalid==1;handoff=primed&&seqmode==(experimental_mode?CACHE[META+74]:0);oldbpm=seqbpm;residual=seqclock;
- generation=pattern_generation;if(handoff){seqservicing=1;}else if(run)seq_transport();mx.slot=s;if(primed)prime();else restore(s,1);mx.boundary=0;seqdeadline=1;memset(seqcursor,0,7);seqdrawvalid=0;mx.padcache=0;
- if(handoff){seq_pattern_release();if(oldbpm!=seqbpm)seqclock=((uint32_t)residual*seqbpm)/oldbpm;seq_pattern_start();}else {memset(seqposition,0,7);if(run)seq_transport();}
+ primed=run&&mx.cachevalid==1;handoff=(run&&syncmode&&syncslave)||(primed&&seqmode==(experimental_mode?CACHE[META+74]:0));oldbpm=seqbpm;residual=seqclock;
+ generation=pattern_generation;if(handoff){seqservicing=1;}else if(run)seq_transport();mx.slot=s;if(primed)prime();else restore(s,1);if(!syncmode||!syncslave)mx.boundary=0;seqdeadline=1;memset(seqcursor,0,7);seqdrawvalid=0;mx.padcache=0;
+ if(handoff){seq_pattern_release();if(oldbpm!=seqbpm)seqclock=((uint32_t)residual*seqbpm)/oldbpm;seq_pattern_handoff();}else {memset(seqposition,0,7);if(run)seq_transport();}
  if(primed){seqservicing=1;install_events();seqeventcache=0;mx.cachevalid=0;seqservicing=busy;if(generation==pattern_generation)mixer_pattern_clean();}
  if(mx.openempty){mx.openempty=0;page=8;seq_open();}dirty=1;return 1;}
 void mixer_clock_reset(void) BANKED {if(mx.magic==0xD3)mx.boundary=0;}
@@ -392,7 +393,7 @@ void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mix
  else {if(edge&(J_LEFT|J_RIGHT))mx.focus^=1;if(edge&J_UP)mx.focus=30;if(edge&J_DOWN)mx.focus=64;}
  if(mx.focus>=2&&mx.focus<30&&(mx.focus-2)%4<2)mx.edit=0;
  if(mx.focus==0){if(edge&(J_A|J_B)){seq_transport();mx.boundary=0;}}
- else if(mx.focus==1){if(edge&(J_A|J_B))mx.quant=(mx.quant+1)%5;}
+ else if(mx.focus==1){if(edge&(J_A|J_B))mx.quant=(mx.quant+1)%5;if(syncmode&&syncslave&&!mx.quant)mx.quant=1;}
  warmfocus();dirty=1;
 }
 

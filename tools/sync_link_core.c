@@ -87,7 +87,7 @@ EMSCRIPTEN_KEEPALIVE void link_run(unsigned frames){
   if(watch_drum_mix&&address==watch_drum_mix&&pcm_pending[i]){
    pcm_buffer[i][GB_safe_read_memory(&machines[i],watch_mix_write)&1]=pcm_pending[i];pcm_pending[i]=0;
   }
-  if(watch_positions&&i==1&&(address==watch_boundary||address==watch_launch))event(&machines[i],address==watch_boundary?0x300:0x301,0);
+  if(watch_positions&&i==1&&(address==watch_boundary||address==watch_launch))event(&machines[i],address==watch_boundary?0x300:0x301,GB_safe_read_memory(&machines[i],0xac8a));
   unsigned delta=GB_run(&machines[i]);clocks[i]+=delta;if(profiling&&i==0&&pc<0x8000&&bank<64)profile[bank*1024+((pc&0x3fff)>>4)]+=delta;}
 }
 EMSCRIPTEN_KEEPALIVE void link_watch_events(unsigned boundary,unsigned launch,unsigned positions,unsigned ticks,unsigned clock){watch_boundary=boundary;watch_launch=launch;watch_positions=positions;watch_ticks=ticks;watch_clock=clock;event_count=0;}
@@ -99,6 +99,16 @@ EMSCRIPTEN_KEEPALIVE void link_watch_pcm(unsigned on,unsigned read,unsigned writ
 EMSCRIPTEN_KEEPALIVE const void *link_events(void){return events;}
 EMSCRIPTEN_KEEPALIVE unsigned link_read(unsigned i,unsigned at){return GB_safe_read_memory(&machines[i],at);}
 EMSCRIPTEN_KEEPALIVE void link_write(unsigned i,unsigned at,unsigned value){GB_write_memory(&machines[i],at,value);}
+/* Fixture access to bank-zero state must not depend on the RAM bank at the
+   exact CPU instruction where a host frame ends. Never use for link I/O. */
+EMSCRIPTEN_KEEPALIVE unsigned link_state_read(unsigned i,unsigned at){
+ if(at>=0xa000&&at<0xc000){size_t size;uint8_t *ram=GB_get_direct_access(&machines[i],GB_DIRECT_ACCESS_CART_RAM,&size,NULL);return ram[at-0xa000];}
+ return GB_safe_read_memory(&machines[i],at);
+}
+EMSCRIPTEN_KEEPALIVE void link_state_write(unsigned i,unsigned at,unsigned value){
+ if(at>=0xa000&&at<0xc000){size_t size;uint8_t *ram=GB_get_direct_access(&machines[i],GB_DIRECT_ACCESS_CART_RAM,&size,NULL);ram[at-0xa000]=value;return;}
+ GB_write_memory(&machines[i],at,value);
+}
 EMSCRIPTEN_KEEPALIVE void link_key(unsigned i,unsigned key,unsigned down){GB_set_key_state(&machines[i],key,down);}
 EMSCRIPTEN_KEEPALIVE unsigned link_edges(void){return edges;}
 EMSCRIPTEN_KEEPALIVE unsigned link_pc(unsigned i){return machines[i].pc;}

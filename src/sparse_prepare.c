@@ -50,7 +50,12 @@ static void prepare_metadata(void){uint8_t c;uint16_t at=0;
 }
 static uint16_t word(const uint8_t *p){return p[0]|((uint16_t)p[1]<<8);}
 static uint8_t native(void){return !experimental_mode&&!monomode&&(!waveengine||waveengine==3);}
-static uint8_t cache_valid(uint8_t slot){return prepare_phase==6&&page==18&&target==slot&&identity==sparse_slots[slot]&&prepared_bpm==(seqglobalbpm?seqglobalbpm:word(FULL+75))&&native();}
+/* Raw-clock tempo is measured, so its estimate can change before a dense
+   pattern finishes loading. Keep immutable notes/tones rather than restarting
+   that I/O forever. The launch packet still validates its own BPM; stale
+   timing is recalculated by the complete-step path at the boundary. */
+static uint8_t tempo_valid(void){return (syncmode>1&&syncslave)||prepared_bpm==(seqglobalbpm?seqglobalbpm:word(FULL+75));}
+static uint8_t cache_valid(uint8_t slot){return prepare_phase==6&&page==18&&target==slot&&identity==sparse_slots[slot]&&tempo_valid()&&native();}
 static uint16_t offset(uint8_t track){uint8_t c;uint16_t at=POOL_EVENTS_OFFSET;for(c=0;c<track;c++)at+=word(HEAD+16+c*2)*4;return at;}
 
 /* One bounded read/scan quantum per foreground service. The playing pattern
@@ -61,7 +66,7 @@ static void prepare_once(void){uint8_t slot,e[4],found;uint16_t count,limit;
  slot=demand<8?demand:mx.pending!=255?mx.pending:mx.focus>=30&&mx.focus<38?mx.focus-30:seqplaying?(mx.slot+1)&7:255;
  if(slot==mx.slot)slot=seqplaying?(slot+1)&7:255;
  if(slot>=8||sparse_slots[slot]==POOL_NONE||sparse_slots[slot]==SPARSE_JOURNAL_REF){prepare_phase=0;target=255;return;}
- if(slot!=target||identity!=sparse_slots[slot]||(prepare_phase!=1&&prepared_bpm!=(seqglobalbpm?seqglobalbpm:word(FULL+75)))){target=slot;identity=sparse_slots[slot];prepare_phase=1;mx.cachevalid=0;scan_cursor=0;memset(FIRST,0,8);memset(FIRST_OTHER,0,16);first_drums=first_drum_overflow=0;KICK=0;}
+ if(slot!=target||identity!=sparse_slots[slot]||(prepare_phase!=1&&!tempo_valid())){target=slot;identity=sparse_slots[slot];prepare_phase=1;mx.cachevalid=0;scan_cursor=0;memset(FIRST,0,8);memset(FIRST_OTHER,0,16);first_drums=first_drum_overflow=0;KICK=0;}
  if(prepare_phase==1){if(!pool_object_read(identity,0,HEAD,POOL_PATTERN_BYTES)){prepare_phase=7;return;}prepare_metadata();prepared_bpm=seqglobalbpm?seqglobalbpm:word(FULL+75);setword(HEAD+97,15360U/prepared_bpm);prepare_phase=13;gate_cursor=0;scan_cursor=0;return;}
  if(prepare_phase==13){setword(HEAD+83+gate_cursor*2,(word(HEAD+97)*FULL[49+gate_cursor])/100);if(++gate_cursor==7)prepare_phase=2;return;}
  if(prepare_phase==2){
@@ -246,7 +251,7 @@ static void apply_metadata(void) __naked {__asm
  __endasm; }
 
 uint8_t sparse_prepared_apply(uint8_t slot) BANKED {
- if(!cache_valid(slot))return 0;apply_metadata();seqgrouptrack=255;seqmode=0;seqbpm=prepared_bpm;seqcachedbpm=seqbpm;seqdeadline=1;seqeventfull=0;*(uint8_t *)0xACCF=HEAD[99];return 1;
+ if(!cache_valid(slot))return 0;apply_metadata();seqgrouptrack=255;seqmode=0;seqbpm=(syncmode>1&&syncslave)?seqglobalbpm:prepared_bpm;seqcachedbpm=prepared_bpm;seqdeadline=1;seqeventfull=0;*(uint8_t *)0xACCF=HEAD[99];return 1;
 }
 uint8_t sparse_prepared_tones(uint8_t slot) BANKED {if(!cache_valid(slot))return 0;tones_apply_cached();seq_native_launch_installed(slot);return 1;}
 uint8_t sparse_prepared_stream(uint8_t slot,PoolStream *stream) BANKED {if(!cache_valid(slot))return 0;memcpy(stream,EVENT_STREAM,sizeof(PoolStream));return 1;}

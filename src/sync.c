@@ -1,5 +1,6 @@
 #pragma bank 59
 #include "api.h"
+#include "mixer_shared.h"
 /* Native serial: F1/BPM, FA/FC transport, 80..BF numbered 24-PPQN clocks.
    LSDj/Arduinoboy: eight link clock edges per 24-PPQN tick.
    Pulse adapters translate one zero byte to one conditioned output pulse. */
@@ -13,6 +14,7 @@ __at (0xFFD8) volatile uint8_t syncr;
 __at (0xFFD9) volatile uint8_t syncw;
 extern __at (0xAC6A) uint16_t seqcachedbpm;
 extern uint16_t seqclock;
+void seq_frame(void) BANKED;
 void seq_pattern_release(void) BANKED;
 void seq_pattern_start(void) BANKED;
 static __at (0xFFDE) uint8_t focus;
@@ -121,7 +123,12 @@ static uint8_t receive(uint8_t b) {uint16_t bpm,elapsed;uint8_t ppqn;
  /* Measure a whole quarter note, rather than quantizing each clock to video. */
  if(syncmode!=1){ppqn=syncmode==4?2:syncmode==5?4:24;
   beatcount=beatcount+1;if(beatcount>=ppqn){elapsed=frames()-beatframe;beatframe=frames();beatcount=0;
-   if(elapsed){bpm=3584U/elapsed;if(bpm>=30&&bpm<=300){seqglobalbpm=seqbpm=bpm;seqcachedbpm=0;dirty=1;}}}}
+   if(elapsed){bpm=3584U/elapsed;if(bpm>=30&&bpm<=300){
+    /* Pending ticks were converted using the previous estimate. Consume
+       them at that tempo before installing the newly measured value. */
+    if(bpm!=seqbpm&&seqplaying&&!seqservicing)seq_frame();
+    seqglobalbpm=seqbpm=bpm;seqcachedbpm=0;dirty=1;
+   }}}}
  if(syncpending<48)syncpending=syncpending+1;else overflow=1;
  return 1;
 }
@@ -147,6 +154,7 @@ void sync_input(uint8_t edge) BANKED {int8_t delta;
  if(seqplaying)seq_transport();delta=edge&J_LEFT?-1:1;
  __critical {SC_REG=0;IF_REG&=~SIO_IFLAG;syncr=syncw=0;rd=wr;st=count=0;}
  if(!focus)syncmode=(syncmode+(delta<0?5:1))%6;else syncslave^=1;
+ if(syncmode&&syncslave&&mx.magic==0xD3&&!mx.quant)mx.quant=4;
  syncpending=syncalign=remainder=tempo_state=pulsebpm=0;sentbpm=0;
  if(syncmode){if(!seqglobalbpm)seqglobalbpm=seqbpm;seqbpm=seqglobalbpm;}
  SB_REG=0;SC_REG=(!syncmode||syncslave)?0x80:0;dirty=1;

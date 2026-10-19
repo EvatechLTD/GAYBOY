@@ -373,7 +373,7 @@ uint8_t pool_commit(void) BANKED {uint8_t copy;uint16_t generation=pool_word_loc
  for(copy=0;copy<2;copy++)root_publish(copy);
  pool_publishing=0;return 1;
 }
-void pool_format(void) BANKED {memset(pool_root,255,sizeof(pool_root));memcpy(pool_root,"GBD1",4);pool_setword_local(pool_root+4,0);pool_root[6]=pool_root[7]=pool_root[8]=0;pool_error=0;memset(pool_used,0,sizeof(pool_used));pool_used[0]=15;pool_commit();}
+void pool_format(void) BANKED {memset(pool_root,255,sizeof(pool_root));memcpy(pool_root,"GBD1",4);pool_setword_local(pool_root+4,0);pool_root[6]=pool_root[7]=0;pool_root[8]=4;pool_error=0;memset(pool_used,0,sizeof(pool_used));pool_used[0]=15;pool_commit();}
 /* A damaged/zeroed root is not proof of an unused cartridge. Inspect every
    persistent pool byte before allowing first-use formatting. */
 uint8_t pool_is_blank(void) BANKED {
