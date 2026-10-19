@@ -47,3 +47,23 @@ edits made there during the wrong-agent exchange remain in primary only.
 
 Architecture, UI controls, bandwidth, framing and reproduction commands:
 docs/linked-mixer.md
+
+
+2026-10-19 navigation/song-layout iteration completed:
+Merged main 3d14470 (Finder hierarchy). Fixed PAGE item MIXER SETTINGS
+owns view, PAIR, sync type/role and independent local/link layout editors.
+Removed SELECT layout shortcut and header focus 65/66. Song objects accept
+legacy 35 bytes plus new 46-byte layout extension. Both masks, PAIR and view
+round-trip through saved songs and power cycles; global Page assignments stay
+independent. Drum labels show actual Amen names and kit abbreviations; kit
+identity shares existing STATE pending byte, with no extra serial bytes.
+AUTO ignores a local stop toggle during the six frames following remote start,
+coalescing nearly simultaneous Play presses. No clock/instrument path changed.
+Current ROM SHA and validation: briefs/mixer-settings-validation.json.
+All eight paired pads align at 120/300 BPM, zero optional live transfers,
+zero serial aborts/missed edges/overflows/added underruns. IRQ max7084 cycles;
+all current IRQ gates pass. WRAM1041/stack512 bytes reserved.
+BGB linked COPE/DEMO instances launched using separate injected batteries from
+primary saves/cope song.gbsong and DEMO1.gbsong. Originals untouched.
+User hardware off-quantize observation still needs reproduction/retest; no
+hardware timing-parity claim. Historical handoff-latency failures remain visible.

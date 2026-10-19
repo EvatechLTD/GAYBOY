@@ -94,7 +94,7 @@ void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED {
  if(++bitcount==8){value=bitshift;bitshift=bitcount=0;link_receive(value);if(link_rx_ready||rxsize==254||!rxsize)bitreceiving=0;}
 }
 static void state_packet(void){uint8_t i;uint16_t pan=0;
- linktx[6]=mx.slot|(mx.quant<<3)|(applied?64:0);linktx[7]=mx.pending<8?mx.pending:127;linktx[8]=seqmuted;linktx[9]=seqsolo;
+ linktx[6]=mx.slot|(mx.quant<<3)|(applied?64:0);linktx[7]=(mx.pending<8?mx.pending:15)|(drumkit<<4);linktx[8]=seqmuted;linktx[9]=seqsolo;
  for(i=0;i<7;i++)linktx[10+i]=mx.level[i];
  for(i=0;i<7;i++)pan|=(uint16_t)mx.pan[i]<<(i*2);linktx[17]=pan&127;linktx[18]=pan>>7;
  linktx[19]=drummutemask&127;linktx[20]=drummutemask>>7;linktx[21]=drumsolomask&127;linktx[22]=drumsolomask>>7;linktx[23]=pattern_generation&127;linktx[24]=(pattern_generation>>7)&127;
@@ -113,7 +113,7 @@ static void accept(void){uint8_t i,type=incoming[0],id=incoming[3];uint16_t peer
   if(type==READY&&rxsize==6&&id==request&&link_pair_phase==1&&incoming[4]==pairslot){waiting=0;link_pair_phase=2;link_pair_hold=0;dirty=1;return;}
   if(type==NAME&&rxsize==22&&incoming[4]<8){uint8_t s=incoming[4];name_ack=s;name_ack_crc=0;for(i=0;i<16;i++){linkmirror.names[s][i]=incoming[5+i];name_ack_crc=crc(name_ack_crc,incoming[5+i]);}linkmirror.namesvalid|=1<<s;if(page==18&&mixer_device){pad_names_valid=0;dirty=1;}}
   if(type==STATE&&rxsize==24&&((incoming[4]>>3)&7)<=4){uint16_t pan=incoming[15]|((uint16_t)incoming[16]<<7);uint8_t oldslot=linkmirror.slot;
-   linkmirror.slot=incoming[4]&7;linkmirror.pending=incoming[5]<8?incoming[5]:255;linkmirror.muted=incoming[6];linkmirror.solo=incoming[7];
+   linkmirror.slot=incoming[4]&7;linkmirror.pending=(incoming[5]&15)<8?(incoming[5]&15):255;linkmirror.kit=(incoming[5]>>4)<6?incoming[5]>>4:0;linkmirror.muted=incoming[6];linkmirror.solo=incoming[7];
    memcpy(linkmirror.level,incoming+8,7);for(i=0;i<7;i++)linkmirror.pan[i]=(pan>>(i*2))&3;
    linkmirror.drummutemask=incoming[17]|((uint16_t)incoming[18]<<7);linkmirror.drumsolomask=incoming[19]|((uint16_t)incoming[20]<<7);
    linkmirror.quant=(incoming[4]>>3)&7;linkmirror.epoch=incoming[21]|((uint16_t)incoming[22]<<7);

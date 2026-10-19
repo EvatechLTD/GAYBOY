@@ -24,6 +24,7 @@ extern uint16_t seqrecordlength;
 /* Bank zero stays selected whenever audio or sequencing can run. */
 
 #include "mixer_shared.h"
+#include "mixer_drum_names.h"
 #include "mixer_pads.h"
 #include "link_control.h"
 __at (0xAC80) Mixer mx;
@@ -33,7 +34,6 @@ static uint8_t mixscroll;
 /* Session layout is presentation-only; logical track/pad IDs never move. */
 uint8_t mixer_hidden[8],layout_cursor,mixer_device,mixer_layout_dirty;
 void mixer_layout_load(void) BANKED;
-static uint8_t layout_open;
 void mixer_layout_render(void) BANKED;
 void mixer_link_render(void) BANKED;
 void mixer_link_input(uint8_t p,uint8_t edge) BANKED;
@@ -107,7 +107,7 @@ static void offsets(void){uint8_t c;uint16_t n=0;for(c=0;c<7;c++){seqeventoffset
 
 void mixer_init(void) BANKED {uint8_t magic[4],i;ram(0);if(mx.magic==0xD3)return;memset(&mx,0,sizeof(mx));mx.magic=0xD3;mx.pending=255;mx.quant=4;mixer_pattern_changed();for(i=0;i<7;i++){mx.level[i]=127;mx.pan[i]=3;}if(sparse_enabled){if(sparse_enabled==1){sparse_restore(pool_root[7]<8?pool_root[7]:0);mx.quant=pool_root[8]<5?pool_root[8]:4;sparse_finish_install();}else {defaults();mx.error=3;}return;}readpart(0,2500,magic,4);if(memcmp(magic,"GBM2",4)){for(i=0;i<8;i++){uint8_t z=0;writepart(i,0,&z,1);}memcpy(magic,"GBM2",4);writepart(0,2500,magic,4);}else if(valid(0))restore(0,0);}
 void mixer_boot(void) BANKED {ram(0);mx.magic=0;mixer_prepare_cancel();if(!sparse_boot())mixer_journal_recover();mixer_init();mixer_layout_load();}
-void mixer_open(void) BANKED {mixer_prepare_cancel();mixer_init();mixer_image.valid=0;pad_names_valid=0;memset(fader_image_knob,255,5);mixscroll=0;layout_open=0;mx.focus=mx.edit=mx.naming=mx.letter=0;mx.browser=(page==24||page==25)?(sparse_song<POOL_SONGS?sparse_song:0):sparse_enabled&&page==20?sparse_patterns:sparse_enabled&&page==19?0:mx.slot;previewshape=255;mx.cachevalid=0;if(page==19||page==20){mx.pending=255;mx.presaved=mx.openempty=0;}mx.padcache=0;dirty=1;}
+void mixer_open(void) BANKED {mixer_prepare_cancel();mixer_init();mixer_image.valid=0;pad_names_valid=0;memset(fader_image_knob,255,5);mixscroll=0;mx.focus=mx.edit=mx.naming=mx.letter=0;mx.browser=(page==24||page==25)?(sparse_song<POOL_SONGS?sparse_song:0):sparse_enabled&&page==20?sparse_patterns:sparse_enabled&&page==19?0:mx.slot;previewshape=255;mx.cachevalid=0;if(page==19||page==20){mx.pending=255;mx.presaved=mx.openempty=0;}mx.padcache=0;dirty=1;}
 uint8_t mixer_velocity(uint8_t c,uint8_t v) BANKED {if(mx.magic!=0xD3||mx.level[c]==127)return v;if(!mx.level[c])return 0;{uint16_t n=(uint16_t)v*mx.level[c]+63;uint8_t q=n>>7;/* n<=16192: n=127*q+(q+(n&127)), with the remainder sum below254. */return q+((uint8_t)((n&127)+q)>=127);}}
 uint8_t mixer_pan(uint8_t c) BANKED {return mx.magic==0xD3?mx.pan[c]:3;}
 /* Source cache is16-byte aligned; destination WRAM need not be. Timer IRQs
@@ -237,7 +237,6 @@ static void pattern_library_render(void){uint8_t i,start=mx.browser>3?mx.browser
 }
 static char *pad_hint(void){uint8_t state;if(mx.error)return sparse_enabled?(pool_error==2?"SAVE DATA DAMAGED":"NOT ENOUGH SPACE"):"PATTERN >512 EVENTS";if(link_pair_phase)return "PAIR PREPARING...";if(linkpair&&linkstate!=2)return "PAIR NEEDS LINK";if(mx.focus==64)return "A+ARROWS B OFF";if(mx.focus>=38)return "A/B TOGGLE";if(mx.focus<30)return "A PICK B EDIT";state=mixer_prepare_status(mx.focus-30);return state==1?"READY A/B":state==2?"PREPARING...":state==3?"QUEUED":"A PICK B EDIT";}
 void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_init();rendering_slot=mx.slot;
- if(page==18&&layout_open){mixer_layout_render();return;}
  if(page==18&&mixer_device){mixer_link_render();return;}
  /* Pad navigation changes only the two pattern rows and their footer. Reuse
     the published strip image when every value that affects it is unchanged. */
@@ -248,7 +247,7 @@ void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_i
  if(sparse_enabled&&(page==19||page==20)){pattern_library_render();return;}
  if(page==20&&mx.naming){namekeyboard();return;}
  if(page!=18){for(i=0;i<8;i++){getname(i,name);num(0,2+i,i+1,mx.browser==i);text(4,2+i,name[0]?name:"EMPTY",mx.browser==i);mixfill();}if(page==20){text(0,11,"NAME",0);text(0,12,mx.name,0);text(0,14,"A NAME WITH KEYBOARD",0);text(0,15,"B SAVE",0);}else text(0,12,"A LOAD INTO LIVE PAD",0);if(mx.error)text(0,16,sparse_enabled?"NOT ENOUGH SPACE":"TOO MANY NOTES (>512)",0);storage_footer();return;}
- text(6,0,"SEL EDIT",1);text(15,0,"LOCAL",mx.focus==65);if(mx.edit)text(17,0,"ED",1);text(0,2,seqplaying?"STOP":"PLAY",mx.focus==0);text(7,2,"LAUNCH",0);text(14,2,mx.quant==0?"NOW":mx.quant==1?"1/8":mx.quant==2?"1/4":mx.quant==3?"1/2":"1/1",mx.focus==1);text(0,3,"TEMPO",0);if(seqglobalbpm)num(7,3,seqglobalbpm,mx.focus==64);else text(7,3,"OFF",mx.focus==64);text(13,3,linkpair?"PAIR ON":"PAIR --",mx.focus==66);mixfill();
+ text(15,0,"LOCAL",1);if(mx.edit)text(17,0,"ED",1);text(0,2,seqplaying?"STOP":"PLAY",mx.focus==0);text(7,2,"LAUNCH",0);text(14,2,mx.quant==0?"NOW":mx.quant==1?"1/8":mx.quant==2?"1/4":mx.quant==3?"1/2":"1/1",mx.focus==1);text(0,3,"TEMPO",0);if(seqglobalbpm)num(7,3,seqglobalbpm,mx.focus==64);else text(7,3,"OFF",mx.focus==64);mixfill();
  /* Five vertical strips fit beside the shared control labels. */
  {uint8_t col=mx.focus==64?0:mx.focus>=38?7+(mx.focus-38)/2:mx.focus>=2&&mx.focus<30?(mx.focus-2)/4:0;
   col=stripcolumn(col);
@@ -258,7 +257,7 @@ void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_i
  text(0,5,"M",0);text(0,6,"S",0);text(0,7,"VOL",0);text(0,11,"PAN",0);
  {uint8_t col=0;for(c=0;c<20;c++){uint8_t f,x;if(!strip_visible(c))continue;if(col<mixscroll||col>=mixscroll+5){col++;continue;}x=4+(col-mixscroll)*3;
   if(c<7){f=2+c*4;text(x,4,tracks[c],0);text(x+1,5,(seqmuted&(1<<c))?"M":"-",mx.focus==f);text(x+1,6,(seqsolo&(1<<c))?"S":"-",mx.focus==f+1);fader(x,col-mixscroll,mx.level[c],mx.focus==f+2);text(x,11,pans[mx.pan[c]],mx.focus==f+3);}
-  else {uint8_t voice=c-7;uint16_t bit=1U<<voice;f=38+voice*2;if(voice<10){text(x,4,"S",0);canvas[4*20+x+1]=16+(voice+1)/10;canvas[4*20+x+2]=16+(voice+1)%10;}else text(x,4,voice==10?"NHH":voice==11?"NSN":"PK",0);text(x+1,5,drummutemask&bit?"M":"-",mx.focus==f);text(x+1,6,drumsolomask&bit?"S":"-",mx.focus==f+1);}
+  else {uint8_t voice=c-7;uint16_t bit=1U<<voice;f=38+voice*2;text(x,4,mixer_drum_name(drumkit,voice),0);text(x+1,5,drummutemask&bit?"M":"-",mx.focus==f);text(x+1,6,drumsolomask&bit?"S":"-",mx.focus==f+1);}
   mixfill();col++;
  }}
  pattern_controls:
@@ -293,11 +292,7 @@ void mixer_remote_apply(uint8_t c,uint8_t field,uint8_t value) BANKED {
 void mixer_tempo_edit(int16_t delta) BANKED {int16_t bpm;if(syncmode&&syncslave&&(syncmode!=1||syncrole||seqplaying))return;if(!syncmode){seqirqready=0;seqirqdirty=1;}if(seqplaying)seq_frame();bpm=(int16_t)seqbpm+delta;seqbpm=bpm<30?30:bpm>300?300:bpm;if(seqglobalbpm)seqglobalbpm=seqbpm;seqcachedbpm=0;seqdeadline=1;dirty=1;}
 static void warmfocus(void){mixer_prepare_focus(mx.focus>=30&&mx.focus<38?mx.focus-30:255);}
 void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mixer_init();if(page==18&&padflash_off&&(edge&(J_A|J_B)))mixer_pad_restore();
- if(page==18&&(edge&J_SELECT)){layout_open^=1;mx.focus=0;mixscroll=0;mixer_image.valid=0;memset(fader_image_knob,255,5);warmfocus();dirty=1;return;}
- if(page==18&&layout_open){if(edge&J_UP)layout_cursor=layout_cursor?layout_cursor-1:27;if(edge&J_DOWN)layout_cursor=(layout_cursor+1)%28;if(edge&(J_A|J_B))mixer_layout_dirty=1;if(edge&J_A)mixer_hidden[mixer_device*4+(layout_cursor>>3)]^=1U<<(layout_cursor&7);if(edge&J_B)memset(mixer_hidden+mixer_device*4,0,4);mixer_image.valid=0;dirty=1;return;}
- if(page==18&&mx.focus==66){if((edge&(J_A|J_B))&&!link_pair_phase){linkpair^=1;mixer_layout_dirty=1;}else if(edge&J_LEFT)mx.focus=65;else if(edge&J_RIGHT)mx.focus=0;else if(edge&J_DOWN)mx.focus=0;else if(edge&J_UP)mx.focus=firstpad();dirty=1;return;}
  if(page==18&&mixer_device){mixer_link_input(p,edge);return;}
- if(page==18&&mx.focus==65){if(edge&(J_A|J_B)){mixer_device=1;mx.focus=0;pad_names_valid=0;mx.padcache=0;if(syncmode==1&&!syncslave&&!seqplaying&&!linkstate)link_begin();}else if(edge&J_DOWN)mx.focus=0;else if(edge&J_UP)mx.focus=firstpad();else if(edge&J_RIGHT)mx.focus=66;else if(edge&J_LEFT)mx.focus=1;dirty=1;return;}
  if((page==20||page==25)&&mx.naming){if(page==20)mixer_pattern_changed();nameinput(edge);dirty=1;return;}
  if(page==24||page==25){if(sparse_enabled!=1)return;if(edge&J_UP)mx.browser=mx.browser?mx.browser-1:POOL_SONGS-1;if(edge&J_DOWN)mx.browser=(mx.browser+1)%POOL_SONGS;
   if(edge&J_A){if(page==25)nameopen();else if(sparse_load_song(mx.browser)){page=18;mx.focus=0;pad_names_valid=0;}else mx.error=1;}
@@ -329,7 +324,7 @@ void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mix
  if(mx.focus>=30){if(edge&(J_LEFT|J_RIGHT)){for(c=0;c<8;c++){mx.focus=30+((mx.focus-30+(edge&J_LEFT?7:1))&7);if(!layout_hidden(20+mx.focus-30))break;}}if(edge&J_UP){c=firststrip();mx.focus=c<20?stripfocus(c,3):0;}else {if(edge&J_A)mixer_launch_request(mx.focus-30,0);if(edge&J_B)mixer_launch_request(mx.focus-30,1);}warmfocus();dirty=1;return;}
  if(mx.focus>=2){c=(mx.focus-2)/4;f=(mx.focus-2)%4;if(f>=2){mx.edit=0;if(p&(J_A|J_B)){int8_t delta=0;if(edge&J_UP)delta++;if(edge&J_DOWN)delta--;if(edge&J_LEFT)delta-=10;if(edge&J_RIGHT)delta+=10;if(delta)change(c,f,delta);dirty=1;return;}}else if(edge&(J_A|J_B)){mutechange(c,f);dirty=1;return;}}
  if(mx.focus>=2){if(!mx.edit&&!(p&J_B))stripnav(edge);}
- else {if(edge&J_LEFT)mx.focus=mx.focus?0:65;if(edge&J_RIGHT)mx.focus=mx.focus?65:1;if(edge&J_UP)mx.focus=firstpad();if(edge&J_DOWN)mx.focus=64;}
+ else {if(edge&J_LEFT)mx.focus=mx.focus?0:1;if(edge&J_RIGHT)mx.focus=mx.focus?0:1;if(edge&J_UP)mx.focus=firstpad();if(edge&J_DOWN)mx.focus=64;}
  if(mx.focus>=2&&mx.focus<30&&(mx.focus-2)%4<2)mx.edit=0;
  if(mx.focus==0){if(edge&(J_A|J_B)){seq_transport();mx.boundary=0;}}
  else if(mx.focus==1){if(edge&(J_A|J_B))mx.quant=(mx.quant+1)%5;if(syncmode&&syncslave&&!mx.quant)mx.quant=1;}

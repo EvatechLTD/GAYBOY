@@ -4,6 +4,7 @@
 #include "link_control.h"
 #include "tones.h"
 #include "mixer_shared.h"
+extern uint8_t mixer_hidden[8],mixer_device,mixer_layout_dirty;
 #include "sparse_store.h"
 
 uint8_t sparse_enabled,sparse_install_slot=255,sparse_song=255;
@@ -209,20 +210,22 @@ void sparse_get_song_name(uint8_t song,char *name) BANKED {uint16_t object;memse
 uint8_t sparse_save_song(uint8_t song) BANKED {uint8_t data[POOL_SONG_BYTES],i;uint16_t object,old_library;
  if(sparse_enabled!=1||song>=POOL_SONGS)return 0;if(!sparse_journal_flush())return 0;if((pattern_dirty||sparse_slots[mx.slot]==POOL_NONE)&&!sparse_snapshot(mx.slot))return 0;
  memset(data,0,sizeof(data));memcpy(data,sparse_song_name,16);if(!data[0]){data[0]='S';data[1]='0'+(song+1)/10;data[2]='0'+(song+1)%10;}
+ data[35]=1;memcpy(data+36,mixer_hidden,8);data[44]=linkpair;data[45]=mixer_device;
  data[16]=0;data[17]=mx.quant;data[18]=mx.slot;for(i=0;i<8;i++)setword(data+19+i*2,sparse_slots[i]);
  old_library=word(pool_root+POOL_LIBRARY_ROOT);if(!library_add(sparse_slots,8,255)){pool_set_reference(POOL_LIBRARY_ROOT,old_library);return 0;}
  object=pool_object_begin(POOL_SONG,sizeof(data));if(object==POOL_NONE){pool_set_reference(POOL_LIBRARY_ROOT,old_library);return 0;}
  if(!pool_object_write(object,0,data,sizeof(data))||!pool_object_finish(object)){pool_set_reference(POOL_LIBRARY_ROOT,old_library);return 0;}pool_set_reference(POOL_SONG_REFS+song*2,object);if(!pool_commit())return 0;refresh();sparse_song=song;memcpy(sparse_song_name,data,17);return 1;
 }
-uint8_t sparse_load_song(uint8_t song) BANKED {uint16_t object;uint8_t data[POOL_SONG_BYTES],i,run=seqplaying;
- if(sparse_enabled!=1||song>=POOL_SONGS)return 0;object=word(pool_root+POOL_SONG_REFS+song*2);if(object==POOL_NONE||!pool_object_read(object,0,data,sizeof(data))||data[17]>4||data[18]>7)return 0;
+uint8_t sparse_load_song(uint8_t song) BANKED {uint16_t object,size;uint8_t data[POOL_SONG_BYTES],i,run=seqplaying;
+ if(sparse_enabled!=1||song>=POOL_SONGS)return 0;object=word(pool_root+POOL_SONG_REFS+song*2);if(object==POOL_NONE)return 0;size=pool_object_size(object);if(size!=POOL_SONG_BYTES&&size!=POOL_SONG_LEGACY_BYTES)return 0;memset(data,0,sizeof(data));if(!pool_object_read(object,0,data,size)||data[17]>4||data[18]>7||(size==POOL_SONG_BYTES&&(data[35]!=1||data[44]>1||data[45]>1)))return 0;
  /* Publish feedback before validation or an outgoing save can block the
     normal renderer. A queued pad launch must not change the song mid-load. */
  mx.pending=255;ui_loading(0,12);
  if(!sparse_journal_flush()){ui_loading(12,12);return 0;}
  for(i=0;i<8;i++){if(word(data+19+i*2)!=POOL_NONE&&!metadata_ok(word(data+19+i*2))){ui_loading(12,12);return 0;}ui_loading(i+1,12);}
  if(pattern_dirty&&!sparse_snapshot(mx.slot)){ui_loading(12,12);return 0;}ui_loading(9,12);
- if(run)seq_transport();for(i=0;i<8;i++)pool_set_reference(POOL_ACTIVE+i*2,word(data+19+i*2));pool_root[7]=data[18];pool_root[8]=data[17];if(!pool_commit()){ui_loading(12,12);return 0;}
+ if(run)seq_transport();for(i=0;i<8;i++)pool_set_reference(POOL_ACTIVE+i*2,word(data+19+i*2));pool_root[7]=data[18];pool_root[8]=data[17];memcpy(pool_root+110,data+36,8);pool_root[118]='M';pool_root[119]=1;pool_root[120]=data[44];pool_root[121]=data[45];if(!pool_commit()){ui_loading(12,12);return 0;}
+ memcpy(mixer_hidden,data+36,8);linkpair=data[44];mixer_device=data[45];mixer_layout_dirty=0;
  ui_loading(10,12);refresh();mx.quant=data[17];sparse_restore(data[18]);ui_loading(11,12);sparse_finish_install();sparse_song=song;memcpy(sparse_song_name,data,17);link_names_dirty=255;ui_loading(12,12);if(run)seq_transport();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
 }
 uint8_t sparse_delete_song(uint8_t song) BANKED {if(sparse_enabled!=1||song>=POOL_SONGS||!sparse_journal_flush())return 0;pool_set_reference(POOL_SONG_REFS+song*2,POOL_NONE);if(!pool_commit())return 0;if(sparse_song==song){sparse_song=255;memset(sparse_song_name,0,17);}return 1;}

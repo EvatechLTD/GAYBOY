@@ -24,7 +24,8 @@
 #define POOL_EVENTS_OFFSET 102U
 #define POOL_PATCH_OFFSET 100U
 #define POOL_TONE_BYTES 450U
-#define POOL_SONG_BYTES 35U
+#define POOL_SONG_LEGACY_BYTES 35U
+#define POOL_SONG_BYTES 46U
 
 /* Raw page I/O never addresses protected banks/regions. The platform
    implementation must restore RAM bank zero before enabling interrupts. */

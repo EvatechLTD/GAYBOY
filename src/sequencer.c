@@ -136,7 +136,8 @@ void seq_pattern_handoff(void) BANKED {
  }else pattern_start(0);
 }
 void seq_next_deadline(void) BANKED;
-void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;if(seqplaying){seq_stop();return;}seq_stop();
+uint8_t sync_local_stop_allowed(void) BANKED;
+void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;if(seqplaying){if(syncmode==1&&syncslave&&!syncbusy&&!sync_local_stop_allowed())return;seq_stop();return;}seq_stop();
  if(seqmode){if(!monomode)monoenable();}
  else {if(monomode||polymode)panic();monomode=polymode=0;if(oldmono){TAC_REG=waveengine?4:0;route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}globals();}}
  memset(seqposition,0,SEQ_TRACKS);seqclock=seqticks=seqfraction=0;if(!(TAC_REG&4)){TMA_REG=240;TIMA_REG=240;IF_REG&=~TIM_IFLAG;TAC_REG=4;}seq_gates();mixer_clock_reset();seqservicing=1;

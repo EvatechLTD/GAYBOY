@@ -1,6 +1,7 @@
 #pragma bank 63
 #include "api.h"
 #include "mixer_shared.h"
+#include "mixer_drum_names.h"
 #include "mixer_pads.h"
 #include "link_control.h"
 extern uint8_t mixer_hidden[8],mixer_device,syncrole;
@@ -16,12 +17,12 @@ static uint8_t focus(uint8_t c,uint8_t f){return c<7?2+c*4+f:38+(c-7)*2+(f>1?1:f
 static uint8_t first_strip(void){uint8_t c;for(c=0;c<20;c++)if(shown(c))return focus(c,0);return 0;}
 static uint8_t pad(void){uint8_t c;for(c=0;c<8;c++)if(shown(c+20))return 30+c;return 0;}
 void mixer_link_render(void) BANKED {uint8_t c,n=0,col=0,selected=mx.focus>=38&&mx.focus<64?7+(mx.focus-38)/2:mx.focus>=2&&mx.focus<30?(mx.focus-2)/4:255;
- memset(canvas,0,360);memset(canvas,96,20);text(0,0,"MIXER",1);text(6,0,"SEL EDIT",1);text(16,0,"LINK",mx.focus==65);
+ memset(canvas,0,360);memset(canvas,96,20);text(0,0,"MIXER",1);text(16,0,"LINK",1);
  text(0,2,seqplaying?"STOP":"PLAY",mx.focus==0);text(7,2,syncmode!=1?"WAIT LINK":syncslave?(seqplaying?"SLAVE MODE":"PLAY TO LINK"):linkstate==2?"CONNECTED":linkstate==3?"STALE":"WAIT LINK",0);
- text(0,3,"LAUNCH",0);text(13,3,linkpair?"PAIR ON":"PAIR --",mx.focus==66);text(8,3,linkmirror.quant==1?"1/8":linkmirror.quant==2?"1/4":linkmirror.quant==3?"1/2":"1/1",mx.focus==1);
+ text(0,3,"LAUNCH",0);text(8,3,linkmirror.quant==1?"1/8":linkmirror.quant==2?"1/4":linkmirror.quant==3?"1/2":"1/1",mx.focus==1);
  for(c=0;c<20;c++)if(shown(c)){if(c==selected)col=n;n++;}if(selected<20){if(col<scroll)scroll=col;if(col>=scroll+5)scroll=col-4;}else if(scroll>=n)scroll=0;
  n=0;for(c=0;c<20;c++){uint8_t f,x;if(!shown(c))continue;col=n++;if(col<scroll||col>=scroll+5)continue;x=4+(col-scroll)*3;
-  f=focus(c,0);if(c<7)text(x,4,names[c],0);else {text(x,4,"D",0);link_number(x,4,c-6,0);}
+  f=focus(c,0);if(c<7)text(x,4,names[c],0);else text(x,4,mixer_drum_name(linkmirror.kit,c-7),0);
   if(c<7){text(x+1,5,linkmirror.muted&(1<<c)?"M":"-",mx.focus==f);text(x+1,6,linkmirror.solo&(1<<c)?"S":"-",mx.focus==f+1);link_number(x,8,linkmirror.level[c],mx.focus==f+2);text(x,11,pans[linkmirror.pan[c]&3],mx.focus==f+3);}
   else {uint16_t bit=1U<<(c-7);text(x+1,5,linkmirror.drummutemask&bit?"M":"-",mx.focus==f);text(x+1,6,linkmirror.drumsolomask&bit?"S":"-",mx.focus==f+1);}mixfill();
  }
@@ -29,8 +30,7 @@ void mixer_link_render(void) BANKED {uint8_t c,n=0,col=0,selected=mx.focus>=38&&
  text(0,17,syncmode!=1?"SELECT GAYBOY SYNC":syncslave?(seqplaying?"USE MASTER MIXER":"PLAY TO LINK"):linkstate==2?(link_pending()?"LINK COMMAND PENDING":"A PICK / HOLD A EDIT"):"CONNECTING...",0);
 }
 void mixer_link_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
- if(mx.focus==65){if(edge&(J_A|J_B)){mixer_device=0;mx.focus=0;pad_names_valid=0;mx.padcache=0;}else if(edge&J_DOWN)mx.focus=first_strip();else if(edge&J_UP)mx.focus=pad();else if(edge&J_RIGHT)mx.focus=66;else if(edge&J_LEFT)mx.focus=1;dirty=1;return;}
- if(mx.focus<2){if(edge&(J_LEFT|J_RIGHT))mx.focus=mx.focus?65:1;if(edge&J_DOWN)mx.focus=first_strip();if(edge&J_UP)mx.focus=pad();
+ if(mx.focus<2){if(edge&(J_LEFT|J_RIGHT))mx.focus=mx.focus?0:1;if(edge&J_DOWN)mx.focus=first_strip();if(edge&J_UP)mx.focus=pad();
   if(edge&(J_A|J_B)){if(!mx.focus)seq_transport();else if(mx.focus==1)link_command(0,5,linkmirror.quant>=4?1:linkmirror.quant+1);}dirty=1;return;}
  if(mx.focus>=30&&mx.focus<38){if(edge&(J_LEFT|J_RIGHT))for(c=0;c<8;c++){mx.focus=30+((mx.focus-30+(edge&J_LEFT?7:1))&7);if(shown(mx.focus-10))break;}
   if(edge&J_UP)mx.focus=first_strip();else if(edge&J_A)link_command(mx.focus-30,4,0);dirty=1;return;}
@@ -38,6 +38,6 @@ void mixer_link_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
  if(c<7&&f>=2&&(p&(J_A|J_B))){int16_t v=link_target(c,f);if(!(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)))return;if(edge&J_UP)v++;if(edge&J_DOWN)v--;if(edge&J_LEFT)v-=10;if(edge&J_RIGHT)v+=10;link_command(c,f,v<0?0:v>(f==2?127:3)?(f==2?127:3):v);dirty=1;return;}
  if(edge&(J_A|J_B))link_command(c,f,!link_target(c,f));
  if(edge&J_LEFT){uint8_t n=c;while(n){n--;if(shown(n)){c=n;break;}}}if(edge&J_RIGHT){uint8_t n=c;while(n<19){n++;if(shown(n)){c=n;break;}}}
- if(edge&J_UP){if(f)f--;else {mx.focus=65;dirty=1;return;}}if(edge&J_DOWN){if(f<(c<7?3:1))f++;else {mx.focus=pad();dirty=1;return;}}
+ if(edge&J_UP){if(f)f--;else {mx.focus=0;dirty=1;return;}}if(edge&J_DOWN){if(f<(c<7?3:1))f++;else {mx.focus=pad();dirty=1;return;}}
  mx.focus=focus(c,f);dirty=1;
 }

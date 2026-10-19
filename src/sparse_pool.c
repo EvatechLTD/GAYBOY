@@ -307,10 +307,10 @@ static uint8_t visit_pattern(uint16_t object){uint16_t size;uint8_t data[2];if(o
  size=pool_object_size_local(object);if(size<POOL_PATTERN_BYTES||size>POOL_PATTERN_BYTES+2048||((size-POOL_PATTERN_BYTES)&3)||(!object_type(object)&&!check(object,POOL_PATTERN))||!chain(object,size))return 0;
  set_type(object,1);if(!pool_object_read_local(object,POOL_PATCH_OFFSET,data,2))return 0;return visit_patch(pool_word_local(data));
 }
-static uint8_t visit_song(uint16_t object){uint8_t data[16],i;if(object==POOL_NONE)return 1;if(object<4||object>=POOL_PAGES)return 0;
+static uint8_t visit_song(uint16_t object){uint8_t data[16],i;uint16_t size;if(object==POOL_NONE)return 1;if(object<4||object>=POOL_PAGES)return 0;
  if(used(object))return object_type(object)==3;
  if(object_type(object)&&object_type(object)!=3)return 0;
- if(pool_object_size_local(object)!=POOL_SONG_BYTES||(!object_type(object)&&!check(object,POOL_SONG))||!chain(object,POOL_SONG_BYTES))return 0;
+ size=pool_object_size_local(object);if((size!=POOL_SONG_BYTES&&size!=POOL_SONG_LEGACY_BYTES)||(!object_type(object)&&!check(object,POOL_SONG))||!chain(object,size))return 0;
  set_type(object,3);if(!pool_object_read_local(object,19,data,16))return 0;for(i=0;i<8;i++)if(!visit_pattern(pool_word_local(data+i*2)))return 0;return 1;
 }
 /* Only explicit boot/song-loading screens opt in. Ordinary commits and

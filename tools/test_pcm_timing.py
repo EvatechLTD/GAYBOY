@@ -124,15 +124,7 @@ def run(scroll,frames=360,view="sequencer",control=None):
   for name in ('seq_transport','seq_fire','drum_fire','drum_enable','seq_gates','seq_frame','seq_next_deadline','mixer_boundary','seq_off','drum_tick'):
    addr=S['_'+name];hook(addr>>16 if addr>=65536 else 0,addr&65535,startup_seen,name)
   if view=="mixer":
-   p.button_press('start')
-   for _ in range(100):
-    p.tick(1)
-    if v('navopen'):break
-   for _ in range(30):
-    if v('navchoice')==18:break
-    press('down')
-   assert v('navchoice')==18
-   p.button_release('start');p.tick(60);assert v('page')==18
+   choose(18);p.tick(60);assert v('page')==18
    # Use the real Mixer transport button, with P1 volume/pan selected afterward.
    press('a')
   else:

@@ -1,0 +1,985 @@
+{
+  "branch": "mixer-improvements",
+  "merged_main": "3d14470a0cf21645ec9c44c89a74ef49ea997332",
+  "rom_sha256": "957bb60ba8741172f7e18b723aef09efa0ba4f5e5a3b8384f5c06001f82ecef9",
+  "passed": [
+    "Finder categories and contextual actions",
+    "Mixer Settings and removal of mixer header/Select configuration",
+    "Independent local/link hidden tracks and pads",
+    "Song-scoped layout, PAIR and view including power-cycle",
+    "Three-character Amen and kit drum labels",
+    "Sparse/legacy working layout redundancy",
+    "All five slave clock modes at 120/300 BPM",
+    "AUTO competing starts at 0/1/2 frame offsets",
+    "CRC rejection/retry, duplicate and malformed frame recovery"
+  ],
+  "live_cable": {
+    "120": {
+      "bpm": 120,
+      "rom_sha256": "957bb60ba8741172f7e18b723aef09efa0ba4f5e5a3b8384f5c06001f82ecef9",
+      "pairs": [
+        {
+          "slot": 0,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 1,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 1,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 2,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 3,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 4,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 2,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 5,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 1,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 6,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 0,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 7,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 3,
+              "b": 3,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 2,
+          "overflow": [
+            0,
+            0
+          ]
+        }
+      ],
+      "admission": {
+        "clockTransfers": 4321,
+        "clockCarriers": 460,
+        "extraMetadataTransfers": 0
+      },
+      "liveRemoteControls": true,
+      "independentRemoteLaunch": true,
+      "liveSaveFrames": 202,
+      "clock": {
+        "meanMs": 20.83344172548365,
+        "idealMs": 20.833333333333332,
+        "peakSpacingErrorMs": 2.209027608235676,
+        "maxDueToLaunchMs": 0.9965896606445312
+      },
+      "unarmedSerialEdges": 0
+    },
+    "300": {
+      "bpm": 300,
+      "rom_sha256": "957bb60ba8741172f7e18b723aef09efa0ba4f5e5a3b8384f5c06001f82ecef9",
+      "pairs": [
+        {
+          "slot": 0,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 11,
+              "b": 11,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 11,
+              "b": 11,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 11,
+              "b": 11,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 33,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 1,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 3,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 2,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 4,
+              "b": 4,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 4,
+              "b": 4,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 4,
+              "b": 4,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 2,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 3,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 2,
+              "b": 2,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 31,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 4,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 9,
+              "b": 9,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 9,
+              "b": 9,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 9,
+              "b": 9,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 59,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 5,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 8,
+              "b": 8,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 8,
+              "b": 8,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 8,
+              "b": 8,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 37,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 6,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 1,
+              "b": 1,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 11,
+          "overflow": [
+            0,
+            0
+          ]
+        },
+        {
+          "slot": 7,
+          "delta": 0,
+          "tracks": [
+            {
+              "track": 0,
+              "a": 9,
+              "b": 9,
+              "delta": 0
+            },
+            {
+              "track": 1,
+              "a": 9,
+              "b": 9,
+              "delta": 0
+            },
+            {
+              "track": 6,
+              "a": 9,
+              "b": 9,
+              "delta": 0
+            }
+          ],
+          "settlingFrames": 59,
+          "overflow": [
+            0,
+            0
+          ]
+        }
+      ],
+      "admission": {
+        "clockTransfers": 23694,
+        "clockCarriers": 619,
+        "extraMetadataTransfers": 0
+      },
+      "liveRemoteControls": true,
+      "independentRemoteLaunch": true,
+      "liveSaveFrames": 466,
+      "patternAndSongLoadNames": true,
+      "clock": {
+        "meanMs": 8.33335228901749,
+        "idealMs": 8.333333333333334,
+        "peakSpacingErrorMs": 3.0747731526692714,
+        "maxDueToLaunchMs": 0.9737014770507812
+      },
+      "unarmedSerialEdges": 0
+    }
+  },
+  "irq_audio": [
+    {
+      "model": "DMG forced cgb=False",
+      "clock_hz": 4194304,
+      "sample_rate_hz": 11459.84699453552,
+      "block_cycles": 11712,
+      "bpm": 300,
+      "frames": 60,
+      "ui": "idle sequencer",
+      "onset_measurement": "Actual NRx4 hardware trigger writes",
+      "first_p1_to_p2_step1_ms": 61.142921447753906,
+      "first_play_entry_interval_ms": null,
+      "startup_trace_ms": [
+        [
+          "seq_transport",
+          10,
+          -49.18098449707031,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          0,
+          -48.75659942626953,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          1,
+          -48.6602783203125,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          2,
+          -48.56395721435547,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          3,
+          -48.46763610839844,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          4,
+          -48.371315002441406,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          5,
+          -48.274993896484375,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          6,
+          -48.178672790527344,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_gates",
+          4,
+          -47.644615173339844,
+          0,
+          0,
+          0
+        ],
+        [
+          "drum_enable",
+          2,
+          -38.9404296875,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_next_deadline",
+          17,
+          -2.0265579223632812,
+          6,
+          0,
+          3
+        ],
+        [
+          "seq_frame",
+          10,
+          47.92499542236328,
+          57,
+          0,
+          3
+        ],
+        [
+          "mixer_boundary",
+          18,
+          52.138328552246094,
+          8,
+          240,
+          3
+        ]
+      ],
+      "pulse1_onsets": 20,
+      "irq_pulse1_onsets": 0,
+      "irq_pulse2_onsets": 0,
+      "expected_pulse1_onsets": 20.091228485107422,
+      "pulse1_interval_ms_min": 44.67487335205078,
+      "pulse1_interval_ms_max": 55.85002899169922,
+      "pulse1_phase_jitter_ms_peak_to_peak": 8.020019531251421,
+      "pulse1_phase_jitter_ms_rms": 2.277980898169223,
+      "full_irq_count": 359,
+      "full_irq_cycles_min": 1836,
+      "full_irq_cycles_mean": 4880.256267409471,
+      "full_irq_cycles_max": 6960,
+      "two_voice_irq_count": 5,
+      "two_voice_irq_cycles_max": 6960,
+      "full_irq_cpu_percent": 41.581550069824246,
+      "worst_irq_budget_percent": 59.42622950819672,
+      "audio_blocks": 334,
+      "expected_audio_blocks": 333,
+      "elapsed_timer_periods": 359.7537568306011,
+      "intentional_idle_timer_periods": 16,
+      "priming_timer_periods": 5,
+      "tail_stop_timer_periods": 5,
+      "audio_underruns": 0,
+      "pending_clock_units_end": 26,
+      "meets_first_step_target": false,
+      "meets_irq_budget": true,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_subdivision_budget": true,
+      "expected_fast_irqs": 359.7537568306011,
+      "meets_startup_regression_budget": true
+    },
+    {
+      "model": "DMG forced cgb=False",
+      "clock_hz": 4194304,
+      "sample_rate_hz": 11459.84699453552,
+      "block_cycles": 11712,
+      "bpm": 300,
+      "frames": 60,
+      "ui": "held right / viewport redraws",
+      "onset_measurement": "Actual NRx4 hardware trigger writes",
+      "first_p1_to_p2_step1_ms": 61.142921447753906,
+      "first_play_entry_interval_ms": null,
+      "startup_trace_ms": [
+        [
+          "seq_transport",
+          10,
+          -49.18098449707031,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          0,
+          -48.75659942626953,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          1,
+          -48.6602783203125,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          2,
+          -48.56395721435547,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          3,
+          -48.46763610839844,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          4,
+          -48.371315002441406,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          5,
+          -48.274993896484375,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          6,
+          -48.178672790527344,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_gates",
+          4,
+          -47.644615173339844,
+          0,
+          0,
+          0
+        ],
+        [
+          "drum_enable",
+          2,
+          -38.9404296875,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_next_deadline",
+          17,
+          -2.0265579223632812,
+          6,
+          0,
+          3
+        ],
+        [
+          "seq_frame",
+          10,
+          47.92499542236328,
+          57,
+          0,
+          3
+        ],
+        [
+          "mixer_boundary",
+          18,
+          52.138328552246094,
+          8,
+          240,
+          3
+        ]
+      ],
+      "pulse1_onsets": 20,
+      "irq_pulse1_onsets": 0,
+      "irq_pulse2_onsets": 0,
+      "expected_pulse1_onsets": 20.091266632080078,
+      "pulse1_interval_ms_min": 33.50830078125,
+      "pulse1_interval_ms_max": 72.30758666992188,
+      "pulse1_phase_jitter_ms_peak_to_peak": 25.65612792968608,
+      "pulse1_phase_jitter_ms_rms": 8.055259546452422,
+      "full_irq_count": 359,
+      "full_irq_cycles_min": 1836,
+      "full_irq_cycles_mean": 4835.743732590529,
+      "full_irq_cycles_max": 7084,
+      "two_voice_irq_count": 5,
+      "two_voice_irq_cycles_max": 7084,
+      "full_irq_cpu_percent": 41.202208929322424,
+      "worst_irq_budget_percent": 60.48497267759563,
+      "audio_blocks": 328,
+      "expected_audio_blocks": 327,
+      "elapsed_timer_periods": 359.7544398907104,
+      "intentional_idle_timer_periods": 23,
+      "priming_timer_periods": 6,
+      "tail_stop_timer_periods": 3,
+      "audio_underruns": 0,
+      "pending_clock_units_end": 29,
+      "meets_first_step_target": false,
+      "meets_irq_budget": true,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_subdivision_budget": true,
+      "expected_fast_irqs": 359.7544398907104,
+      "meets_startup_regression_budget": true
+    },
+    {
+      "model": "DMG forced cgb=False",
+      "clock_hz": 4194304,
+      "sample_rate_hz": 11459.84699453552,
+      "block_cycles": 11712,
+      "bpm": 300,
+      "frames": 60,
+      "ui": "Mixer held volume",
+      "onset_measurement": "Actual NRx4 hardware trigger writes",
+      "first_p1_to_p2_step1_ms": 61.142921447753906,
+      "first_play_entry_interval_ms": null,
+      "startup_trace_ms": [
+        [
+          "seq_transport",
+          10,
+          -49.167633056640625,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          0,
+          -48.743247985839844,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          1,
+          -48.64692687988281,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          2,
+          -48.55060577392578,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          3,
+          -48.45428466796875,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          4,
+          -48.35796356201172,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          5,
+          -48.26164245605469,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          6,
+          -48.165321350097656,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_gates",
+          4,
+          -47.631263732910156,
+          0,
+          0,
+          0
+        ],
+        [
+          "drum_enable",
+          2,
+          -38.98811340332031,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_next_deadline",
+          17,
+          -2.0284652709960938,
+          6,
+          0,
+          3
+        ],
+        [
+          "seq_frame",
+          10,
+          48.10523986816406,
+          57,
+          0,
+          3
+        ],
+        [
+          "mixer_boundary",
+          18,
+          52.318572998046875,
+          8,
+          240,
+          3
+        ]
+      ],
+      "pulse1_onsets": 20,
+      "irq_pulse1_onsets": 0,
+      "irq_pulse2_onsets": 0,
+      "expected_pulse1_onsets": 20.091304779052734,
+      "pulse1_interval_ms_min": 36.62109375,
+      "pulse1_interval_ms_max": 64.23282623291016,
+      "pulse1_phase_jitter_ms_peak_to_peak": 21.27952575683878,
+      "pulse1_phase_jitter_ms_rms": 5.907933948171278,
+      "full_irq_count": 359,
+      "full_irq_cycles_min": 1836,
+      "full_irq_cycles_mean": 4824.991643454039,
+      "full_irq_cycles_max": 7052,
+      "two_voice_irq_count": 5,
+      "two_voice_irq_cycles_max": 7052,
+      "full_irq_cpu_percent": 41.11051935562574,
+      "worst_irq_budget_percent": 60.21174863387978,
+      "audio_blocks": 327,
+      "expected_audio_blocks": 326,
+      "elapsed_timer_periods": 359.75512295081967,
+      "intentional_idle_timer_periods": 24,
+      "priming_timer_periods": 5,
+      "tail_stop_timer_periods": 4,
+      "audio_underruns": 0,
+      "pending_clock_units_end": 28,
+      "meets_first_step_target": false,
+      "meets_irq_budget": true,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_subdivision_budget": true,
+      "expected_fast_irqs": 359.75512295081967,
+      "meets_startup_regression_budget": true
+    }
+  ],
+  "reserves": {
+    "wram_bytes": 1041,
+    "stack_bytes": 512
+  },
+  "hardware_launch_quantization": "User-reported off-quantize hardware launches are not yet confirmed fixed. Existing strict native handoff-latency gate fails on both previous candidate and pinned main; do not claim hardware timing parity.",
+  "emulators": {
+    "engine": "BGB virtual cable",
+    "left": "COPE: imported saves/cope song.gbsong",
+    "right": "DEMO: imported saves/DEMO1.gbsong",
+    "original_archives_modified": false
+  }
+}

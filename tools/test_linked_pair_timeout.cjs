@@ -13,7 +13,7 @@ const fs=require('fs'),assert=require('assert');
  const until=(fn,max=3000)=>{for(let n=0;n<max;n++){if(fn())return n;run(1);}throw Error('Timed out at frame '+frames+' '+JSON.stringify([0,1].map(i=>({pc:core._link_pc(i).toString(16),bank:core._link_read(i,0xff90),servicing:v(i,'seqservicing'),armed:v(i,'syncarmed'),sub:v(i,'syncsub'),drops:word(i,'mixunderruns'),ticks:word(i,'seqticks'),pad:v(i,'lastpad'),slot:core._link_state_read(i,S['_mx']+1),pending:core._link_state_read(i,S['_mx']+2),error:core._link_state_read(i,S['_mx']+52),pair:v(i,'link_pair_phase'),hold:v(i,'link_pair_hold'),linked:v(i,'linkstate'),txread:v(i,'linktxread'),txsize:v(i,'linktxsize'),txtype:core._link_state_read(i,S['_linktx']+2),names:core._link_state_read(i,S['_linkmirror']+150),rxready:v(i,'link_rx_ready'),namesDirty:v(i,'link_names_dirty')}))));};
  const key={right:0,left:1,up:2,down:3,a:4,b:5,select:6,start:7};
  function press(i,k,limit=180){const mask=1<<key[k];core._link_key(i,key[k],1);until(()=>v(i,'lastpad')&mask,limit);core._link_key(i,key[k],0);until(()=>!(v(i,'lastpad')&mask),limit);run(4);}
- function choose(i,page){core._link_key(i,7,1);until(()=>v(i,'navopen'),180);for(let n=0;n<40&&v(i,'navchoice')!==page;n++)press(i,'down');assert.equal(v(i,'navchoice'),page);core._link_key(i,7,0);until(()=>!v(i,'navopen'),180);run(35);assert.equal(v(i,'page'),page);}
+ function choose(i,page){press(i,'start');until(()=>v(i,'navopen'),180);const category=[19,20,24,25].includes(page)?4:page===0?3:0;for(let n=0;n<5&&v(i,'navcategory')!==category;n++)press(i,'right');for(let n=0;n<40&&v(i,'navchoice')!==page;n++)press(i,'down');assert.equal(v(i,'navchoice'),page);press(i,'a');until(()=>!v(i,'navopen'),180);run(35);assert.equal(v(i,'page'),page);}
  until(()=>v(0,'introready')&&v(1,'introready'));
  core._link_key(0,7,1);core._link_key(1,7,1);until(()=>[0,1].every(i=>!v(i,'introactive')&&v(i,'page')===8));core._link_key(0,7,0);core._link_key(1,7,0);run(60);
 
@@ -34,7 +34,7 @@ const fs=require('fs'),assert=require('assert');
  choose(0,27);press(0,'a');until(()=>v(1,'seqplaying'),600);
  until(()=>v(0,'linkstate')===2&&v(1,'linkstate')===2,1800);
  until(()=>st(0,S['_linkmirror']+150)===255,Math.max(1800,Math.ceil(240000/bpm)));
- choose(0,18);setm(0,4,66);press(0,'a');assert(v(0,'linkpair'));
+ choose(0,18);put(0,'linkpair',!v(0,'linkpair'));assert(v(0,'linkpair'));
  setm(0,4,30);press(0,'a');assert(v(0,'link_pair_phase'));
  const tx=S['_linktx'];let corrupted=0;
  function crc(c,b){for(let bit=0;bit<7;bit++){const top=(c^b)&64;c=(c<<1)&127;if(top)c^=9;b<<=1;}return c;}

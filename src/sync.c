@@ -156,7 +156,7 @@ static uint8_t receive(uint8_t b) {uint16_t bpm,elapsed;uint8_t ppqn;
    tempo_state=0;return 1;
   }
   if(b==0xFC){native_peer_running=native_claimed=0;if(seqplaying)seq_transport();return 1;}
-  if(b==0xFA){native_claimed=0;native_peer_running=1;native_peer_frame=frames();link_reset();if(seqplaying)seq_transport();seq_transport();return 1;}
+  if(b==0xFA){native_claimed=0;native_peer_running=1;native_claim_time=native_peer_frame=frames();link_reset();if(seqplaying)seq_transport();seq_transport();return 1;}
   if(b==0xFB){native_peer_running=1;if(!seqplaying)seq_transport();return 1;}
   if(b!=0xF8)return 0;
  }else if(!seqplaying){seq_transport();lastpulse=beatframe=frames();return 1;}
@@ -206,4 +206,12 @@ void sync_input(uint8_t edge) BANKED {int8_t delta;
  native_peer_running=native_claimed=0;
  if(syncmode){if(!seqglobalbpm)seqglobalbpm=seqbpm;seqbpm=seqglobalbpm;}
  link_reset();__critical {add_SIO(syncmode==1?link_serial_isr:serial_isr);SB_REG=0;SC_REG=(!syncmode||syncslave)?0x80:0;}dirty=1;
+}
+
+void sync_setting_edit(uint8_t row,uint8_t edge) BANKED {uint8_t saved=focus;if(seqplaying)return;focus=row;sync_input(edge);focus=saved;}
+
+/* Coalesce near-simultaneous Play presses with an AUTO remote start. This
+   runs only on a local transport press, never on clock or instrument paths. */
+uint8_t sync_local_stop_allowed(void) BANKED {
+ return syncmode!=1||syncrole||!native_peer_running||(uint16_t)(frames()-native_claim_time)>=6;
 }

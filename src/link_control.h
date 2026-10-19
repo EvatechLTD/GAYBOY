@@ -5,7 +5,7 @@ typedef struct {
  char names[8][16];
  uint8_t level[7],pan[7],muted,solo;
  uint16_t drummutemask,drumsolomask;
- uint8_t slot,pending,namesvalid,quant;
+ uint8_t slot,pending,namesvalid,quant,kit;
  uint16_t epoch;
 } LinkMirror;
 extern LinkMirror linkmirror;

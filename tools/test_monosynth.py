@@ -16,7 +16,7 @@ def word(n):
  if n=='seqgateleft' and '_seqeventcounts' in S:return fixture_value(p,S,n,0)
  a=S['_'+n];return p.memory[a]|p.memory[a+1]<<8
 def press(k):
- mask={'right':1,'left':2,'up':4,'down':8,'a':16,'b':32,'select':64}[k]
+ mask={'right':1,'left':2,'up':4,'down':8,'a':16,'b':32,'select':64,'start':128}[k]
  p.button_press(k)
  for _ in range(60):
   p.tick(1)
@@ -36,6 +36,18 @@ def choose(n):
   choose(16);press('a');assert v('experimental_mode');choose(0)
  if 1<=n<=6 and v('page')>=7:choose(0)
  target=([11,12,13,15,14][v('selected')] if n==0 else n)
+ if '_navcategory' in S:
+  press('start')
+  category=4 if target in (19,20,24,25) else 3 if target in (1,2,3,4,5,6,7,9,11,12,13,14,15,17,23) else 0
+  for _ in range(5):
+   if v('navcategory')==category:break
+   press('right')
+  for _ in range(40):
+   if v('navchoice')==target:break
+   press('down')
+  assert v('navchoice')==target,target
+  press('a');p.tick(40);assert v('page')==(1 if n==0 else n)
+  return
  p.button_press('start')
  for _ in range(100):
   p.tick(1)

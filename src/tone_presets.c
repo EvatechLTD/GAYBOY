@@ -44,23 +44,23 @@ static const char * const finderpages[]={"LIVE","TONE","MODULATION","BANK","CC",
 static void finder_text(uint8_t x,uint8_t y,const char *t,uint8_t inverse){uint8_t c;while(*t&&x<20){c=*t++;canvas[(uint16_t)y*20+x++]=c-32+(inverse?96:0);if(!(x&3))mixfill();}}
 /* Finder categories keep existing page/action IDs; 28..34 jump to tracks. */
 const uint8_t finderitems[5][14]={
- {18,8,16,27,4,44,255},
+ {18,8,45,16,27,4,44,255},
  {38,21,43,22,42,36,37,35,26,40,41,39,255},
  {28,29,30,31,32,33,34,10,255},
  {11,12,13,14,15,17,7,9,23,1,2,3,5,6},
  {19,20,24,25,255}};
-const uint8_t findercount[5]={6,12,8,14,4};
-const char *findertracks[]={"P1","P2","WAVE1","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
+const uint8_t findercount[5]={7,12,8,14,4};
+const char * const findertracks[]={"P1","P2","WAVE1","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
 uint8_t pageconfig;
 static uint8_t pageslot;
-uint8_t finder_allowed(uint8_t item){if(item==255)return 0;if(pageconfig==2)return item!=18&&item!=8&&item!=16&&item!=27;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
+uint8_t finder_allowed(uint8_t item){if(item==255)return 0;if(item==45)return pageconfig!=2;if(pageconfig==2)return item!=18&&item!=8&&item!=16&&item!=27;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
 static void page_defaults(void);
-static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?12:findercount[navcategory];}
-static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==10?16:i==11?27:pool_root[100+i-2];}
+static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?13:findercount[navcategory];}
+static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==2?45:i==11?16:i==12?27:pool_root[100+i-3];}
 void finder_first(void) BANKED {uint8_t i,item;mx.error=0;navchoice=255;for(i=0;i<finder_count();i++){item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 void finder_step(int8_t delta) BANKED {uint8_t i,n=finder_count(),tries,item;mx.error=0;for(i=0;i<n;i++)if(finder_item(i)==navchoice)break;for(tries=0;tries<n;tries++){i=delta<0?(i?i-1:n-1):(i+1)%n;item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 static const char * const finderedit[]={"CLEAR TRACK","COPY TRACK","PASTE TRACK","SELECT ALL","CLEAR SONG","COPY PATTERN","PASTE PATTERN","DELETE NOTES","CUT"};
-static const char *finder_label(uint8_t item){if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
+static const char *finder_label(uint8_t item){if(item==45)return "MIXER SETTINGS";if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
 static const char *shortcut_label(uint8_t item);
 void ui_menu(void) BANKED {uint8_t i,row=4,inv,rank=0,n=0,start;const char *labels[]={"PAGE","EDT","SEQ","INS","FIL"};const uint8_t x[]={0,5,9,13,17};
  memset(canvas,0,sizeof(canvas));

@@ -13,7 +13,7 @@ const fs=require('fs'),assert=require('assert');
  const until=(fn,max=3000)=>{for(let n=0;n<max;n++){if(fn())return n;run(1);}throw Error('Timed out at frame '+frames+' '+JSON.stringify([0,1].map(i=>({pc:core._link_pc(i).toString(16),bank:core._link_read(i,0xff90),servicing:v(i,'seqservicing'),armed:v(i,'syncarmed'),sub:v(i,'syncsub'),drops:word(i,'mixunderruns'),ticks:word(i,'seqticks'),pad:v(i,'lastpad')}))));};
  const key={right:0,left:1,up:2,down:3,a:4,b:5,select:6,start:7};
  function press(i,k){const mask=1<<key[k];core._link_key(i,key[k],1);until(()=>v(i,'lastpad')&mask,180);core._link_key(i,key[k],0);until(()=>!(v(i,'lastpad')&mask),180);run(4);}
- function choose(i,page){core._link_key(i,7,1);until(()=>v(i,'navopen'),180);for(let n=0;n<40&&v(i,'navchoice')!==page;n++)press(i,'down');assert.equal(v(i,'navchoice'),page);core._link_key(i,7,0);until(()=>!v(i,'navopen'),180);run(35);assert.equal(v(i,'page'),page);}
+ function choose(i,page){press(i,'start');until(()=>v(i,'navopen'),180);const category=[19,20,24,25].includes(page)?4:page===0?3:0;for(let n=0;n<5&&v(i,'navcategory')!==category;n++)press(i,'right');for(let n=0;n<40&&v(i,'navchoice')!==page;n++)press(i,'down');assert.equal(v(i,'navchoice'),page);press(i,'a');until(()=>!v(i,'navopen'),180);run(35);assert.equal(v(i,'page'),page===45?28:page);}
  until(()=>v(0,'introready')&&v(1,'introready'));
  core._link_key(0,7,1);core._link_key(1,7,1);until(()=>[0,1].every(i=>!v(i,'introactive')&&v(i,'page')===8));core._link_key(0,7,0);core._link_key(1,7,0);run(60);
 
@@ -21,7 +21,7 @@ const fs=require('fs'),assert=require('assert');
  const mirror=(n)=>state(0,S['_linkmirror']+n);
  choose(0,27);press(0,'down');press(0,'right');
  assert(!v(0,'syncslave')&&v(1,'syncslave'));
- choose(0,18);press(0,'left');press(0,'a');
+ choose(0,45);press(0,'a');press(0,'b');
  assert.equal(v(0,'mixer_device'),1);
  until(()=>v(0,'linkstate')===2&&v(1,'linkstate')===2,600);
  until(()=>mirror(150)===255,1800);

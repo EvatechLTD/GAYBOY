@@ -5,11 +5,16 @@
 GAYBOY sync defaults to AUTO. Both stopped machines listen; the first local
 Play becomes master and starts its peer. Stop returns AUTO machines to listening.
 MASTER and SLAVE overrides remain available. Other sync modes retain manual roles.
-The native start claim runs before arming the musical clock. A detected start
+The native start claim runs before arming the musical clock. A local AUTO Play
+press in the six video frames following an incoming Start is coalesced with
+that start, preventing near-simultaneous presses from stopping only the slave. A detected start
 collision cancels playback and shows START CLASH - RETRY; press Play again.
 
-Select LOCAL/LINK in the mixer header to switch between this machine and its
-connected peer. LINK offers pattern selection, track volume/pan/mute/solo and
+Open Start ? PAGE ? MIXER SETTINGS. MIXER VIEW selects LOCAL or LINK;
+PAIR PATTERNS, SYNC TYPE, SYNC ROLE and both layout editors live here.
+B returns to the mixer. Sync configuration edits require stopped transport.
+The mixer header has no configuration controls and SELECT does not open a menu.
+LOCAL/LINK switches between this machine and its connected peer. LINK offers pattern selection, track volume/pan/mute/solo and
 individual drum mute/solo. Hold A with arrows to change volume/pan. The master
 shows acknowledged remote values; COMMAND PENDING means an edit is in flight.
 Edits are absolute and guarded by the remote pattern generation. A stale edit is
@@ -20,11 +25,21 @@ for the pending indication to clear. This deliberately bounds protocol work.
 
 Four 40-pixel pattern pads are visible at once, with five characters per label.
 Move horizontally to page through visible pads. The focused pad's full name is
-shown above; off-page playing/queued pads have indicators. SELECT opens layout
-editing for the selected machine: arrows select, A hides/shows, B restores all,
-SELECT returns. Hiding affects display/navigation only. LOCAL and LINK layouts
-are independent. Layout and PAIR changes apply immediately; battery writes wait
-until stopped and use redundant, checked storage records.
+shown above; off-page playing/queued pads have indicators. LOCAL LAYOUT and
+LINK LAYOUT in Mixer Settings open independent editors: arrows select, A hides
+or shows, B restores all, SELECT returns to settings. Hiding affects display
+and navigation only. Drum strips show three-character sample names, including
+Amen slice names and kit-specific percussion abbreviations. The remote kit is
+packed into the existing STATE pending-slot byte, adding no bytes or transfers.
+
+Saved songs include both hidden-strip/pad masks, PAIR and the selected mixer
+view. Loading a song restores these settings; autosaved working layout changes
+do not rewrite another saved song. Older songs default to all visible, PAIR off
+and LOCAL view. Working layout writes wait until stopped. Song storage accepts
+both the original 35-byte payload and a 46-byte extension: byte 35 version 1,
+36..43 hidden masks, 44 PAIR, 45 view. Original pattern references stay at 19..34.
+The working copy uses root 110..121; Page-menu assignments remain global at
+100..109. Archive/save-manager readers must accept both song lengths.
 
 PAIR launches matching numbered pads on both machines. Both prepare first;
 the master's existing quantization boundary commits the prepared pair with the
@@ -114,14 +129,14 @@ layout power cycles/redundancy, incremental/full pixel equivalence and queued-pa
 flash cancellation.
 
 The current 300 BPM IRQ/audio fixture passes delivery, note rate, startup and
-subdivision budgets with zero measured underruns; longest measured IRQ is 7680
+subdivision budgets with zero measured underruns; longest measured IRQ is 7084
 cycles. The pinned main baseline's corresponding historical startup budget fails
 with corrected native hardware-write instrumentation; its other budgets pass.
 The candidate adds bounded CPU work (approximately one percentage point in this
 fixture). Zero extra transfers is a wire guarantee, not zero CPU overhead or a
 proof that all hardware note-latency distributions are identical. Actual console,
 cable and hot-plug checks remain necessary before a release timing-parity claim.
-WRAM reserve is 1045 bytes and reserved stack is 512 bytes; adding globals needs
+WRAM reserve is 1041 bytes and reserved stack is 512 bytes; adding globals needs
 another memory audit. Test ROM, symbols and JSON traces live under build/.
 
 The older standalone test_mixer_live.py is not a passing acceptance gate: it
@@ -151,6 +166,7 @@ python tools/test_slave_clock_cpu.py
 python tools/test_mixer_pixel_cache.py
 python tools/test_queued_flash.py
 python tools/test_mixer_layout_persistence.py
+python tools/test_mixer_settings.py
 ```
 
 Reference main is 258b713064ab6796443b6237a040718b1d5d7e9e. The locally pinned
