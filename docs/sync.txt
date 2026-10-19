@@ -1,12 +1,17 @@
 SYNC (Start menu)
 
-Choose TYPE with Left/Right. Up/Down selects TYPE or ROLE. Choose MASTER on
-one machine and SLAVE on the other. A starts/stops playback. Configuration
-changes stop playback. Settings are session-only; boot defaults to OFF.
+Choose TYPE with Left/Right. Up/Down selects TYPE or ROLE. A starts/stops
+playback. Configuration changes stop playback. Settings are session-only;
+boot defaults to GAYBOY with AUTO role. OFF remains available.
 
 GAYBOY: connect two Game Boys using a compatible Game Boy link cable.
-Choose GAYBOY on both, one MASTER and one SLAVE. Configure the slave first,
-then play on the master. Master mixer GLOBAL TEMPO is sent to the slave;
+Choose GAYBOY on both. AUTO listens while stopped: starting either machine
+locally makes it MASTER, and the peer receiving Start becomes SLAVE. A master
+stop returns both AUTO peers to listening. AUTO displays its active role
+while playing. Forced MASTER and SLAVE remain available for explicit setups;
+configure a forced slave first, then play on the master. Simultaneous AUTO
+starts have not yet been validated; use forced roles for that case.
+Master mixer GLOBAL TEMPO is sent to the slave;
 slave tempo editing is locked, global tempo stays enabled across pattern loads.
 The slave advances only on incoming clock. Start resets positions; stop is
 explicit. A late-connected slave requires restarting the master.

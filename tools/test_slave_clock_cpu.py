@@ -9,7 +9,7 @@ tests = r'''
             write_word(p,S['_seqbpm'],bpm);write_word(p,S['_seqglobalbpm'],bpm)
             write_word(p,S['_seqclock'],0);write_word(p,S['_seqticks'],0);write_word(p,S['_seqthreshold'],15360)
             write_word(p,S['_sys_time'],0);put('seqswing',50);put('seqswingphase',0);put('mx',0,10);put('mx',255,2)
-            call('sync_transport',1)
+            put('syncbusy',1);call('sync_transport',1);put('syncbusy',0)
             unit=30720 if mode==4 else 15360 if mode==5 else 2560
             pulses=16*15360*4//unit
             for n in range(1,pulses+1):

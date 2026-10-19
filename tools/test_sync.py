@@ -15,9 +15,8 @@ def inject(data):
 
 try:
     choose(27)
-    press('right')
-    assert v('syncmode') == 1 and word('seqglobalbpm') == word('seqbpm')
-    press('down'); press('right')
+    assert v('syncmode') == 1 and v('syncslave') == 1
+    press('down'); press('right'); press('right')
     assert v('syncslave') == 1
     p.screen.image.save('build/sync.png')
     inject([0xF1, 1, 9, 0xFA])
@@ -61,7 +60,7 @@ try:
             assert v('seqposition') == (2 if mode == 4 else 1), mode
             p.tick(160)
             assert not v('seqplaying'), 'Raw clock loss failed to stop playback'
-    press('right'); press('down'); press('right')
+    press('right'); press('down'); press('right'); press('right')
     assert v('syncmode') == 1 and not v('syncslave')
     p._serial()
     press('a')

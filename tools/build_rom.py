@@ -16,7 +16,7 @@ else:
  import fcntl
  fcntl.flock(build_lock,fcntl.LOCK_EX)
 compiler=root/'tools/gbdk/bin/lcc.exe'; out=root/'build/objects';out.mkdir(exist_ok=True)
-names='seq_launch seq_native sparse_prepare control seq_irq seq_pulse sync_clock sync sparse_seed clear_pattern sparse_pool sparse_store sparse_journal pattern_io kits drum_samples32 drum_samples33 drum_samples34 drum_samples35 drum_samples36 main ui legacy experimental exp_waves5 exp_waves6 exp_waves7 exp_waves8 exp_coefficients exp_maps storage sequencer seq_gen seq_clipboard tones tones_native tone_presets noiselab instruments seq_pixels finepitch global drum drum_samples drum_samples19 drum_samples20 mixer intro intro_demo cinema cinema0 cinema1 cinema2 cinema5 train_motion0 train_motion1 train_window zoom0 zoom1 zoom2'.split()
+names='seq_launch seq_native sparse_prepare control seq_irq seq_pulse sync_clock sync sparse_seed clear_pattern sparse_pool sparse_store sparse_journal pattern_io kits drum_samples32 drum_samples33 drum_samples34 drum_samples35 drum_samples36 main ui legacy experimental exp_waves5 exp_waves6 exp_waves7 exp_waves8 exp_coefficients exp_maps storage sequencer seq_gen seq_clipboard tones tones_native tone_presets noiselab instruments seq_pixels finepitch global drum drum_samples drum_samples19 drum_samples20 mixer mixer_layout intro intro_demo cinema cinema0 cinema1 cinema2 cinema5 train_motion0 train_motion1 train_window zoom0 zoom1 zoom2'.split()
 names += ['intro_damage'+str(stage) for stage in range(1,11)]
 if options.demo_seed:
  from make_sparse_seed import generate

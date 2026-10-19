@@ -15,7 +15,7 @@ def pulse_write_sites(symbols):
  tree=ast.parse((Path(pyboy.__file__).parent/"core/opcodes.py").read_text())
  lengths=next(ast.literal_eval(n.value.args[1]) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="OPCODE_LENGTHS" for t in n.targets))
  sites=[]
- for name in ('_play','_seq_irq_tick'):
+ for name in ('_play','_seq_irq_tick','_seq_native_hardware'):
   if name not in symbols:continue
   pc=symbols[name]
   end=min(v for k,v in symbols.items() if k.startswith("_") and pc<v<0x4000)
@@ -49,6 +49,7 @@ def run(scroll,frames=360,view="sequencer",control=None):
  source=Path('tools/test_monosynth.py').read_text().split('# Native oscillator baseline')[0]
  source=source.replace('build/GAYBOY.noi',ROM.with_suffix('.noi').as_posix()).replace('build/GAYBOY.gb',ROM.as_posix())
  if HARDWARE_DEMO:source=source.replace(';enter_app(p)',';p.tick(180)')
+ source=source.replace(';enter_app(p)',';enter_app(p,S)')
  source=source.replace('sound_emulated=True,ram_file=', 'sound_emulated=True,cgb=False,ram_file=')
  exec(source,env)
  if HARDWARE_DEMO:env['send']([0xb0,103,127])
@@ -174,7 +175,7 @@ def run(scroll,frames=360,view="sequencer",control=None):
    'ui':('Mixer held '+control if control else 'Mixer idle') if view=='mixer' else 'held right / viewport redraws' if scroll else 'idle sequencer',
    'onset_measurement':'Actual NRx4 hardware trigger writes',
    'first_p1_to_p2_step1_ms':first_interval,
-   'first_play_entry_interval_ms':(entry_first[1]-entry_first[0])*1000/CPU_HZ,
+   'first_play_entry_interval_ms':None if None in entry_first else (entry_first[1]-entry_first[0])*1000/CPU_HZ,
    'startup_trace_ms':[(n,c,(t-first[0])*1000/CPU_HZ,ticks,clock,engine) for n,c,t,ticks,clock,engine in startup],
    'pulse1_onsets':len(p1),
     'irq_pulse1_onsets':irq_onsets[0],

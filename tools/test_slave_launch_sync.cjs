@@ -45,9 +45,11 @@ const fs=require('fs'),assert=require('assert');
  choose(1,18);core._link_state_write(1,mx+4,31);press(1,'a');run(60);
  choose(1,19);core._link_state_write(1,mx+6,1);press(1,'a');run(60);
  core._link_state_write(1,mx+4,30);press(1,'a');run(60);
- for(const i of [0,1]){writeWord(i,S['_seqbpm'],bpm);writeWord(i,S['_seqglobalbpm'],bpm);choose(i,27);for(let n=0;n<mode;n++)press(i,'right');}
+ for(const i of [0,1]){writeWord(i,S['_seqbpm'],bpm);writeWord(i,S['_seqglobalbpm'],bpm);choose(i,27);for(let n=1;n<mode;n++)press(i,'right');}
  core._link_state_write(1,mx+3,0); // Simulate a saved NOW preference.
- press(1,'down');press(1,'right');assert.equal(core._link_state_read(1,mx+3),4,'Entering slave mode must enable quantization');press(0,'a');
+ if(mode===1){press(1,'down');press(1,'right');press(1,'right');}
+ else {press(0,'down');press(0,'right');press(1,'down');press(1,'right');press(1,'right');}
+ assert.equal(core._link_state_read(1,mx+3),4,'Entering slave mode must enable quantization');press(0,'a');
  until(()=>v(1,'seqplaying'));run(90);assert.equal(v(1,'syncmode'),mode);
  choose(1,18);
  // Raw clock starts on its first byte, up to one pulse behind the sending

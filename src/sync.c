@@ -29,6 +29,10 @@ static __at (0xFFEA) uint16_t beatframe;
 static __at (0xFFEC) uint16_t pulsequot;
 static __at (0xFFEE) uint16_t pulserem;
 static __at (0xFFF0) uint16_t pulsebpm;
+/* Selected policy is separate from syncslave, the active wire role.
+   0 AUTO, 1 forced MASTER, 2 forced SLAVE. Raw protocols keep manual roles. */
+uint8_t syncrole;
+static uint8_t native_peer_running;
 __at (0xFFB8) volatile uint8_t syncirqphase[3];
 __at (0xFFBB) volatile uint16_t syncincrement;
 __at (0xFFBD) volatile uint8_t synclimit[3];
@@ -44,7 +48,7 @@ __at (0xFFC8) volatile uint8_t syncstart;
 __at (0xFFC9) volatile uint8_t synctxbyte;
 static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUINOBOY","POCKET OPERATOR","GATE"};
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
-void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);}
+void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=0;syncmode=1;syncslave=1;}
 void sync_control_service(void) BANKED {
  __critical {if(syncr!=syncw&&!synctxwait&&!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)){
   synctxbyte=synctx[syncr];SB_REG=synctxbyte;syncr=(syncr+1)&31;SC_REG=0x81;
@@ -82,6 +86,14 @@ void sync_transport(uint8_t playing) BANKED {uint32_t limit;
  if(!playing&&syncmode==1&&!syncslave&&syncarmed){send(0xFC);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
  if(syncarmed){__critical {syncarmed=0;syncdue=0;TMA_REG=TIMA_REG=syncreload;}}
  remainder=seqbpm-1;syncalign=0;syncpending=0;beatcount=0;lastpulse=beatframe=frames();
+ /* Native AUTO idle is externally clocked. A local transport start claims
+    the clock; starts dispatched by sync_receive retain the listening role.
+    seq_transport calls stop internally before start, so use syncbusy rather
+    than the previous role to distinguish the two paths. */
+ if(syncmode==1&&!syncrole){
+  if(!playing){if(!syncslave){syncslave=1;SB_REG=0;SC_REG=0x80;}}
+  else if(!syncbusy&&!native_peer_running){syncslave=0;SC_REG=0;}
+ }
  if(!syncmode||syncslave||!playing)return;
  limit=(uint32_t)pulse_units()<<6;
  __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synclimit[0]=limit;synclimit[1]=limit>>8;synclimit[2]=limit>>16;synctick=0;syncstart=syncmode==1;syncarmed=1;synctxwait=0;}
@@ -113,9 +125,9 @@ static uint8_t receive(uint8_t b) {uint16_t bpm,elapsed;uint8_t ppqn;
    else if(seqplaying&&bpm<2560U){uint8_t clocks=(beatcount-markerbase)&63,busy=seqservicing;uint16_t ticks;seqservicing=1;syncpending=clocks;remainder=seqbpm-1;syncalign=bpm;ticks=sync_advance(0);__critical {seqclock=0;seqticks=ticks;}seq_pattern_release();seq_pattern_start();seqservicing=busy;}
    tempo_state=0;return 1;
   }
-  if(b==0xFC){if(seqplaying)seq_transport();return 1;}
-  if(b==0xFA){if(seqplaying)seq_transport();seq_transport();return 1;}
-  if(b==0xFB){if(!seqplaying)seq_transport();return 1;}
+  if(b==0xFC){native_peer_running=0;if(seqplaying)seq_transport();return 1;}
+  if(b==0xFA){native_peer_running=1;if(seqplaying)seq_transport();seq_transport();return 1;}
+  if(b==0xFB){native_peer_running=1;if(!seqplaying)seq_transport();return 1;}
   if(b!=0xF8)return 0;
  }else if(!seqplaying){seq_transport();lastpulse=beatframe=frames();return 1;}
  lastpulse=frames();
@@ -140,7 +152,8 @@ static void drawtext(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=c
 static void drawnumber(uint8_t x,uint8_t y,uint16_t n){char s[4];s[0]='0'+n/100;s[1]='0'+(n/10)%10;s[2]='0'+n%10;s[3]=0;drawtext(x,y,s,0);}
 void sync_render(void) BANKED {memset(canvas,0,360);memset(canvas,96,20);drawtext(0,0,"SYNC",1);
  drawtext(1,3,"TYPE",focus==0);drawtext(1,4,modes[syncmode],focus==0);
- drawtext(1,6,"ROLE",focus==1);drawtext(8,6,syncslave?"SLAVE":"MASTER",focus==1);
+ drawtext(1,6,"ROLE",focus==1);drawtext(8,6,syncmode==1&&!syncrole?"AUTO":syncslave?"SLAVE":"MASTER",focus==1);
+ if(syncmode==1&&!syncrole&&seqplaying)drawtext(8,7,syncslave?"> SLAVE":"> MASTER",0);
  drawtext(1,8,"GLOBAL BPM",0);drawnumber(13,8,seqglobalbpm?seqglobalbpm:seqbpm);
  drawtext(0,11,"U/D SELECT L/R EDIT",0);drawtext(0,13,"A PLAY / STOP",0);
  if(syncmode>=4)drawtext(0,15,"PULSE ADAPTER NEEDED",0);
@@ -153,9 +166,13 @@ void sync_input(uint8_t edge) BANKED {int8_t delta;
  if(!(edge&(J_LEFT|J_RIGHT)))return;
  if(seqplaying)seq_transport();delta=edge&J_LEFT?-1:1;
  __critical {SC_REG=0;IF_REG&=~SIO_IFLAG;syncr=syncw=0;rd=wr;st=count=0;}
- if(!focus)syncmode=(syncmode+(delta<0?5:1))%6;else syncslave^=1;
+ if(!focus)syncmode=(syncmode+(delta<0?5:1))%6;
+ else if(syncmode==1)syncrole=(syncrole+(delta<0?2:1))%3;
+ else syncslave^=1;
+ if(syncmode==1){if(syncrole==1)syncslave=0;else syncslave=1;}
  if(syncmode&&syncslave&&mx.magic==0xD3&&!mx.quant)mx.quant=4;
  syncpending=syncalign=remainder=tempo_state=pulsebpm=0;sentbpm=0;
+ native_peer_running=0;
  if(syncmode){if(!seqglobalbpm)seqglobalbpm=seqbpm;seqbpm=seqglobalbpm;}
  SB_REG=0;SC_REG=(!syncmode||syncslave)?0x80:0;dirty=1;
 }
