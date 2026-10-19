@@ -26,8 +26,8 @@ const fs=require('fs'),assert=require('assert');
   let offset=0;for(let c=0;c<7;c++){writeWord(i,S['_seqeventoffsets']+c*2,offset);writeWord(i,S['_seqeventcounts']+c*2,tracks[c].length);writeWord(i,S['_seqlength']+c*2,16);for(const e of tracks[c]){for(let j=0;j<4;j++)sw(i,S['_seqevents_lo']+offset*4+j,e[j]);offset++;}}
   sw(i,S['_seqeventcache'],0);sw(i,S['_pattern_dirty'],1);writeWord(i,S['_seqbpm'],bpm);writeWord(i,S['_seqglobalbpm'],bpm);writeWord(i,S['_seqcachedbpm'],0);sw(i,0xACCF,0x43);
   const name=Buffer.from('PAIRED LIVE TEST\0');for(let j=0;j<17;j++)setm(i,26+j,name[j]||0);
-  choose(i,20);setm(i,6,0);press(i,'b');
-  for(let slot=1;slot<8;slot++){choose(i,18);setm(i,4,30+slot);press(i,'a');choose(i,19);setm(i,6,0);press(i,'a');}
+  choose(i,20);setm(i,6,0);press(i,'b');if(v(i,'page')===26){press(i,'up');press(i,'a');}
+  for(let slot=1;slot<8;slot++){choose(i,18);setm(i,4,30+slot);press(i,'b');run(80);choose(i,19);setm(i,6,0);press(i,'a');if(v(i,'page')===26){press(i,'up');press(i,'a');}}
   choose(i,18);assert.equal(m(i,1),7);
  }
  if(process.argv.includes('--storage')){choose(1,25);setm(1,6,0);press(1,'b',1800);choose(1,18);}
@@ -65,13 +65,13 @@ const fs=require('fs'),assert=require('assert');
  setm(0,4,37);press(0,'a');until(()=>m(1,1)===7&&m(1,2)===255,2400);until(()=>st(0,S['_linkmirror']+148)===m(1,1),1200);run(10);assert.equal(m(0,1),0);
  report.liveRemoteControls=true;report.independentRemoteLaunch=true;
  // A real slave save publishes the renamed current pad without a name request.
- choose(1,20);const renamed=Buffer.from('SLAVE NEW NAME\0');for(let j=0;j<17;j++)setm(1,26+j,renamed[j]||0);setm(1,6,process.argv.includes('--storage')?1:0);const saveStarted=frames;press(1,'b',1800);report.liveSaveFrames=frames-saveStarted;
+ choose(1,20);const renamed=Buffer.from('SLAVE NEW NAME\0');for(let j=0;j<17;j++)sw(1,0xae98+j,renamed[j]||0);setm(1,6,process.argv.includes('--storage')?1:0);const saveStarted=frames;press(1,'b',1800);if(v(1,'page')===26){press(1,'up');press(1,'a',1800);}report.liveSaveFrames=frames-saveStarted;
  const remoteName=slot=>Buffer.from(Array.from({length:16},(_,j)=>st(0,S['_linkmirror']+slot*16+j))).toString().split('\0')[0];
  until(()=>remoteName(7)==='SLAVE NEW NAME',1800);
  if(process.argv.includes('--storage')){
-  choose(1,19);setm(1,6,0);press(1,'a',1800);until(()=>remoteName(7)==='PAIRED LIVE TEST',3600);
-  choose(1,19);setm(1,6,1);press(1,'a',1800);until(()=>remoteName(7)==='SLAVE NEW NAME',1800);
-  choose(1,24);setm(1,6,0);press(1,'a',1800);until(()=>remoteName(7)==='PAIRED LIVE TEST',3600);
+  choose(1,19);setm(1,6,0);press(1,'a',1800);if(v(1,'page')===26){press(1,'up');press(1,'a',1800);}until(()=>remoteName(7)==='PAIRED LIVE TEST',3600);
+  choose(1,19);setm(1,6,1);press(1,'a',1800);if(v(1,'page')===26){press(1,'up');press(1,'a',1800);}until(()=>remoteName(7)==='SLAVE NEW NAME',1800);
+  choose(1,24);setm(1,6,0);press(1,'a',1800);if(v(1,'page')===26){press(1,'up');press(1,'a',1800);}until(()=>remoteName(7)==='PAIRED LIVE TEST',3600);
   assert(v(0,'seqplaying')&&v(1,'seqplaying'));report.patternAndSongLoadNames=true;
  }
 

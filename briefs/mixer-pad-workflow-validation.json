@@ -1,0 +1,729 @@
+{
+  "rom_sha256": "84011fdc5e16857b24b287e121db30360881ea0c35d0c2cdd46706b53148b002",
+  "passed": [
+    "Highlighted-pad copy/paste/load/save with live-pattern isolation",
+    "File target retained when switching file pages",
+    "Overwrite confirmation and default Cancel",
+    "Local and linked stopped-pad A starts AUTO transport",
+    "Tiny number inside pad above title, focus outline, no external number row",
+    "40 incremental pad / 56 fader / 25 whole-map cases equal full redraw",
+    "All five slave phase modes at 120/300 BPM",
+    "Distinct eight-pad LEFT and RIGHT batteries boot correctly"
+  ],
+  "live_300_storage": {
+    "bpm": 300,
+    "rom_sha256": "84011fdc5e16857b24b287e121db30360881ea0c35d0c2cdd46706b53148b002",
+    "pairs": [
+      {
+        "slot": 0,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 2,
+            "b": 2,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 2,
+            "b": 2,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 2,
+            "b": 2,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 57,
+        "overflow": [
+          0,
+          0
+        ]
+      },
+      {
+        "slot": 1,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 8,
+            "b": 8,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 8,
+            "b": 8,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 8,
+            "b": 8,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 1,
+        "overflow": [
+          0,
+          0
+        ]
+      },
+      {
+        "slot": 2,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 4,
+            "b": 4,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 4,
+            "b": 4,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 4,
+            "b": 4,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 31,
+        "overflow": [
+          0,
+          0
+        ]
+      },
+      {
+        "slot": 3,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 0,
+            "b": 0,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 0,
+            "b": 0,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 0,
+            "b": 0,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 83,
+        "overflow": [
+          0,
+          0
+        ]
+      },
+      {
+        "slot": 4,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 4,
+            "b": 4,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 4,
+            "b": 4,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 4,
+            "b": 4,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 24,
+        "overflow": [
+          0,
+          0
+        ]
+      },
+      {
+        "slot": 5,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 2,
+            "b": 2,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 2,
+            "b": 2,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 2,
+            "b": 2,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 42,
+        "overflow": [
+          0,
+          0
+        ]
+      },
+      {
+        "slot": 6,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 0,
+            "b": 0,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 0,
+            "b": 0,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 0,
+            "b": 0,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 72,
+        "overflow": [
+          0,
+          0
+        ]
+      },
+      {
+        "slot": 7,
+        "delta": 0,
+        "tracks": [
+          {
+            "track": 0,
+            "a": 15,
+            "b": 15,
+            "delta": 0
+          },
+          {
+            "track": 1,
+            "a": 15,
+            "b": 15,
+            "delta": 0
+          },
+          {
+            "track": 6,
+            "a": 15,
+            "b": 15,
+            "delta": 0
+          }
+        ],
+        "settlingFrames": 0,
+        "overflow": [
+          0,
+          0
+        ]
+      }
+    ],
+    "admission": {
+      "clockTransfers": 22907,
+      "clockCarriers": 660,
+      "extraMetadataTransfers": 0
+    },
+    "liveRemoteControls": true,
+    "independentRemoteLaunch": true,
+    "liveSaveFrames": 488,
+    "patternAndSongLoadNames": true,
+    "clock": {
+      "meanMs": 8.333311261625298,
+      "idealMs": 8.333333333333334,
+      "peakSpacingErrorMs": 3.2082875569661464,
+      "maxDueToLaunchMs": 0.9832382202148438
+    },
+    "unarmedSerialEdges": 0
+  },
+  "irq_audio": [
+    {
+      "model": "DMG forced cgb=False",
+      "clock_hz": 4194304,
+      "sample_rate_hz": 11459.84699453552,
+      "block_cycles": 11712,
+      "bpm": 300,
+      "frames": 60,
+      "ui": "idle sequencer",
+      "onset_measurement": "Actual NRx4 hardware trigger writes",
+      "first_p1_to_p2_step1_ms": 61.14482879638672,
+      "first_play_entry_interval_ms": null,
+      "startup_trace_ms": [
+        [
+          "seq_transport",
+          10,
+          -49.25346374511719,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          0,
+          -48.829078674316406,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          1,
+          -48.732757568359375,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          2,
+          -48.636436462402344,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          3,
+          -48.54011535644531,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          4,
+          -48.44379425048828,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          5,
+          -48.34747314453125,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          6,
+          -48.25115203857422,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_gates",
+          4,
+          -47.71709442138672,
+          0,
+          0,
+          0
+        ],
+        [
+          "drum_enable",
+          2,
+          -39.020538330078125,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_next_deadline",
+          17,
+          -1.987457275390625,
+          6,
+          0,
+          3
+        ],
+        [
+          "seq_frame",
+          10,
+          48.00987243652344,
+          57,
+          0,
+          3
+        ],
+        [
+          "mixer_boundary",
+          18,
+          52.13165283203125,
+          8,
+          240,
+          3
+        ]
+      ],
+      "pulse1_onsets": 20,
+      "irq_pulse1_onsets": 0,
+      "irq_pulse2_onsets": 0,
+      "expected_pulse1_onsets": 20.091266632080078,
+      "pulse1_interval_ms_min": 44.28291320800781,
+      "pulse1_interval_ms_max": 58.650970458984375,
+      "pulse1_phase_jitter_ms_peak_to_peak": 10.74771881103942,
+      "pulse1_phase_jitter_ms_rms": 2.8859267132568935,
+      "full_irq_count": 359,
+      "full_irq_cycles_min": 1824,
+      "full_irq_cycles_mean": 4896.412256267409,
+      "full_irq_cycles_max": 7024,
+      "two_voice_irq_count": 5,
+      "two_voice_irq_cycles_max": 7024,
+      "full_irq_cpu_percent": 41.719125731824136,
+      "worst_irq_budget_percent": 59.97267759562842,
+      "audio_blocks": 335,
+      "expected_audio_blocks": 334,
+      "elapsed_timer_periods": 359.7544398907104,
+      "intentional_idle_timer_periods": 15,
+      "priming_timer_periods": 5,
+      "tail_stop_timer_periods": 5,
+      "audio_underruns": 0,
+      "pending_clock_units_end": 9,
+      "meets_first_step_target": false,
+      "meets_irq_budget": true,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_subdivision_budget": true,
+      "expected_fast_irqs": 359.7544398907104,
+      "meets_startup_regression_budget": true
+    },
+    {
+      "model": "DMG forced cgb=False",
+      "clock_hz": 4194304,
+      "sample_rate_hz": 11459.84699453552,
+      "block_cycles": 11712,
+      "bpm": 300,
+      "frames": 60,
+      "ui": "held right / viewport redraws",
+      "onset_measurement": "Actual NRx4 hardware trigger writes",
+      "first_p1_to_p2_step1_ms": 61.14482879638672,
+      "first_play_entry_interval_ms": null,
+      "startup_trace_ms": [
+        [
+          "seq_transport",
+          10,
+          -49.25346374511719,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          0,
+          -48.829078674316406,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          1,
+          -48.732757568359375,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          2,
+          -48.636436462402344,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          3,
+          -48.54011535644531,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          4,
+          -48.44379425048828,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          5,
+          -48.34747314453125,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          6,
+          -48.25115203857422,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_gates",
+          4,
+          -47.71709442138672,
+          0,
+          0,
+          0
+        ],
+        [
+          "drum_enable",
+          2,
+          -39.020538330078125,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_next_deadline",
+          17,
+          -1.987457275390625,
+          6,
+          0,
+          3
+        ],
+        [
+          "seq_frame",
+          10,
+          48.00987243652344,
+          57,
+          0,
+          3
+        ],
+        [
+          "mixer_boundary",
+          18,
+          52.13165283203125,
+          8,
+          240,
+          3
+        ]
+      ],
+      "pulse1_onsets": 20,
+      "irq_pulse1_onsets": 0,
+      "irq_pulse2_onsets": 0,
+      "expected_pulse1_onsets": 20.09124755859375,
+      "pulse1_interval_ms_min": 39.42394256591797,
+      "pulse1_interval_ms_max": 66.99848175048828,
+      "pulse1_phase_jitter_ms_peak_to_peak": 22.50957489013672,
+      "pulse1_phase_jitter_ms_rms": 7.668905455348744,
+      "full_irq_count": 359,
+      "full_irq_cycles_min": 1824,
+      "full_irq_cycles_mean": 4843.342618384401,
+      "full_irq_cycles_max": 6640,
+      "two_voice_irq_count": 5,
+      "two_voice_irq_cycles_max": 5688,
+      "full_irq_cpu_percent": 41.26699324067745,
+      "worst_irq_budget_percent": 56.69398907103825,
+      "audio_blocks": 330,
+      "expected_audio_blocks": 329,
+      "elapsed_timer_periods": 359.75409836065575,
+      "intentional_idle_timer_periods": 21,
+      "priming_timer_periods": 6,
+      "tail_stop_timer_periods": 3,
+      "audio_underruns": 0,
+      "pending_clock_units_end": 60,
+      "meets_first_step_target": false,
+      "meets_irq_budget": true,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_subdivision_budget": true,
+      "expected_fast_irqs": 359.75409836065575,
+      "meets_startup_regression_budget": true
+    },
+    {
+      "model": "DMG forced cgb=False",
+      "clock_hz": 4194304,
+      "sample_rate_hz": 11459.84699453552,
+      "block_cycles": 11712,
+      "bpm": 300,
+      "frames": 60,
+      "ui": "Mixer held volume",
+      "onset_measurement": "Actual NRx4 hardware trigger writes",
+      "first_p1_to_p2_step1_ms": 61.141014099121094,
+      "first_play_entry_interval_ms": null,
+      "startup_trace_ms": [
+        [
+          "seq_transport",
+          10,
+          -49.2706298828125,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          0,
+          -48.84624481201172,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          1,
+          -48.74992370605469,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          2,
+          -48.653602600097656,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          3,
+          -48.557281494140625,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          4,
+          -48.460960388183594,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          5,
+          -48.36463928222656,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_off",
+          6,
+          -48.26831817626953,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_gates",
+          4,
+          -47.73426055908203,
+          0,
+          0,
+          0
+        ],
+        [
+          "drum_enable",
+          2,
+          -39.03007507324219,
+          0,
+          0,
+          0
+        ],
+        [
+          "seq_next_deadline",
+          17,
+          -2.0055770874023438,
+          6,
+          0,
+          3
+        ],
+        [
+          "seq_frame",
+          10,
+          48.05946350097656,
+          57,
+          0,
+          3
+        ],
+        [
+          "mixer_boundary",
+          18,
+          52.173614501953125,
+          8,
+          240,
+          3
+        ]
+      ],
+      "pulse1_onsets": 20,
+      "irq_pulse1_onsets": 0,
+      "irq_pulse2_onsets": 0,
+      "expected_pulse1_onsets": 20.091228485107422,
+      "pulse1_interval_ms_min": 35.933494567871094,
+      "pulse1_interval_ms_max": 64.5914077758789,
+      "pulse1_phase_jitter_ms_peak_to_peak": 18.288993835447798,
+      "pulse1_phase_jitter_ms_rms": 5.213364772852433,
+      "full_irq_count": 360,
+      "full_irq_cycles_min": 1824,
+      "full_irq_cycles_mean": 4816.844444444445,
+      "full_irq_cycles_max": 6992,
+      "two_voice_irq_count": 5,
+      "two_voice_irq_cycles_max": 6992,
+      "full_irq_cpu_percent": 41.15557943683018,
+      "worst_irq_budget_percent": 59.69945355191257,
+      "audio_blocks": 328,
+      "expected_audio_blocks": 328,
+      "elapsed_timer_periods": 359.7537568306011,
+      "intentional_idle_timer_periods": 22,
+      "priming_timer_periods": 5,
+      "tail_stop_timer_periods": 5,
+      "audio_underruns": 0,
+      "pending_clock_units_end": 14,
+      "meets_first_step_target": false,
+      "meets_irq_budget": true,
+      "meets_audio_delivery": true,
+      "meets_note_rate": true,
+      "meets_subdivision_budget": true,
+      "expected_fast_irqs": 359.7537568306011,
+      "meets_startup_regression_budget": true
+    }
+  ],
+  "pixel_cache": {
+    "passes": true
+  },
+  "reserves": {
+    "wram_bytes": 1041,
+    "stack_bytes": 512
+  },
+  "test_content": {
+    "left": "L01..L08 GROOVE / TR-808",
+    "right": "R01..R08 GROOVE / TR-909",
+    "distinct_beats": 16
+  },
+  "hardware_quantization": "Existing user-reported hardware off-quantize behavior still needs retest; automated gates do not establish hardware timing parity."
+}

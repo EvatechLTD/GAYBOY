@@ -52,10 +52,24 @@ static uint8_t library_add(const uint16_t *extra,uint8_t count,uint8_t replace){
  if(!pool_object_finish(object))return 0;pool_set_reference(POOL_LIBRARY_ROOT,object);(void)old;return 1;
 }
 void sparse_library_name(uint8_t index,char *name) BANKED {uint16_t object=library_reference(index);memset(name,0,17);if(object!=POOL_NONE)pool_object_read(object,0,(uint8_t *)name,16);}
-uint8_t sparse_save_pattern(uint8_t index) BANKED {uint16_t object,old;
- if(sparse_enabled!=1||index>sparse_patterns)return 0;if(!sparse_snapshot(mx.slot))return 0;object=sparse_slots[mx.slot];old=word(pool_root+POOL_LIBRARY_ROOT);
- if(!library_add(&object,1,index)){pool_set_reference(POOL_LIBRARY_ROOT,old);return 0;}if(!pool_commit())return 0;refresh();return 1;
+/* Keep the clone buffer off the live snapshot/save call stack. */
+static uint16_t named_pattern(uint16_t source,const char *name){uint16_t object,size,at;uint8_t buf[16],n;
+ if(source==POOL_NONE||!pool_object_read(source,0,buf,16))return POOL_NONE;
+ if(!memcmp(buf,name,16))return source;
+ if(!pool_reclaim())return POOL_NONE;size=pool_object_size(source);object=pool_object_begin(POOL_PATTERN,size);if(object==POOL_NONE)return POOL_NONE;
+ for(at=0;at<size;at+=n){n=size-at>16?16:size-at;if(!pool_object_read(source,at,buf,n))return POOL_NONE;if(!at)memcpy(buf,name,16);if(!pool_object_write(object,at,buf,n))return POOL_NONE;mixfill();}
+ return pool_object_finish(object)?object:POOL_NONE;
 }
+/* Saving an unplayed pad reads its immutable snapshot, never the live engine. */
+uint8_t sparse_save_pad_pattern(uint8_t pad,uint8_t index,const char *name) BANKED {uint16_t object,old;
+ if(sparse_enabled!=1||pad>=8||index>sparse_patterns||!sparse_journal_flush())return 0;
+ if(pad==mx.slot){memcpy(mx.name,name,16);mx.name[16]=0;mixer_pattern_changed();if(!sparse_snapshot(pad))return 0;object=sparse_slots[pad];}
+ else object=named_pattern(sparse_slots[pad],name);
+ if(object==POOL_NONE)return 0;
+ old=word(pool_root+POOL_LIBRARY_ROOT);if(!library_add(&object,1,index)){pool_set_reference(POOL_LIBRARY_ROOT,old);return 0;}
+ pool_set_reference(POOL_ACTIVE+pad*2,object);if(!pool_commit())return 0;refresh();link_names_dirty|=1<<pad;return 1;
+}
+uint8_t sparse_save_pattern(uint8_t index) BANKED {return sparse_save_pad_pattern(mx.slot,index,mx.name);}
 static void compact_meta(uint8_t *to,const uint8_t *from){uint8_t c;memcpy(to,from,14);
  for(c=0;c<7;c++){to[14+c]=word(from+14+c*2);to[21+c]=word(from+28+c*2);}memcpy(to+28,from+42,39);
 }
@@ -248,11 +262,16 @@ uint8_t sparse_clear_slot(uint8_t slot) BANKED {uint16_t source,object;
  memset(PREFIX+16,0,14);PREFIX[99]=64;object=pool_object_begin(POOL_PATTERN,POOL_PATTERN_BYTES);if(object==POOL_NONE)return 0;
  if(!pool_object_write(object,0,PREFIX,POOL_PATTERN_BYTES)||!pool_object_finish(object))return 0;pool_set_reference(POOL_ACTIVE+slot*2,object);if(!pool_commit())return 0;refresh();mx.padcache=0;return 1;
 }
-uint8_t sparse_load_pattern(uint8_t slot) BANKED {uint8_t active=mx.slot,run=seqplaying;uint16_t source,tone;
- if(sparse_enabled!=1||slot>=sparse_patterns)return 0;mx.pending=255;if(!sparse_journal_flush())return 0;source=library_reference(slot);if(!pool_object_read(source,POOL_PATCH_OFFSET,(uint8_t *)&tone,2))return 0;
- if(pattern_dirty&&!sparse_snapshot(active))return 0;
- if(run)seq_transport();pool_set_reference(POOL_ACTIVE+active*2,source);if(!pool_commit())return 0;sparse_slots[active]=source;sparse_tones[active]=tone;sparse_restore(active);sparse_finish_install();link_names_dirty|=1<<active;if(run)seq_transport();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
+uint8_t sparse_load_pad_pattern(uint8_t index,uint8_t pad) BANKED {uint8_t active=mx.slot,run=seqplaying;uint16_t source,tone;
+ if(sparse_enabled!=1||index>=sparse_patterns||pad>=8)return 0;mx.pending=255;mixer_prepare_cancel();if(!sparse_journal_flush())return 0;
+ source=library_reference(index);if(!pool_object_read(source,POOL_PATCH_OFFSET,(uint8_t *)&tone,2))return 0;
+ if(pad==active&&pattern_dirty&&!sparse_snapshot(active))return 0;
+ if(pad==active&&run)seq_transport();pool_set_reference(POOL_ACTIVE+pad*2,source);if(!pool_commit())return 0;
+ sparse_slots[pad]=source;sparse_tones[pad]=tone;
+ if(pad==active){if(!sparse_restore(active))return 0;sparse_finish_install();if(run)seq_transport();}
+ link_names_dirty|=1<<pad;mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
 }
+uint8_t sparse_load_pattern(uint8_t index) BANKED {return sparse_load_pad_pattern(index,mx.slot);}
 
 /* Immutable clipboard root survives pad edits, saved-song loads and reclamation.
    Pasting shares a snapshot; the next edit creates an independent generation. */

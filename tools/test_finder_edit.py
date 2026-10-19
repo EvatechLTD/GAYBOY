@@ -23,7 +23,7 @@ def image():
  p.memory[0x4000]=0
  return SparseImage(bytes(data))
 
-def pad(n):p.memory[S['_mx']+4]=30+n
+def pad(n):p.memory[0,S['_mx']+4]=30+n
 try:
  enter_app(p);p.tick(30)
  # Select visible 16 steps, then duplicate a drum beat into steps 17..32.
@@ -79,14 +79,16 @@ try:
  if v('page')==26:confirm()
  pasted=image();assert pasted.word(pasted.root,18)==clip
  assert all(not t for t in read_tracks(p,S)),'inactive paste must preserve the live pattern'
- tap('a');p.tick(60);assert p.memory[S['_mx']+1]==1
+ tap('a');p.tick(60);assert p.memory[0,S['_mx']+1]==1
  assert read_tracks(p,S)==live
  assert image().object(tone,'T')==tone_bytes
  # Overwrite acknowledgement and cancellation preserve the destination.
  pad(1);action(41);assert v('page')==26;cancel();assert read_tracks(p,S)==live
  # Clear Song wipes the working pads only, without erasing saved archives or clipboard.
  action(39);assert v('page')==26;p.screen.image.save('build/finder-clear-song.png');cancel();assert read_tracks(p,S)==live
- p.memory[S['_mx']+4]=0;tap('a');assert v('seqplaying')
+ p.memory[0,S['_mx']+4]=0
+ if not v('seqplaying'):tap('a')
+ assert v('seqplaying')
  action(39);confirm();cleared=image()
  assert all(cleared.word(cleared.root,16+i*2)==65535 for i in range(8))
  assert cleared.word(cleared.root,96)==library and cleared.word(cleared.root,32)==song

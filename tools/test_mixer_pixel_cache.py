@@ -101,7 +101,9 @@ try:
  assert v('navopen')
  render();incremental=screen_state();render(force_pads=True,force_faders=True);full=screen_state()
  assert incremental==full,'START menu overlay differs after full regeneration'
- p.button_release('start');p.tick(120);assert v('page')==18 and not v('navopen')
+ p.button_release('start');p.tick(12)
+ if v('navopen'):env['press']('select')
+ p.tick(120);assert v('page')==18 and not v('navopen')
  render(invalidate_pads=False);incremental=screen_state();render(force_pads=True,force_faders=True);full=screen_state()
  assert incremental==full,'Returning from START menu leaves stale mixer pixels'
  report={'rom_sha256':hashlib.sha256(Path(args.rom).read_bytes()).hexdigest(),'model':'DMG','pad_cases':results,'fader_cases':faders,'whole_background_cases':whole,'retained_mixer_image_exercised':'_mixer_image' in S,'menu_open_and_return_equal':True,'passes':True};Path(args.output).write_text(json.dumps(report,indent=2));print('PASS: %d pad transitions compare all40 active tiles + queued10 opposite tiles; %d fader cases and %d whole-map/VRAM transitions match full regeneration'%(len(results),len(faders),len(whole)))

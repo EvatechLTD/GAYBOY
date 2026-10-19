@@ -67,3 +67,23 @@ BGB linked COPE/DEMO instances launched using separate injected batteries from
 primary saves/cope song.gbsong and DEMO1.gbsong. Originals untouched.
 User hardware off-quantize observation still needs reproduction/retest; no
 hardware timing-parity claim. Historical handoff-latency failures remain visible.
+
+
+Pad workflow/visual follow-up complete:
+A starts stopped local or linked pads. Start captures highlighted local pad
+for files and edits. Inactive save/rename uses immutable COW data, inactive
+load leaves live notes, slot and transport untouched. File target persists
+across file pages. Destructive load/save/paste confirms with default Cancel.
+Local files/edits cannot accidentally operate on LINK-view pads.
+Two-character instrument labels distinguish local and linked channels.
+Pads contain tiny number above name; independent focus outline; only running
+pads invert. Removed external number row, moved PAN into reclaimed row.
+Incremental focus borders repaint old/new pad columns, not every pad.
+Sentinel255 never addresses an empty visible column (hidden-pad ghost fix).
+All UI/pixel/IRQ/cable gates pass; detailed current SHA/results are in
+briefs/mixer-pad-workflow-validation.json. Native300 storage stress shows
+zero extra metadata transfers, missed edges, aborts, overflow or added audio
+underruns; all eight paired instrument grids match. Reserved WRAM1041,
+stack512; measured minSP de4e/de69. No hardware timing-parity claim.
+Launched linked BGB LEFT and RIGHT, eight distinct random beats each,
+TR-808 vs TR-909. Standard Shift/Space/Z/X bindings persisted in launcher.

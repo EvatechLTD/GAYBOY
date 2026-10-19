@@ -26,8 +26,8 @@ const fs=require('fs'),assert=require('assert');
   let offset=0;for(let c=0;c<7;c++){writeWord(i,S['_seqeventoffsets']+c*2,offset);writeWord(i,S['_seqeventcounts']+c*2,tracks[c].length);writeWord(i,S['_seqlength']+c*2,16);for(const e of tracks[c]){for(let j=0;j<4;j++)sw(i,S['_seqevents_lo']+offset*4+j,e[j]);offset++;}}
   sw(i,S['_seqeventcache'],0);sw(i,S['_pattern_dirty'],1);writeWord(i,S['_seqbpm'],bpm);writeWord(i,S['_seqglobalbpm'],bpm);writeWord(i,S['_seqcachedbpm'],0);sw(i,0xACCF,0x43);
   const name=Buffer.from('PAIRED LIVE TEST\0');for(let j=0;j<17;j++)setm(i,26+j,name[j]||0);
-  choose(i,20);setm(i,6,0);press(i,'b');
-  for(let slot=1;slot<8;slot++){choose(i,18);setm(i,4,30+slot);press(i,'a');choose(i,19);setm(i,6,0);press(i,'a');}
+  choose(i,20);setm(i,6,0);press(i,'b');if(v(i,'page')===26){press(i,'up');press(i,'a');}
+  for(let slot=1;slot<8;slot++){choose(i,18);setm(i,4,30+slot);press(i,'b');run(80);choose(i,19);setm(i,6,0);press(i,'a');if(v(i,'page')===26){press(i,'up');press(i,'a');}}
   choose(i,18);assert.equal(m(i,1),7);
  }
 

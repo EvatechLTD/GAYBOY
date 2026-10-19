@@ -39,7 +39,7 @@ extern uint8_t ui_menu_allowed(uint8_t item) BANKED;
 void ui_menu_step(int8_t delta) BANKED {do{navchoice=delta<0?(navchoice<=1?PAGE_COUNT-1:navchoice-1):(navchoice>=PAGE_COUNT-1?1:navchoice+1);}while(!ui_menu_allowed(navchoice));}
 
 /* Finder lives beside presets to leave room in the main UI ROM bank. */
-extern uint8_t navcategory;
+extern uint8_t navcategory,mixer_device;
 static const char * const finderpages[]={"LIVE","TONE","MODULATION","BANK","CC","TABLE","FX","MONOSYNTH","SEQUENCER","MASTURBATE","SEQ SETTINGS","P1","P2","WAVE1","WAVE2","NOISE","GLOBAL SETTINGS","DRUMSYNTH","MIXER","LOAD PATTERN","SAVE PATTERN","COPY","PASTE","KITS","LOAD SONG","SAVE SONG","CLEAR PATTERN","SYNC"};
 static void finder_text(uint8_t x,uint8_t y,const char *t,uint8_t inverse){uint8_t c;while(*t&&x<20){c=*t++;canvas[(uint16_t)y*20+x++]=c-32+(inverse?96:0);if(!(x&3))mixfill();}}
 /* Finder categories keep existing page/action IDs; 28..34 jump to tracks. */
@@ -53,7 +53,7 @@ const uint8_t findercount[5]={7,12,8,14,4};
 const char * const findertracks[]={"P1","P2","WAVE1","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
 uint8_t pageconfig;
 static uint8_t pageslot;
-uint8_t finder_allowed(uint8_t item){if(item==255)return 0;if(item==45)return pageconfig!=2;if(pageconfig==2)return item!=18&&item!=8&&item!=16&&item!=27;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
+uint8_t finder_allowed(uint8_t item){if(item==255)return 0;if(page==18&&mixer_device&&(item==19||item==20))return 0;if(item==45)return pageconfig!=2;if(pageconfig==2)return item!=18&&item!=8&&item!=16&&item!=27;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
 static void page_defaults(void);
 static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?13:findercount[navcategory];}
 static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==2?45:i==11?16:i==12?27:pool_root[100+i-3];}

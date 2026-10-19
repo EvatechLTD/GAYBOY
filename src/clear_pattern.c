@@ -4,6 +4,10 @@
 #include "clear_pattern.h"
 #include "ui_startup_font.h"
 static uint8_t origin,slot,track,clear_choice,operation;
+extern uint8_t mixer_device;
+uint8_t mixer_file_pad(void) BANKED;
+uint8_t mixer_file_load(void) BANKED;
+uint8_t mixer_file_save(void) BANKED;
 extern uint8_t seqselectused;
 extern uint8_t seqauditionnote,seqauditiontrack;
 void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=0;if(n)event(0x80|c,n-1,0);}
@@ -46,14 +50,17 @@ void ui_loading_begin(void) BANKED {uint8_t tile;
 void ui_init(void) BANKED {ui_loading_active=0;memset(visible,255,sizeof(visible));page=8;seqtrack=6;seq_open();ui_render();roll_commit();set_bkg_tiles(0,0,20,18,canvas);memcpy(visible,canvas,sizeof(visible));ui_transition_hidden=0;SHOW_BKG;}
 uint8_t clear_available(void) BANKED {return page==8||page==18;}
 void clear_capture(void) BANKED {origin=page;track=page==8?seqtrack:255;slot=page==18&&mx.focus>=30&&mx.focus<38?mx.focus-30:mx.slot;operation=0;}
+uint8_t mixer_menu_pad(void) BANKED {return origin==18?slot:(origin==19||origin==20)?mixer_file_pad():mx.slot;}
+void mixer_file_confirm(uint8_t target,uint8_t saving) BANKED {origin=page;slot=target;track=255;operation=saving?5:4;clear_choice=1;page=26;dirty=1;}
 void clear_open(void) BANKED {if(origin!=8&&origin!=18)return;clear_choice=1;page=26;dirty=1;}
 void clear_song_open(uint8_t song) BANKED {origin=24;slot=song;track=255;operation=1;clear_choice=1;page=26;dirty=1;}
 void clear_render(void) BANKED {uint8_t row;seqflushpending=1;HIDE_SPRITES;
  for(row=0;row<18;row++)memset(canvas+row*20,0,20);
- memset(canvas,96,20);clear_text(0,0,operation==1?"DELETE SAVED SONG":operation==2?"CLEAR SONG":operation==3?"PASTE PATTERN":track<7?"CLEAR TRACK":"CLEAR PATTERN",1);
+ memset(canvas,96,20);clear_text(0,0,operation==1?"DELETE SAVED SONG":operation==2?"CLEAR SONG":operation==5?"SAVE PATTERN":operation==4?"LOAD PATTERN":operation==3?"PASTE PATTERN":track<7?"CLEAR TRACK":"CLEAR PATTERN",1);
  if(operation==1){clear_text(0,4,"DELETE SAVED SONG",0);clear_number(0,6,slot+1,3,0);}
  else if(operation==2){clear_text(0,4,"EMPTY ALL 8 PADS?",0);clear_text(0,6,"SAVED SONGS AND",0);clear_text(0,7,"LIBRARY ARE KEPT",0);}
- else if(operation==3){clear_text(0,4,"REPLACE PATTERN",0);clear_number(17,4,slot+1,1,0);clear_text(0,6,"ALL NOTES, SETTINGS",0);clear_text(0,7,"AND PATCHES REPLACED",0);}
+ else if(operation==5){clear_text(0,4,"REPLACE SAVED ITEM",0);clear_number(0,6,mx.browser+1,3,0);}
+ else if(operation>=3){clear_text(0,4,"REPLACE PATTERN",0);clear_number(17,4,slot+1,1,0);clear_text(0,6,"ALL NOTES, SETTINGS",0);clear_text(0,7,"AND PATCHES REPLACED",0);}
  else {clear_text(0,3,"SELECTED PATTERN",0);clear_number(17,3,slot+1,3,0);
   clear_text(0,5,track==255?"ALL SEQUENCES WILL":"ONLY THIS TRACK WILL",0);clear_text(0,6,"BE CLEARED",0);if(track<7){clear_text(0,8,"TRACK",0);clear_number(6,8,track+1,1,0);}clear_text(0,10,"PATCHES ARE KEPT",0);
  }
@@ -66,10 +73,12 @@ void clear_input(uint8_t edge) BANKED {uint8_t ok=1;
  if(operation==1)ok=sparse_delete_song(slot);
  else if(operation==2)ok=sparse_clear_working_song();
  else if(operation==3)ok=sparse_paste_pad(slot);
+ else if(operation==4)ok=mixer_file_load();
+ else if(operation==5)ok=mixer_file_save();
  else if(slot==mx.slot)seq_clear_notes(track);
  else if(sparse_enabled)ok=sparse_clear_slot(slot);
  else ok=mixer_clear_saved(slot);
- close();if(!ok)mx.error=2;
+ close();if(ok&&operation>=4){page=18;mx.focus=30+slot;mx.naming=0;}if(!ok)mx.error=2;
 }
 
 extern uint8_t seqrecordtrack;
@@ -85,9 +94,10 @@ void seq_clear_notes(uint8_t track) BANKED {uint8_t c,busy=seqservicing;seqservi
 }
 
 /* Edit context follows the displayed grid or the focused mixer pad. */
-static uint8_t edit_pad(void){return mx.focus>=30&&mx.focus<38?mx.focus-30:mx.slot;}
+static uint8_t edit_pad(void){return origin==18?slot:(origin==19||origin==20)?mixer_file_pad():mx.slot;}
 static uint8_t edit_grid(void){return page==8;}
 uint8_t finder_edit_allowed(uint8_t item) BANKED {
+ if(page==18&&mixer_device)return 0;
  if(item==26)return page==18;
  if(item==39)return page==18&&sparse_enabled==1;
  if(item==40)return page==18&&sparse_enabled==1&&(edit_pad()==mx.slot||sparse_slots[edit_pad()]!=POOL_NONE);

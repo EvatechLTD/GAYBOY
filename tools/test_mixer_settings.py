@@ -6,7 +6,9 @@ from boot_helpers import enter_app
 S={l.split()[1]:int(l.split()[2],16) for l in Path('build/GAYBOY.noi').read_text().splitlines() if l.startswith('DEF ')}
 p=PyBoy('build/GAYBOY.gb',window='null',sound_emulated=True,ram_file=BytesIO(bytes(32768)))
 p.set_emulation_speed(0)
-def v(n,o=0):return p.memory[S['_'+n]+o]
+def v(n,o=0):
+ a=S['_'+n]+o
+ return p.memory[0,a] if 0xa000<=a<0xc000 else p.memory[a]
 def tap(k):
  mask={'start':128,'select':64,'a':16,'b':32,'left':2,'right':1,'up':4,'down':8}[k]
  p.button_press(k)

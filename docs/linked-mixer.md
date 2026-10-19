@@ -23,7 +23,21 @@ launch can wait behind an outstanding command; repeating the same parameter
 coalesces to its latest requested value. Different additional edits should wait
 for the pending indication to clear. This deliberately bounds protocol work.
 
-Four 40-pixel pattern pads are visible at once, with five characters per label.
+Instrument strip names use two characters: local P1/P2, W1/W2, N1, M1, D1;
+linked P3/P4, W3/W4, N2, M2, D2.
+
+Four 40-pixel pattern pads are visible at once. Each contains a small slot
+number above its five-character name. The focus outline is independent of
+playing inversion and queued flashing. The external number row is removed;
+PAN uses the reclaimed mixer row. A stopped pad press starts transport.
+A linked pad press starts AUTO transport, then sends its selection after
+discovery without adding live serial transfers.
+
+Opening Start on a local pad captures its highlighted slot for Edit and File
+actions, independently of the active/playing slot. Inactive Load/Save and
+Copy/Paste preserve the live pattern and transport. Replacements ask for
+confirmation with Cancel selected first. Pattern File/Edit actions are local;
+they are unavailable in LINK view to prevent edits to the wrong machine.
 Move horizontally to page through visible pads. The focused pad's full name is
 shown above; off-page playing/queued pads have indicators. LOCAL LAYOUT and
 LINK LAYOUT in Mixer Settings open independent editors: arrows select, A hides
@@ -129,7 +143,7 @@ layout power cycles/redundancy, incremental/full pixel equivalence and queued-pa
 flash cancellation.
 
 The current 300 BPM IRQ/audio fixture passes delivery, note rate, startup and
-subdivision budgets with zero measured underruns; longest measured IRQ is 7084
+subdivision budgets with zero measured underruns; longest measured IRQ is 7024
 cycles. The pinned main baseline's corresponding historical startup budget fails
 with corrected native hardware-write instrumentation; its other budgets pass.
 The candidate adds bounded CPU work (approximately one percentage point in this
@@ -167,6 +181,9 @@ python tools/test_mixer_pixel_cache.py
 python tools/test_queued_flash.py
 python tools/test_mixer_layout_persistence.py
 python tools/test_mixer_settings.py
+python tools/test_mixer_pad_context.py
+python tools/test_mixer_pad_outline.py
+node tools/test_mixer_pad_start.cjs
 ```
 
 Reference main is 258b713064ab6796443b6237a040718b1d5d7e9e. The locally pinned
@@ -175,3 +192,10 @@ reference ROM SHA256 is
 
 Sparse mixer layout occupies root bytes 110..120, leaving the current main
 checkout's Quick Menu assignments at 100..109 untouched on integration.
+
+
+For distinct emulator test content, run `python tools/prepare_linked_beats.py`
+then `tools/launch_linked_mixer.ps1`. LEFT uses eight L01..L08 TR-808 beats;
+RIGHT uses eight different R01..R08 TR-909 beats. The generated test batteries
+live in build/linked-test, preserve earlier batteries as backups and never
+modify saves/*.gbsong. Keys: Shift Start, Space Select, Z B, X A.
