@@ -4,6 +4,7 @@
 #include "clear_pattern.h"
 #include "ui_startup_font.h"
 static uint8_t origin,slot,track,clear_choice,operation;
+extern uint8_t seqselectused;
 extern uint8_t seqauditionnote,seqauditiontrack;
 void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=0;if(n)event(0x80|c,n-1,0);}
 uint8_t seq_group_contains(uint8_t step,uint8_t pitch) BANKED {return seqgrouptrack==seqtrack&&step>=seqgroupx0&&step<=seqgroupx1&&pitch>=seqgroupy0&&pitch<=seqgroupy1;}
@@ -49,18 +50,22 @@ void clear_open(void) BANKED {if(origin!=8&&origin!=18)return;clear_choice=1;pag
 void clear_song_open(uint8_t song) BANKED {origin=24;slot=song;track=255;operation=1;clear_choice=1;page=26;dirty=1;}
 void clear_render(void) BANKED {uint8_t row;seqflushpending=1;HIDE_SPRITES;
  for(row=0;row<18;row++)memset(canvas+row*20,0,20);
- memset(canvas,96,20);clear_text(0,0,operation?"DELETE SONG":"CLEAR PATTERN",1);
- if(operation){clear_text(0,4,"DELETE SAVED SONG",0);clear_number(0,6,slot+1,3,0);}
+ memset(canvas,96,20);clear_text(0,0,operation==1?"DELETE SAVED SONG":operation==2?"CLEAR SONG":operation==3?"PASTE PATTERN":track<7?"CLEAR TRACK":"CLEAR PATTERN",1);
+ if(operation==1){clear_text(0,4,"DELETE SAVED SONG",0);clear_number(0,6,slot+1,3,0);}
+ else if(operation==2){clear_text(0,4,"EMPTY ALL 8 PADS?",0);clear_text(0,6,"SAVED SONGS AND",0);clear_text(0,7,"LIBRARY ARE KEPT",0);}
+ else if(operation==3){clear_text(0,4,"REPLACE PATTERN",0);clear_number(17,4,slot+1,1,0);clear_text(0,6,"ALL NOTES, SETTINGS",0);clear_text(0,7,"AND PATCHES REPLACED",0);}
  else {clear_text(0,3,"SELECTED PATTERN",0);clear_number(17,3,slot+1,3,0);
   clear_text(0,5,track==255?"ALL SEQUENCES WILL":"ONLY THIS TRACK WILL",0);clear_text(0,6,"BE CLEARED",0);if(track<7){clear_text(0,8,"TRACK",0);clear_number(6,8,track+1,1,0);}clear_text(0,10,"PATCHES ARE KEPT",0);
  }
- clear_text(3,12,"Do it",clear_choice==0);clear_text(3,14,"Cancel",clear_choice==1);clear_text(0,17,"A CHOOSE  B CANCEL",0);
+ clear_text(3,12,"Do it",clear_choice==0);clear_text(3,14,"Cancel",clear_choice==1);clear_text(0,17,"START/A OK  SEL BACK",0);
 }
 static void close(void){page=origin;if(page==8){seqdrawvalid=0;seqviewtrack=255;}mx.padcache=0;dirty=1;}
 void clear_input(uint8_t edge) BANKED {uint8_t ok=1;
  if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)){clear_choice^=1;dirty=1;}
- if(edge&J_B){close();return;}if(!(edge&J_A))return;if(clear_choice){close();return;}
- if(operation)ok=sparse_delete_song(slot);
+ if(edge&J_SELECT){seqselectused=1;close();return;}if(!(edge&(J_A|J_START)))return;if(clear_choice){close();return;}
+ if(operation==1)ok=sparse_delete_song(slot);
+ else if(operation==2)ok=sparse_clear_working_song();
+ else if(operation==3)ok=sparse_paste_pad(slot);
  else if(slot==mx.slot)seq_clear_notes(track);
  else if(sparse_enabled)ok=sparse_clear_slot(slot);
  else ok=mixer_clear_saved(slot);
@@ -77,4 +82,36 @@ void seq_clear_notes(uint8_t track) BANKED {uint8_t c,busy=seqservicing;seqservi
  else if(track<7){if(seqrecordtrack==track){seqrecordtrack=255;seqrecordlength=0;}seq_clear_release(track);seq_track_clear(track);}
  else {seqservicing=busy;return;}
  seqgrouptrack=255;seqapending=seqamoved=0;seqdrawvalid=0;seqviewtrack=255;seqdeadline=1;mixer_pattern_changed();seqservicing=busy;dirty=1;
+}
+
+/* Edit context follows the displayed grid or the focused mixer pad. */
+static uint8_t edit_pad(void){return mx.focus>=30&&mx.focus<38?mx.focus-30:mx.slot;}
+static uint8_t edit_grid(void){return page==8;}
+uint8_t finder_edit_allowed(uint8_t item) BANKED {
+ if(item==26)return page==18;
+ if(item==39)return page==18&&sparse_enabled==1;
+ if(item==40)return page==18&&sparse_enabled==1&&(edit_pad()==mx.slot||sparse_slots[edit_pad()]!=POOL_NONE);
+ if(item==41)return page==18&&sparse_enabled==1&&pool_reference(POOL_PATTERN_CLIP)!=POOL_NONE;
+ if(!edit_grid())return 0;
+ if(item==21||item==42||item==43)return seqgrouptrack==seqtrack;
+ if(item==22)return seq_clip_kind()==2;
+ if(item==37)return seq_clip_kind()==1;
+ return item==35||item==36||item==38;
+}
+uint8_t finder_edit_action(uint8_t item) BANKED {uint8_t ok=1;
+ if(!finder_edit_allowed(item))return 0;
+ if(item==26||item==35){clear_open();return 1;}
+ if(item==39){operation=2;origin=18;clear_choice=1;page=26;dirty=1;return 1;}
+ if(item==40)ok=sparse_copy_pad(edit_pad());
+ if(item==41){slot=edit_pad();origin=18;operation=3;
+  if(sparse_slots[slot]!=POOL_NONE||(slot==mx.slot&&seq_event_total()!=0)){clear_choice=1;page=26;dirty=1;return 1;}
+  ok=sparse_paste_pad(slot);
+ }
+ if(item==36)seq_copy_track();
+ if(item==37)seq_paste();
+ if(item==38)seq_select_visible();
+ if(item==21||item==43){sparse_finish_install();ok=seq_region_copy(item==43);if(ok&&item==43)mixer_pattern_changed();}
+ if(item==22){sparse_journal_edit_barrier();sparse_finish_install();ok=seq_region_paste(seqcursor[seqtrack],seqtrack==6?drumrow:seqpitch[seqtrack]);if(ok)mixer_pattern_changed();}
+ if(item==42)seq_delete_selection();
+ if(!ok)mx.error=2;seqdrawvalid=0;mx.padcache=0;dirty=1;return ok;
 }

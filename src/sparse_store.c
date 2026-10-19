@@ -250,3 +250,24 @@ uint8_t sparse_load_pattern(uint8_t slot) BANKED {uint8_t active=mx.slot,run=seq
  if(pattern_dirty&&!sparse_snapshot(active))return 0;
  if(run)seq_transport();pool_set_reference(POOL_ACTIVE+active*2,source);if(!pool_commit())return 0;sparse_slots[active]=source;sparse_tones[active]=tone;sparse_restore(active);sparse_finish_install();link_names_dirty|=1<<active;if(run)seq_transport();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
 }
+
+/* Immutable clipboard root survives pad edits, saved-song loads and reclamation.
+   Pasting shares a snapshot; the next edit creates an independent generation. */
+uint8_t sparse_copy_pad(uint8_t slot) BANKED {uint16_t source;
+ if(sparse_enabled!=1||slot>=8)return 0;mx.pending=255;mixer_prepare_cancel();sparse_finish_install();if(!sparse_journal_flush())return 0;
+ if(slot==mx.slot&&(pattern_dirty||sparse_slots[slot]==POOL_NONE)&&!sparse_snapshot(slot))return 0;source=sparse_slots[slot];if(source==POOL_NONE)return 0;
+ pool_set_reference(POOL_PATTERN_CLIP,source);return pool_commit();
+}
+uint8_t sparse_paste_pad(uint8_t slot) BANKED {uint16_t source;uint8_t run;
+ if(sparse_enabled!=1||slot>=8)return 0;mx.pending=255;mixer_prepare_cancel();sparse_finish_install();if(!sparse_journal_flush())return 0;
+ source=pool_reference(POOL_PATTERN_CLIP);if(source==POOL_NONE||!pool_object_check(source,POOL_PATTERN))return 0;
+ pool_set_reference(POOL_ACTIVE+slot*2,source);if(!pool_commit())return 0;refresh();mx.cachevalid=0;mx.padcache=0;
+ if(slot==mx.slot){run=seqplaying;if(run)seq_transport();if(!sparse_restore(slot))return 0;sparse_finish_install();if(run)seq_transport();}
+ dirty=1;return 1;
+}
+uint8_t sparse_clear_working_song(void) BANKED {uint8_t i;
+ if(sparse_enabled!=1)return 0;mx.pending=255;mixer_prepare_cancel();sparse_finish_install();if(!sparse_journal_flush())return 0;
+ for(i=0;i<8;i++)pool_set_reference(POOL_ACTIVE+i*2,POOL_NONE);pool_root[7]=0;if(!pool_commit())return 0;
+ if(seqplaying)seq_transport();refresh();mx.slot=0;mx.pending=255;mx.cachevalid=mx.presaved=mx.protectedslots=0;mx.focus=30;
+ sparse_song=255;memset(sparse_song_name,0,17);seq_clear_notes(255);defaults();mixer_pattern_clean();mx.padcache=0;seqdrawvalid=0;dirty=1;return 1;
+}

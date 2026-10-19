@@ -14,6 +14,7 @@
 #define POOL_ACTIVE 16U
 #define POOL_SONG_REFS 32U
 #define POOL_LIBRARY_ROOT 96U
+#define POOL_PATTERN_CLIP 98U
 #define POOL_LIBRARY 'L'
 #define POOL_PATTERN 'P'
 #define POOL_PATCH 'T'

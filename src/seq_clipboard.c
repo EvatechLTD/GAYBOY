@@ -56,3 +56,18 @@ void seq_swing_edit(int16_t delta) BANKED {int16_t value;if(seqplaying)seq_frame
 
 extern uint8_t seqmeterbeats,seqmeterdenom,seqbeats,seqdenom;
 void seq_meterbuild(void) BANKED{uint8_t i,beat=0,within=0,steps;if(seqmeterbeats==seqbeats&&seqmeterdenom==seqdenom)return;steps=16/seqdenom;for(i=0;i<64;i++){seqgrid[i]=within?64:beat?76:160;if(++within==steps){within=0;if(++beat==seqbeats)beat=0;}if(!(i&7)){mixfill();if(monomode&&expconfig[0])exp_fill();}}seqmeterbeats=seqbeats;seqmeterdenom=seqdenom;}
+
+/* The track and region clipboards share SRAM, with explicit menu actions. */
+uint8_t seq_clip_kind(void) BANKED {uint8_t meta[16];clip_part(0,meta,16,0);return meta[0]==0xC8&&meta[11]==0x73?1:meta[0]==0xC9&&meta[11]==0x74?2:0;}
+void seq_copy_track(void) BANKED {uint8_t group=seqgrouptrack;seqgrouptrack=255;seq_copy();seqgrouptrack=group;}
+void seq_select_visible(void) BANKED {uint16_t end;uint8_t c=seqtrack;
+ seq_dimensions();end=(uint16_t)seqbase+seqcols;if(end>seqlength[c])end=seqlength[c];
+ seqgrouptrack=c;seqgroupx0=seqbase;seqgroupx1=end-1;seqgroupy1=c==6?12:seqtop[c];seqgroupy0=c==6?0:seqtop[c]+1-seqrows;
+ seqcursor[c]=seqbase;if(c==6)drumrow=0;else seqpitch[c]=seqgroupy1;seqapending=seqamoved=seqhead=seqfocus=0;seqdrawvalid=0;dirty=1;
+}
+void seq_clear_release(uint8_t track) BANKED;
+void seq_delete_selection(void) BANKED {uint8_t e[4],c=seqtrack;uint16_t i;
+ if(seqgrouptrack!=c)return;sparse_journal_edit_barrier();sparse_finish_install();i=seq_event_count(c);
+ while(i){i--;seq_event_get(c,i,e);if(region_selected(e))seq_event_erase(c,i);mixfill();}
+ seq_clear_release(c);mixer_pattern_changed();seqdrawvalid=0;dirty=1;
+}

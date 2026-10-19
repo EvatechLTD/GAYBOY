@@ -342,6 +342,7 @@ static uint8_t collect(uint8_t fresh){uint8_t i,data[2],base=0;uint16_t total=40
  if(library!=POOL_NONE&&pool_object_read_local(library,0,data,2)&&pool_word_local(data)<=255)total+=pool_word_local(data);
  for(i=0;i<8;i++){if(!visit_pattern(pool_reference_local(POOL_ACTIVE+i*2))){pool_error=2;return 0;}graph_progress(i+1,total,base);}
  for(i=0;i<POOL_SONGS;i++){if(!visit_song(pool_reference_local(POOL_SONG_REFS+i*2))){pool_error=2;return 0;}graph_progress(9+i,total,base);}
+ if(!visit_pattern(pool_reference_local(POOL_PATTERN_CLIP))){pool_error=2;return 0;}
  if(!visit_library(pool_reference_local(POOL_LIBRARY_ROOT),base)){pool_error=2;return 0;}return 1;
 }
 uint8_t pool_collect(void) BANKED {return collect(1);}
