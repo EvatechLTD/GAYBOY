@@ -2,6 +2,7 @@
 #include "api.h"
 #include "sequencer.h"
 #include "mixer_shared.h"
+#include "link_control.h"
 void mixer_pattern_changed(void) BANKED;
 void seq_audition_stop(void) BANKED;
 void seq_irq_launch(void) BANKED;
@@ -115,7 +116,7 @@ void seq_pattern_release(void) BANKED {uint8_t c,busy=seqservicing;if(!syncmode)
  seqservicing=busy;}
 static void pattern_start(uint8_t preserve){uint8_t c,busy=seqservicing;if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);if(!preserve)seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
  seq_native_reset();seq_native_launch();
- if(seqcachedbpm!=seqbpm)seq_gates();if(!preserve)mixer_clock_reset();if(syncmode)sync_pattern();
+ if(seqcachedbpm!=seqbpm)seq_gates();if(!preserve)mixer_clock_reset();if(syncmode&&(!preserve||syncslave))sync_pattern();
  if(!seq_native_fire(0)){if(seq_enabled(6))seq_fire(6);
  for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);}seqservicing=busy;
 }
@@ -133,7 +134,7 @@ void seq_pattern_handoff(void) BANKED {
    seqticks+=pending;seqplaying=1;
   }
   pattern_start(1);
- }else pattern_start(0);
+ }else pattern_start(MIXER_KEEP_SYNC_GRID);
 }
 void seq_next_deadline(void) BANKED;
 uint8_t sync_local_stop_allowed(void) BANKED;

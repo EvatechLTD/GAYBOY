@@ -41,10 +41,10 @@ const fs=require('fs'),assert=require('assert');
  const mx=S['_mx'];
  assert.equal(core._link_state_read(1,mx+3),4,'Fresh demo must default to 1/1');
  // Populate pad 1 on the slave through Save/Load UI, leaving pad 0 active.
- choose(1,20);core._link_state_write(1,mx+6,1);press(1,'b');run(40);
- choose(1,18);core._link_state_write(1,mx+4,31);press(1,'a');run(60);
- choose(1,19);core._link_state_write(1,mx+6,1);press(1,'a');run(60);
- core._link_state_write(1,mx+4,30);press(1,'a');run(60);
+ choose(1,20);core._link_state_write(1,mx+6,1);press(1,'b');if(v(1,'page')===26){press(1,'up');press(1,'a');}run(40);
+ choose(1,18);core._link_state_write(1,mx+4,31);press(1,'b');run(60);
+ choose(1,19);core._link_state_write(1,mx+6,1);press(1,'a');if(v(1,'page')===26){press(1,'up');press(1,'a');}run(60);
+ choose(1,18);core._link_state_write(1,mx+4,30);press(1,'b');run(60);
  for(const i of [0,1]){writeWord(i,S['_seqbpm'],bpm);writeWord(i,S['_seqglobalbpm'],bpm);choose(i,27);for(let n=1;n<mode;n++)press(i,'right');}
  core._link_state_write(1,mx+3,0); // Simulate a saved NOW preference.
  if(mode===1){press(1,'down');press(1,'right');press(1,'right');}
@@ -59,6 +59,7 @@ const fs=require('fs'),assert=require('assert');
  // purpose is preparation progress; master phase comparisons use normal runs.
  tempoJitter=process.argv.includes('--tempo-jitter');
  const maxGridLag=mode===4?3:mode===1?1:2;
+ const settle=()=>until(()=>[0,1].every(i=>!v(i,'seqservicing')&&!v(i,'syncbusy')&&v(i,'rd')===v(i,'wr')&&!v(i,'syncpending')&&word(i,'seqticks')<word(i,'seqdeadline')),180);
  const report={mode,bpm,stress:process.argv.includes('--stress'),tempoJitter,launches:[]};
  core._link_watch_events(S['_mixer_boundary'],S['_seq_pattern_handoff'],S['_seqposition'],S['_seqticks'],S['_seqclock']);
  function events(){const count=core._link_event_count(),at=core._link_events();let out=[];for(let n=0;n<count;n++){const a=at+n*28,d=new DataView(core.HEAPU8.buffer,a,28);out.push({cycle:d.getUint32(0,true),tag:d.getUint32(8,true),grid:d.getUint32(12,true),clock:d.getUint32(20,true),ticks:d.getUint32(24,true)});}return out;}
@@ -70,7 +71,7 @@ const fs=require('fs'),assert=require('assert');
   core._link_watch_events(S['_mixer_boundary'],S['_seq_pattern_handoff'],S['_seqposition'],S['_seqticks'],S['_seqclock']);
   const target=1-core._link_state_read(1,mx+1),before=core._link_event_count();
   core._link_state_write(1,mx+3,quant);core._link_state_write(1,mx+4,30+target);press(1,'a');
-  until(()=>core._link_state_read(1,mx+1)===target&&core._link_state_read(1,mx+2)===255,1800);run(12);
+  until(()=>core._link_state_read(1,mx+1)===target&&core._link_state_read(1,mx+2)===255,1800);run(12);settle();
   const launches=events().slice(before).filter(e=>e.tag===0x301),effective=quant||4;
   assert.equal(core._link_state_read(1,mx+3),effective,'Requested quantization changed');
   assert.equal(launches.length,1,'Expected one local handoff');
@@ -80,14 +81,14 @@ const fs=require('fs'),assert=require('assert');
   report.launches.push({quant,effective,target,delta,launch:launches[0]});
   // Retrigger current pad on the same continuing transport grid.
   const retriggerStart=core._link_event_count();press(1,'a');
-  until(()=>events().slice(retriggerStart).some(e=>e.tag===0x301),1800);run(8);
+  until(()=>events().slice(retriggerStart).some(e=>e.tag===0x301),1800);run(8);settle();
   const retrigger=events().slice(retriggerStart).filter(e=>e.tag===0x301);
   assert.equal(retrigger.length,1);assert.equal(retrigger[0].grid%(1<<effective),0);
   assert((tempoJitter||gridDelta()<=maxGridLag||gridDelta()===15),'Retrigger shifted slave grid '+JSON.stringify({mode,quant,delta:gridDelta()}));
  }
- // Quantization selector must still expose all four rhythmic choices.
- core._link_state_write(1,mx+4,1);const choices=[];for(let n=0;n<4;n++){press(1,'a');choices.push(core._link_state_read(1,mx+3));}
- assert.deepEqual(choices,[1,2,3,4]);report.choices=choices;
+ // Quantization selector must still expose all four rhythmic choices and LONG.
+ core._link_state_write(1,mx+4,1);const choices=[];for(let n=0;n<(process.argv.includes('--baseline-quant')?4:5);n++){press(1,'a');choices.push(core._link_state_read(1,mx+3));}
+ assert.deepEqual(choices,process.argv.includes('--baseline-quant')?[1,2,3,4]:[5,1,2,3,4]);report.choices=choices;
  assert(!v(0,'overflow')&&!v(1,'overflow'),'Serial queue overflow');
  assert.equal(core._link_wire_aborts(),0,'Serial transfer restarted');
  fs.writeFileSync(`build/slave-launch-mode${mode}-${bpm}${process.argv.includes('--stress')?'-stress':''}${tempoJitter?'-jitter':''}.json`,JSON.stringify(report,null,2));

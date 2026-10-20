@@ -4,7 +4,7 @@
 #include "mixer_pads.h"
 #include "link_control.h"
 #include "mixer_font.h"
-extern uint8_t mixer_hidden[8],mixer_device;
+extern uint8_t mixer_hidden[8],mixer_device,mixer_pad_pages[2];
 extern __at (0xACC4) uint8_t pad_image_playing;
 extern __at (0xACC5) uint8_t pad_image_queued;
 __at (0xAE40) uint8_t pad_names[8][5];
@@ -44,8 +44,9 @@ static void upload(uint8_t bank,uint8_t *columns){uint8_t k,tx,y,buf[16],*src,*d
 void mixer_pads_render(void) BANKED {uint8_t i,j,n=0,pg=0,mask=hidden(),active=MIXER_LINK_VIEW?linkmirror.slot:mx.slot,play=seqplaying?active:255,q=queued(),focus=mx.focus>=30&&mx.focus<38?mx.focus-30:255,rebuild=0,columns[20],*rows=(uint8_t *)0xAD00;char name[17];
  /* Determine the page from the focused logical pad after visibility filters. */
  for(i=0;i<8;i++)if(!(mask&(1<<i))){if(mx.focus==30+i)pg=n/4;n++;}
- if(mx.focus<30||mx.focus>=38)pg=pad_names_valid?cachedpage:0;
+ if(mx.focus<30||mx.focus>=38)pg=mixer_pad_pages[!!MIXER_LINK_VIEW];
  if(pg>=(n+3)/4)pg=0;
+ mixer_pad_pages[!!MIXER_LINK_VIEW]=pg;
  if(!pad_names_valid||cachedpage!=pg||cachedmask!=mask||cacheddevice!=!!MIXER_LINK_VIEW)rebuild=1;
  if(!MIXER_LINK_VIEW&&pad_names_valid&&mx.name[0]&&memcmp(pad_names[active],mx.name,5)){pad_names_valid=0;rebuild=1;}
  if(!pad_names_valid||cacheddevice!=!!MIXER_LINK_VIEW){for(i=0;i<8;i++){

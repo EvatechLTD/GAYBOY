@@ -144,7 +144,7 @@ uint8_t sparse_snapshot(uint8_t slot) BANKED {uint16_t patch,object,size,at,gene
  link_names_dirty|=1<<slot;if(slot==mx.slot&&generation==pattern_generation)mixer_pattern_clean();return 1;
 }
 void sparse_name(uint8_t slot,char *name) BANKED {memset(name,0,17);if(slot<8&&sparse_slots[slot]!=POOL_NONE)pattern_read(sparse_slots[slot],0,(uint8_t *)name,16);name[16]=0;}
-uint8_t sparse_restore(uint8_t slot) BANKED {uint8_t busy=seqservicing;
+uint8_t sparse_restore(uint8_t slot) BANKED {uint8_t busy=seqservicing,prepared;
  if(sparse_enabled!=1||slot>=8)return 0;sparse_install_slot=255;seqservicing=1;
  if(sparse_slots[slot]==POOL_NONE){uint8_t c;
    /* Empty note descriptors need no live-array erase. A retained outgoing
@@ -153,17 +153,17 @@ uint8_t sparse_restore(uint8_t slot) BANKED {uint8_t busy=seqservicing;
    for(c=0;c<7;c++){seqlength[c]=16;seqdefaultvel[c]=100;seqdefaultdur[c]=c==6?0:c==5?4:1;seqgate[c]=(c<2||c>=5)?100:80;seqcachedgate[c]=seqgate[c];seqgateunits[c]=(c<2||c>=5)?128:102;mx.level[c]=127;mx.pan[c]=3;}
    drummutemask=drumsolomask=0;seqmuted=seqsolo=seqmode=0;seqbpm=seqglobalbpm?seqglobalbpm:120;seqcachedbpm=0;seqstepunits=128;seqbeats=seqdenom=4;memset(mx.name,0,17);seqeventfull=0;seqeventcache=2;install_position=0;sparse_install_slot=slot;*(uint8_t *)0xACCF=64;
   mx.slot=slot;seqservicing=busy;return 1;}
- if(!sparse_prepared_apply(slot)){
+ prepared=sparse_prepared_apply(slot);if(!prepared){
  if(!pattern_read(sparse_slots[slot],0,PREFIX,POOL_PATTERN_BYTES)){seqservicing=busy;return 0;}
  expand_meta(META_BUFFER,PREFIX+16);applymeta(META_BUFFER);memcpy(mx.name,PREFIX,16);mx.name[16]=0;
  seqstepunits=word(PREFIX+97);memcpy(seqgateunits,PREFIX+83,14);memcpy(seqcachedgate,seqgate,7);seqcachedbpm=seqglobalbpm?0:seqbpm;*(uint8_t *)0xACCF=PREFIX[99];
  }
  if(sparse_tones[slot]==SPARSE_JOURNAL_REF){sparse_journal_tones(0,TONE_RAW,POOL_TONE_BYTES);memcpy(TONE_KICK_RAW,TONE_RAW+TONE_RAW_BYTES,8);tones_apply();}
  else if(!sparse_prepared_tones(slot)&&!tones_apply_object(sparse_tones[slot])){seqservicing=busy;return 0;}
- mx.slot=slot;seqeventcache=2;install_position=0;if(sparse_slots[slot]!=SPARSE_JOURNAL_REF&&!sparse_prepared_stream(slot,&install_stream))pool_stream_seek(&install_stream,sparse_slots[slot],POOL_EVENTS_OFFSET);sparse_install_slot=slot;seqservicing=busy;mixer_pattern_clean();return 1;
+ mx.slot=slot;seqeventcache=prepared==2?3:2;install_position=0;if(sparse_slots[slot]!=SPARSE_JOURNAL_REF&&!sparse_prepared_stream(slot,&install_stream))pool_stream_seek(&install_stream,sparse_slots[slot],POOL_EVENTS_OFFSET);sparse_install_slot=slot;seqservicing=busy;mixer_pattern_clean();return 1;
 }
 uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t run=seqplaying,busy=seqservicing,mode=seqmode;uint16_t bpm=seqbpm,residual=seqclock;
- seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.presaved=0;if(!syncmode||!syncslave)mx.boundary=0;mx.padcache=0;seqdrawvalid=0;memset(seqcursor,0,7);
+ seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.presaved=0;if((!syncmode||!syncslave)&&!MIXER_KEEP_SYNC_GRID)mx.boundary=0;mx.padcache=0;seqdrawvalid=0;memset(seqcursor,0,7);
  if(run&&(mode==seqmode||(syncmode&&syncslave))){seq_pattern_release();if(bpm!=seqbpm)seqclock=((uint32_t)residual*seqbpm)/bpm;seq_pattern_handoff();}
  else {if(run){seqplaying=1;seq_transport();seq_transport();}else {memset(seqposition,0,7);seqclock=seqticks=seqfraction=0;seqdeadline=1;}}
  seqservicing=busy;if(mx.openempty&&!link_ui_hold)mx.openempty=2;else mx.openempty=0;dirty=1;return 1;
@@ -209,7 +209,8 @@ void sparse_service(void) BANKED {uint16_t size;uint8_t n,buf[16],busy,i;
  if(sparse_install_slot!=mx.slot){sparse_install_slot=255;return;}size=total()*4;
  busy=seqservicing;seqservicing=1;
  if(install_position<size){n=size-install_position>16?16:size-install_position;
-  if(sparse_slots[mx.slot]==SPARSE_JOURNAL_REF)sparse_journal_read(POOL_EVENTS_OFFSET+install_position,buf,n);
+  if(seqeventcache==3)memcpy(buf,(const uint8_t *)0xB020+install_position,n);
+  else if(sparse_slots[mx.slot]==SPARSE_JOURNAL_REF)sparse_journal_read(POOL_EVENTS_OFFSET+install_position,buf,n);
   else if(!pool_stream_read(&install_stream,buf,n)){seqservicing=busy;mx.error=3;return;}memcpy(live(install_position),buf,n);install_position+=n;
  }seqservicing=busy;
  if(install_position==size){busy=seqservicing;seqservicing=1;seqeventcache=0;sparse_install_slot=255;seqservicing=busy;}
@@ -231,7 +232,7 @@ uint8_t sparse_save_song(uint8_t song) BANKED {uint8_t data[POOL_SONG_BYTES],i;u
  if(!pool_object_write(object,0,data,sizeof(data))||!pool_object_finish(object)){pool_set_reference(POOL_LIBRARY_ROOT,old_library);return 0;}pool_set_reference(POOL_SONG_REFS+song*2,object);if(!pool_commit())return 0;refresh();sparse_song=song;memcpy(sparse_song_name,data,17);return 1;
 }
 uint8_t sparse_load_song(uint8_t song) BANKED {uint16_t object,size;uint8_t data[POOL_SONG_BYTES],i,run=seqplaying;
- if(sparse_enabled!=1||song>=POOL_SONGS)return 0;object=word(pool_root+POOL_SONG_REFS+song*2);if(object==POOL_NONE)return 0;size=pool_object_size(object);if(size!=POOL_SONG_BYTES&&size!=POOL_SONG_LEGACY_BYTES)return 0;memset(data,0,sizeof(data));if(!pool_object_read(object,0,data,size)||data[17]>4||data[18]>7||(size==POOL_SONG_BYTES&&(data[35]!=1||data[44]>1||data[45]>1)))return 0;
+ if(sparse_enabled!=1||song>=POOL_SONGS)return 0;object=word(pool_root+POOL_SONG_REFS+song*2);if(object==POOL_NONE)return 0;size=pool_object_size(object);if(size!=POOL_SONG_BYTES&&size!=POOL_SONG_LEGACY_BYTES)return 0;memset(data,0,sizeof(data));if(!pool_object_read(object,0,data,size)||data[17]>5||data[18]>7||(size==POOL_SONG_BYTES&&(data[35]!=1||data[44]>1||data[45]>1)))return 0;
  /* Publish feedback before validation or an outgoing save can block the
     normal renderer. A queued pad launch must not change the song mid-load. */
  mx.pending=255;ui_loading(0,12);

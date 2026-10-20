@@ -143,7 +143,7 @@ void mixfill(void){if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */
- if(seqplaying&&!seqservicing&&seqeventcache==2){seqservicing=1;sparse_service();seqservicing=0;}
+ if(seqplaying&&!seqservicing&&seqeventcache>=2){seqservicing=1;sparse_service();seqservicing=0;}
  if((rd==wr||(syncmode==1&&!syncslave))&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
  if((rd==wr||(syncmode==1&&!syncslave))&&seqplaying&&!seqservicing&&seqticks<seqdeadline)seq_native_prepare();}
 /* Intro audio can interrupt graphics in any ROM bank. Restore that bank before

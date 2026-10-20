@@ -47,7 +47,7 @@ extern uint8_t mixer_device;
 extern uint16_t pattern_generation;
 
 static uint16_t link_frames(void){uint16_t t;__critical {t=sys_time;}return t;}
-static void ui_pause(void){link_ui_hold=1;ui_quiet_since=ui_clock_frame=link_frames();ui_clock=*(volatile uint8_t *)0xFFE1;}
+void link_ui_pause(void) BANKED {link_ui_hold=1;ui_quiet_since=ui_clock_frame=link_frames();ui_clock=syncslave?*(volatile uint8_t *)0xFFE1:synctick;}
 static uint8_t crc(uint8_t c,uint8_t b){uint8_t i;for(i=0;i<7;i++){uint8_t top=(c^b)&64;c=(c<<1)&127;if(top)c^=9;b<<=1;}return c;}
 static uint8_t idle(void){return linktxread==linktxsize;}
 static void packet(uint8_t type,uint8_t payload){uint8_t i,c=0,n=payload+5;
@@ -118,7 +118,7 @@ static void accept(void){uint8_t i,type=incoming[0],id=incoming[3];uint16_t peer
   if(linkstate!=2)return;
   if(type==READY&&rxsize==6&&id==request&&link_pair_phase==1&&incoming[4]==pairslot){waiting=0;link_pair_phase=2;link_pair_hold=0;dirty=1;return;}
   if(type==NAME&&rxsize==22&&incoming[4]<8){uint8_t s=incoming[4];name_ack=s;name_ack_crc=0;for(i=0;i<16;i++){linkmirror.names[s][i]=incoming[5+i];name_ack_crc=crc(name_ack_crc,incoming[5+i]);}linkmirror.namesvalid|=1<<s;if(page==18&&mixer_device){pad_names_valid=0;dirty=1;}}
-  if(type==STATE&&rxsize==24&&((incoming[4]>>3)&7)<=4){uint16_t pan=incoming[15]|((uint16_t)incoming[16]<<7);uint8_t oldslot=linkmirror.slot;
+  if(type==STATE&&rxsize==24&&((incoming[4]>>3)&7)<=5){uint16_t pan=incoming[15]|((uint16_t)incoming[16]<<7);uint8_t oldslot=linkmirror.slot;
    linkmirror.slot=incoming[4]&7;linkmirror.pending=(incoming[5]&15)<8?(incoming[5]&15):255;linkmirror.kit=(incoming[5]>>4)<6?incoming[5]>>4:0;linkmirror.muted=incoming[6];linkmirror.solo=incoming[7];
    memcpy(linkmirror.level,incoming+8,7);for(i=0;i<7;i++)linkmirror.pan[i]=(pan>>(i*2))&3;
    linkmirror.drummutemask=incoming[17]|((uint16_t)incoming[18]<<7);linkmirror.drumsolomask=incoming[19]|((uint16_t)incoming[20]<<7);
@@ -127,12 +127,12 @@ static void accept(void){uint8_t i,type=incoming[0],id=incoming[3];uint16_t peer
   }
  }else if(linkstate==2&&type==NAME_ACK&&rxsize==7){if(incoming[4]==name_pending&&incoming[5]==name_crc)name_pending=255;
  }else if(linkstate==2&&(type==SET||type==LAUNCH||type==PREPARE)){
-  if(type==SET&&rxsize==10&&incoming[4]<20&&((incoming[5]<2&&incoming[6]<2)||(incoming[4]<7&&incoming[5]==2)||(incoming[4]<7&&incoming[5]==3&&incoming[6]<4)||(incoming[5]==5&&incoming[6]>=1&&incoming[6]<=4))){
+  if(type==SET&&rxsize==10&&incoming[4]<20&&((incoming[5]<2&&incoming[6]<2)||(incoming[4]<7&&incoming[5]==2)||(incoming[4]<7&&incoming[5]==3&&incoming[6]<4)||(incoming[5]==5&&incoming[6]>=1&&incoming[6]<=5))){
    if(id!=lastrequest){applied=0;if((incoming[7]|((uint16_t)incoming[8]<<7))==(pattern_generation&16383)){mixer_remote_apply(incoming[4],incoming[5],incoming[6]);applied=1;}}lastrequest=id;request=id;state_due=1;
   }else if(type==LAUNCH&&rxsize==6&&incoming[4]<8){
-   if(id!=lastrequest){ui_pause();mx.openempty=0;mixer_launch_request(incoming[4],0);mx.openempty=0;}lastrequest=id;request=id;state_due=1;
+   if(id!=lastrequest){link_ui_pause();mx.openempty=0;mixer_launch_request(incoming[4],0);mx.openempty=0;}lastrequest=id;request=id;state_due=1;
   }else if(type==PREPARE&&rxsize==6&&incoming[4]<8){
-   if(id!=lastrequest){ui_pause();mx.openempty=0;pairslot=incoming[4];link_pair_hold=1;link_pair_phase=3;pairdeadline=link_frames();pair_internal=1;mixer_launch_request(pairslot,0);mx.openempty=0;pair_internal=0;}
+   if(id!=lastrequest){link_ui_pause();mx.openempty=0;pairslot=incoming[4];link_pair_hold=1;link_pair_phase=3;pairdeadline=link_frames();pair_internal=1;mixer_launch_request(pairslot,0);mx.openempty=0;pair_internal=0;}
    else if(link_pair_phase==4)link_pair_phase=3;
    lastrequest=id;request=id;state_due=1;
   }
@@ -169,7 +169,7 @@ uint8_t link_receive(uint8_t b) BANKED {
 }
 uint8_t link_command(uint8_t track,uint8_t field,uint8_t value) BANKED {
  /* Queue behind an in-flight packet; service publishes only after it drains. */
- if(syncmode!=1||syncslave||linkstate!=2||linkmirror.quant>4)return 0;
+ if(syncmode!=1||syncslave||linkstate!=2||linkmirror.quant>5)return 0;
  if(field==4||field==6){if(track>=8)return 0;}else if(field==5){if(value<1||value>4)return 0;}else if(track>=20||field>=4||(field==3&&value>3)||(field<2&&value>1)||value>127)return 0;
  if(waiting){if(field<6){if(nextfield<6&&(nexttrack!=track||nextfield!=field))return 0;nexttrack=track;nextfield=field;nextvalue=value;nextepoch=linkmirror.epoch;return 1;}return 0;}
  commandtrack=track;commandfield=field;commandvalue=value;commandepoch=linkmirror.epoch;request=(request+1)&127;waiting=2;retries=0;sentframe=link_frames();return 1;
@@ -181,7 +181,7 @@ uint8_t link_target(uint8_t track,uint8_t field) BANKED {
  return !!((field?linkmirror.drumsolomask:linkmirror.drummutemask)&(1U<<(track-7)));
 }
 uint8_t link_pending(void) BANKED {return waiting||nextfield<6;}
-static void ui_release(void){uint16_t ticks;uint8_t clock=*(volatile uint8_t *)0xFFE1;
+static void ui_release(void){uint16_t ticks;uint8_t clock=syncslave?*(volatile uint8_t *)0xFFE1:synctick;
  if(clock!=ui_clock){ui_clock=clock;ui_clock_frame=link_frames();}
  /* Losing the cable must not trap the UI behind an uncommitted launch.
     Cancel presentation/preparation only; do not reset musical clock phase. */
@@ -213,7 +213,10 @@ void link_service(void) BANKED {uint8_t now=(uint8_t)link_frames(),i;
   else if(!seqplaying&&(linkstate==1||linkstate==2)){linktx[0]=0;linktxsize=1;linktxread=0;}
  }else if(linkstate==2){
   if(welcome){welcome=0;linktx[6]='G';linktx[7]='B';linktx[8]=1;packet(WELCOME,3);}
-  else if(link_pair_phase==3&&mx.pending==pairslot&&!mixer_prepare_busy()){linktx[6]=pairslot;packet(READY,1);link_pair_phase=4;}
+  /* READY is optional reverse traffic and may be dropped while the master
+     is busy. Repeat it on existing clocks until the tagged commit arrives;
+     a lost reply must not leave both prepared machines waiting for seconds. */
+  else if((link_pair_phase==3||link_pair_phase==4)&&mx.pending==pairslot&&!mixer_prepare_busy()){linktx[6]=pairslot;packet(READY,1);link_pair_phase=4;}
   else if(state_due||!(now&31)){state_due=0;state_packet();}
   else if(link_names_dirty&&name_pending>=8){char name[17];uint8_t j;for(i=0;i<8;i++)if(link_names_dirty&(1<<i))break;link_names_dirty&=~(1<<i);getname(i,name);name_crc=0;for(j=0;j<16;j++){name[j]&=127;name_crc=crc(name_crc,name[j]);}name_pending=i;/* Include the slow forward ACK at low BPM, and retry dropped replies
      sooner at high BPM. No extra transfers: replies replace idle bytes. */

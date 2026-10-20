@@ -31,6 +31,15 @@ Transport start and native master beat-one markers can establish a new grid;
 a local slave pad launch cannot. Raw clock formats have no bar-position data:
 the first received byte establishes beat one, so arrange the external start
 accordingly. A slave joining a running raw clock cannot infer the master's bar.
+LONG waits for the longest populated enabled track to finish its current cycle.
+Muted/hidden tracks still count; unused empty tracks do not override populated
+ones. If all tracks are empty, the longest enabled length is used. The host's
+LONG boundary controls a PAIR launch; independent slave launches use their own
+outgoing longest track. LONG is stored with songs and the working arrangement.
+
+With a negotiated native peer, quantized independent host launches preserve
+the transport grid and leave the slave's current sequence running. PAIR, NOW
+resync and legacy peers retain the explicit native phase-marker behavior.
 Library/song loading remains a separate transport-level operation.
 
 LSDJ: eight serial clock edges per tick, 24 ticks per quarter note. Choose the

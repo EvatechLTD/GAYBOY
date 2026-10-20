@@ -4,6 +4,7 @@
 void seq_audition_stop(void) BANKED;
 extern uint8_t seqselectused;
 void mixer_prepare_cancel(void) BANKED;
+void mixer_view_capture(void) BANKED;
 uint8_t canvas[360],visible[360],flushrow,page,cursor[8],edited[4],lastcc,lastvalue,midiage;
 __at (0xACF8) uint8_t ui_transition_hidden;
 __at (0xACF9) uint8_t ui_font_upload_pending;
@@ -193,7 +194,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {uint8_t max;if(experimental_mode&
    dirty=1;
   }return;
  }
- if((edge&J_START)&&!navblocked){if(page==8||page==10)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();if(page==18)mixer_prepare_cancel();tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
+ if((edge&J_START)&&!navblocked){if(page==8||page==10)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();if(page==18){mixer_view_capture();mixer_prepare_cancel();}tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
  if(page==1&&tonepresetopen){tone_preset_input(edge);return;}
  if(page==28){mixer_settings_input(edge);return;}if(page==27){sync_input(edge);return;}if(page==23){kits_input(p,edge);return;}if(page>=18){mixer_input(p,edge);return;}if(page==17){drum_synth_input(p,edge);return;}if(page==16){global_input(p,edge);return;}if(page==7){mono_input(p,edge);return;}if(page==8||page==10){seq_input(p,edge);return;}if(page==9){noise_input(p,edge);return;}
  if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%(experimental_mode?5:4);choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}

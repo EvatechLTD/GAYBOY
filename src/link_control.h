@@ -11,6 +11,7 @@ typedef struct {
 extern LinkMirror linkmirror;
 extern uint8_t linkstate,link_names_dirty,linkcollision;
 extern uint8_t link_ui_hold;
+void link_ui_pause(void) BANKED;
 extern volatile uint8_t linktx[26],linktxread,linktxsize;
 extern uint8_t linkpair,link_pair_hold,link_pair_phase;
 void link_reset(void) BANKED;

@@ -154,7 +154,7 @@ layout power cycles/redundancy, incremental/full pixel equivalence and queued-pa
 flash cancellation.
 
 The current 300 BPM IRQ/audio fixture passes delivery, note rate, startup and
-subdivision budgets with zero measured underruns; longest measured IRQ is 7100
+subdivision budgets with zero measured underruns; longest measured IRQ is 7772
 cycles. The pinned main baseline's corresponding historical startup budget fails
 with corrected native hardware-write instrumentation; its other budgets pass.
 The candidate adds bounded CPU work (approximately one percentage point in this
@@ -163,6 +163,10 @@ proof that all hardware note-latency distributions are identical. Actual console
 cable and hot-plug checks remain necessary before a release timing-parity claim.
 WRAM reserve is 1035 bytes and reserved stack is 512 bytes; adding globals needs
 another memory audit. Test ROM, symbols and JSON traces live under build/.
+
+The older test_sync_link.cjs fixture also times out before its launch checks
+on both the previous and current ROM: its stopped-A and overwrite-confirmation
+assumptions need updating. It is not used as an acceptance gate here.
 
 The older standalone test_mixer_live.py is not a passing acceptance gate: it
 hits an input-release timeout on the candidate and a cache-ownership assertion
@@ -187,7 +191,6 @@ node tools/test_sync_auto_start.cjs
 node tools/test_mixer_linked_paging.cjs
 node tools/test_linked_frozen_ui.cjs
 node tools/test_linked_frozen_ui.cjs --wave --disconnect
-node tools/test_sync_link.cjs --bpm 300 --stress
 node tools/test_linked_mixer_legacy.cjs --reference-rom <pinned-main.gb>
 python tools/test_sync_irq_budget.py
 python tools/test_slave_clock_cpu.py
@@ -216,7 +219,7 @@ names and event contents are distinct. The generated test batteries
 live in build/linked-test, preserve earlier batteries as backups and never
 modify saves/*.gbsong. Keys: Shift Start, Space Select, Z B, X A.
 
-Current build SHA256: `e37966aeab764c97059b91f52e14c09968c7a48c7c31c29585add7971e73c0b8`.
+Previous hardware-test build SHA256: `e37966aeab764c97059b91f52e14c09968c7a48c7c31c29585add7971e73c0b8`.
 The 300 BPM storage/paired-launch test measured zero extra metadata transfers,
 zero aborted transfers, zero unarmed edges and no added audio underruns.
 Both PCM and wave receiver tests recorded zero VRAM writes or page changes
@@ -253,3 +256,99 @@ as musical-onset acceptance criteria. The report is diagnostic and does not
 mark these timing distributions as passing. Firmware and the hardware-test ROM
 were left unchanged for this investigation. Raw samples are in
 build/launch-path-profile.json.
+
+
+## Independent host launches and LONG
+
+With a negotiated native peer, a quantized independent host launch keeps the
+running transport grid. It restarts the selected local pattern's notes without
+sending the F2 marker that would restart the slave's current sequence. PAIR,
+legacy peers and explicit NOW resync retain their existing marker behavior.
+The music clock and serial interrupt implementations are unchanged.
+
+Native independent host patterns containing up to 256 events now stage their
+complete note data before becoming ready to launch. Each foreground quantum
+reads at most 16 bytes. The 1024-byte staging area is B020..B41F, separate from
+incoming metadata, tone data and both native attack packets. Playback uses that
+RAM data while copying it into the normal live arrays. Larger patterns retain
+the existing streamed installation path. Direct slave launches, remote slave
+launches, PAIR and raw sync modes retain their previous preparation path.
+
+Staged events use cache state 3 and the existing B020 reader; live note readers
+do not gain an extra branch. Another pad cannot overwrite active staging while
+installation runs. Editing/copy/save barriers finish the installation, and
+opening a menu finishes an active staged installation before font or roll
+scratch can reuse B000. A pending staged preparation is rebuilt after menu/font
+restoration. The 256-event and 257-event tests compare every installed event,
+including first and repeated launches and a Mixer/SEQ/Mixer navigation roundtrip.
+WRAM and stack reservations remain 1035 and 512 bytes.
+
+LONG follows 1/1 in the quantize selector. It waits for the last step of the
+longest populated, enabled track in the outgoing pattern, then launches or
+retriggers at step one. Muting and hiding do not remove a track from this
+calculation. Empty tracks are ignored when populated tracks exist; an entirely
+empty pattern uses the longest enabled track. This is the longest track's cycle,
+not the least common multiple of every track length. If preparation is late,
+the launch waits for its next complete cycle. In PAIR the host's LONG boundary
+commits both prepared patterns. LONG is carried by the existing three-bit state
+field and saved in songs and the working root, without enlarging wire packets.
+
+AUTO startup now distinguishes the native F6 acknowledgement from arbitrary
+queued metadata replies: zero-valued metadata after an acknowledgement is not a
+clock collision. An uncertain AUTO claim with a non-idle response and no valid
+acknowledgement returns to listening. This check happens before musical clocks
+are armed. A prepared PAIR repeats READY on existing reverse clock slots until
+commit, so one dropped optional reply does not impose a long retry delay.
+
+Current candidate SHA256:
+`057ab58d52ea0f927ad80ec340821ce9ae3d8f4747adf9510bb9a66a88b168d7`.
+Hardware-test artifact: build/GAYBOYMIXER-FIX.gb. Do not treat emulator timing as
+a hardware performance-parity claim: the dense diagnostic still records note
+spacing excursions outside handoff, especially on the slave. Native direct
+slave launch tests pass with the same settled-grid threshold as the previous
+ROM; the test now captures quiescent scheduler states rather than mid-catch-up
+states. The old ROM passes the same corrected fixture. All eight launch/retrigger
+cases retain zero settled grid offset.
+
+Additional reproducible checks:
+
+```text
+node tools/profile_linked_launch_paths.cjs
+node tools/profile_linked_launch_paths.cjs --forced
+node tools/profile_linked_launch_paths.cjs --long
+node tools/profile_linked_launch_paths.cjs --slave-only
+node tools/test_host_event_staging.cjs --events 256 --menu
+node tools/test_host_event_staging.cjs --events 257
+node tools/test_slave_launch_sync.cjs --mode 1 --bpm 300 --stress
+node tools/test_linked_mixer_live.cjs --bpm 300 --long
+python tools/test_long_quantization.py
+```
+
+On this candidate the twelve-case AUTO profile measured host-local handoff to
+first pulse at 11.027..13.630 ms, versus 14.993..16.455 ms on the earlier ROM.
+Direct slave handoffs measured 10.721..13.150 ms, within the earlier observed
+10.144..13.297 ms range. These describe first attacks in the specified fixture,
+not worst-case guarantees for arbitrary songs. No slave launch used the host
+staging state, and independent launch traces contained no transport restart,
+link reset or new election. Full normal/LONG paired-storage tests, reconnect,
+legacy-peer compatibility and all five raw/native clock invariants passed on
+the matching ROM. Existing one-frame standalone handoff limitations remain.
+
+### Mixer navigation
+
+Mixer retains its channel viewport, pad page for each device bank, and cursor
+when leaving for SEQ, Mixer Settings or file menus. Renderer scratch is still
+invalidated on return; the retained view lives independently in session RAM.
+Header focus no longer jumps the channel viewport back to the first strip.
+This is session navigation state, not a change to the saved song format.
+
+Check: `python tools/test_mixer_view_state.py`.
+
+The navigation update is built as `build/GAYBOYMIXER-FIX.gb`, SHA-256
+`580bc44449a079ccc75db5565d3190a1b6ddc8bb5beeb295185b90451db78b75`.
+It retains the host launch and LONG changes described above. On this exact ROM,
+navigation, pad file context, song settings, pixel-cache, LONG, IRQ-budget,
+dense direct-slave launch, legacy-peer, host staging/menu and quick launch-path
+checks passed, along with the live paired LONG/control/name-publication test.
+The earlier full-profile measurements above remain attributed
+to their earlier SHA rather than being restated as measurements of this ROM.

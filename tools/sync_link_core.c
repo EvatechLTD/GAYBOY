@@ -12,6 +12,8 @@ static bool outgoing[2];
 static bool cable_connected=true;
 static unsigned edges;
 static bool profiling;static unsigned profile[65536];
+static unsigned profile_side,profile_arm=255,profile_delay,profile_duration;
+static uint64_t profile_from,profile_until;
 static unsigned wire_bits,wire_byte,wire_clocks,wire_aborts,wire_unarmed_edges;
 static bool wire_active;
 static unsigned rx_base,rx_values[256];
@@ -21,6 +23,9 @@ static struct {unsigned cycle,value;} trace[32768];
 static unsigned event_count,watch_boundary,watch_launch,watch_positions,watch_ticks,watch_clock;
 static bool watch_both_launch;
 static unsigned watch_launch_detail[4];
+static unsigned watch_launch_transport[3];
+static unsigned watch_servicing;
+static unsigned watch_event_cache;
 static unsigned ui_hold_address,ui_page_address,ui_hold_count[2],ui_vram_count[2],ui_page_count[2];
 static unsigned min_sp[2]={0xffff,0xffff};
 static unsigned watch_drum_on,watch_mix_read,watch_mix_write,watch_drum_mix;
@@ -35,6 +40,9 @@ static void event(GB_gameboy_t *gb,unsigned tag,unsigned value){
  events[i].ticks=GB_safe_read_memory(gb,watch_ticks)|(GB_safe_read_memory(gb,watch_ticks+1)<<8);
 }
 static bool writes(GB_gameboy_t *gb,uint16_t addr,uint8_t value){
+ if(watch_event_cache&&addr==watch_event_cache)event(gb,0x721,value);
+ if(watch_both_launch&&rx_base&&addr>=rx_base&&addr<rx_base+256)event(gb,0x725,value);
+ if(watch_servicing&&addr==watch_servicing&&value!=GB_safe_read_memory(gb,addr))event(gb,0x720,(value?0x80000000u:0)|(gb->mbc_rom_bank<<16)|gb->pc);
  if(ui_hold_address){unsigned side=id(gb);
   if(addr==ui_hold_address&&value)ui_hold_count[side]++;
   if(GB_safe_read_memory(gb,ui_hold_address)){
@@ -108,18 +116,23 @@ EMSCRIPTEN_KEEPALIVE void link_run(unsigned frames){
  target+=(uint64_t)frames*140448;
  while(clocks[0]<target||clocks[1]<target){unsigned i=clocks[0]>clocks[1];unsigned pc=machines[i].pc,bank=pc<0x4000?0:machines[i].mbc_rom_bank;
   unsigned address=pc|(pc<0x4000?0:bank<<16);
+  if(i==profile_arm&&address==watch_launch){profile_side=i;profile_arm=255;profile_from=clocks[i]+profile_delay;profile_until=profile_from+profile_duration;profiling=true;}
   if(watch_drum_mix&&address==watch_drum_mix&&pcm_pending[i]){
    pcm_buffer[i][GB_safe_read_memory(&machines[i],watch_mix_write)&1]=pcm_pending[i];pcm_pending[i]=0;
   }
   if(watch_positions&&(i==1||watch_both_launch)&&(address==watch_boundary||address==watch_launch))event(&machines[i],address==watch_boundary?0x300:0x301,GB_safe_read_memory(&machines[i],0xac8a));
   if(watch_both_launch)for(unsigned j=0;j<4;j++)if(watch_launch_detail[j]&&address==watch_launch_detail[j])event(&machines[i],0x310+j,0);
+  if(watch_both_launch)for(unsigned j=0;j<3;j++)if(watch_launch_transport[j]&&address==watch_launch_transport[j])event(&machines[i],0x314+j,0);
   if(watch_positions&&machines[i].sp<min_sp[i])min_sp[i]=machines[i].sp;
-  unsigned delta=GB_run(&machines[i]);clocks[i]+=delta;if(profiling&&i==0&&pc<0x8000&&bank<64)profile[bank*1024+((pc&0x3fff)>>4)]+=delta;}
+  unsigned delta=GB_run(&machines[i]);clocks[i]+=delta;if(profiling&&i==profile_side&&clocks[i]>=profile_from&&(!profile_until||clocks[i]<profile_until)&&pc<0x8000&&bank<64)profile[bank*1024+((pc&0x3fff)>>4)]+=delta;}
 }
 EMSCRIPTEN_KEEPALIVE void link_watch_events(unsigned boundary,unsigned launch,unsigned positions,unsigned ticks,unsigned clock){watch_boundary=boundary;watch_launch=launch;watch_positions=positions;watch_ticks=ticks;watch_clock=clock;event_count=0;wire_unarmed_edges=0;}
 EMSCRIPTEN_KEEPALIVE unsigned link_event_count(void){return event_count;}
 EMSCRIPTEN_KEEPALIVE void link_watch_both_launch(unsigned enabled){watch_both_launch=enabled!=0;}
 EMSCRIPTEN_KEEPALIVE void link_watch_launch_detail(unsigned launch,unsigned marker,unsigned fire,unsigned start){watch_launch_detail[0]=launch;watch_launch_detail[1]=marker;watch_launch_detail[2]=fire;watch_launch_detail[3]=start;}
+EMSCRIPTEN_KEEPALIVE void link_watch_launch_transport(unsigned transport,unsigned begin,unsigned reset){watch_launch_transport[0]=transport;watch_launch_transport[1]=begin;watch_launch_transport[2]=reset;}
+EMSCRIPTEN_KEEPALIVE void link_watch_servicing(unsigned address){watch_servicing=address;}
+EMSCRIPTEN_KEEPALIVE void link_watch_event_cache(unsigned address){watch_event_cache=address;}
 EMSCRIPTEN_KEEPALIVE unsigned link_min_sp(unsigned i){return min_sp[i];}
 EMSCRIPTEN_KEEPALIVE void link_watch_pcm(unsigned on,unsigned read,unsigned write,unsigned mix){
  watch_drum_on=on;watch_mix_read=read;watch_mix_write=write;watch_drum_mix=mix;
@@ -151,7 +164,8 @@ EMSCRIPTEN_KEEPALIVE unsigned link_trace_count(void){return trace_count;}
 EMSCRIPTEN_KEEPALIVE unsigned link_trace_cycle(unsigned i){return trace[i].cycle;}
 EMSCRIPTEN_KEEPALIVE unsigned link_trace_value(unsigned i){return trace[i].value;}
 
-EMSCRIPTEN_KEEPALIVE void link_profile_start(void){memset(profile,0,sizeof(profile));profiling=true;}
+EMSCRIPTEN_KEEPALIVE void link_profile_start(void){memset(profile,0,sizeof(profile));profile_side=0;profile_arm=255;profile_from=profile_until=0;profiling=true;}
+EMSCRIPTEN_KEEPALIVE void link_profile_launch_window(unsigned side,unsigned delay,unsigned duration){memset(profile,0,sizeof(profile));profiling=false;profile_arm=side;profile_delay=delay;profile_duration=duration;}
 EMSCRIPTEN_KEEPALIVE unsigned link_profile(unsigned index){profiling=false;return profile[index];}
 
 EMSCRIPTEN_KEEPALIVE void link_watch_ui(unsigned hold,unsigned page){ui_hold_address=hold;ui_page_address=page;memset(ui_hold_count,0,sizeof(ui_hold_count));memset(ui_vram_count,0,sizeof(ui_vram_count));memset(ui_page_count,0,sizeof(ui_page_count));}

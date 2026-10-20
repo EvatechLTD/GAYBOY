@@ -2,7 +2,7 @@
 #pragma opt_code_speed
 #include "api.h"
 #include "mixer_shared.h"
-extern uint8_t link_ui_hold;
+extern uint8_t link_ui_hold,linkpair;
 #include "tones.h"
 
 /* Mixer-only scratch, outside font uploads, outgoing journal capture and
@@ -24,6 +24,9 @@ static PoolStream tone_stream;
    Ends at B820, immediately before META_BUFFER. */
 #define FIRST_OTHER ((uint8_t *)0xB7D0)
 #define FIRST_DRUM ((uint8_t *)0xB7E0)
+/* Sparse Mixer scratch: 256 events, disjoint from metadata and tone caches.
+   The current packet stays at A000; off-Mixer preparation holds the UI. */
+#define STAGED_EVENTS ((uint8_t *)0xB020)
 static uint8_t first_drums,first_drum_overflow;
 extern const uint16_t notes[140];
 void seq_native_launch_begin(uint8_t slot,uint8_t count,uint8_t overflow) BANKED;
@@ -50,20 +53,27 @@ static void prepare_metadata(void){uint8_t c;uint16_t at=0;
  memcpy(FULL+42,HEAD+44,39);
 }
 static uint16_t word(const uint8_t *p){return p[0]|((uint16_t)p[1]<<8);}
+static uint16_t event_bytes(void){return (word(OFFSETS+12)+word(FULL+12))*4;}
 static uint8_t native(void){return !experimental_mode&&!monomode&&(!waveengine||waveengine==3);}
 /* Raw-clock tempo is measured, so its estimate can change before a dense
    pattern finishes loading. Keep immutable notes/tones rather than restarting
    that I/O forever. The launch packet still validates its own BPM; stale
    timing is recalculated by the complete-step path at the boundary. */
 static uint8_t tempo_valid(void){return (syncmode>1&&syncslave)||prepared_bpm==(seqglobalbpm?seqglobalbpm:word(FULL+75));}
-static uint8_t cache_valid(uint8_t slot){return prepare_phase==6&&(page==18||link_ui_hold)&&target==slot&&identity==sparse_slots[slot]&&tempo_valid()&&native();}
+static uint8_t cache_valid(uint8_t slot){return prepare_phase==6&&(page==18||link_ui_hold)&&target==slot&&identity==sparse_slots[slot]&&tempo_valid()&&native()&&(!(syncmode==1&&!syncslave&&!link_ui_hold)||( !navopen&&!seqfontdirty&&!ui_font_upload_pending));}
 static uint16_t offset(uint8_t track){uint8_t c;uint16_t at=POOL_EVENTS_OFFSET;for(c=0;c<track;c++)at+=word(HEAD+16+c*2)*4;return at;}
 
 /* One bounded read/scan quantum per foreground service. The playing pattern
    and its immutable source remain untouched throughout preparation. */
 static void prepare_once(void){uint8_t slot,e[4],found;uint16_t count,limit;
  if((page!=18&&!link_ui_hold)||!native()){prepare_phase=0;target=255;return;}
- if(navopen&&!link_ui_hold)return;
+ if(linkpair&&prepare_phase==6&&mx.cachevalid==2){prepare_phase=14;mx.cachevalid=0;}
+ /* Menu/font restoration shares B000..B4FF. Re-stage after that owner has
+    finished, even if the menu cancelled a previously ready request. */
+ if(!link_ui_hold&&(navopen||(syncmode==1&&!syncslave&&(seqfontdirty||ui_font_upload_pending)))){
+  if(syncmode==1&&!syncslave&&(prepare_phase==15||prepare_phase==6)){prepare_phase=14;mx.cachevalid=0;}
+  return;
+ }
  slot=demand<8?demand:mx.pending!=255?mx.pending:mx.focus>=30&&mx.focus<38?mx.focus-30:seqplaying?(mx.slot+1)&7:255;
  if(slot==mx.slot)slot=seqplaying?(slot+1)&7:255;
  if(slot>=8||sparse_slots[slot]==POOL_NONE||sparse_slots[slot]==SPARSE_JOURNAL_REF){prepare_phase=0;target=255;return;}
@@ -76,7 +86,15 @@ static void prepare_once(void){uint8_t slot,e[4],found;uint16_t count,limit;
   if(!pool_stream_read(&tone_stream,TONE_CACHED_RAW+scan_cursor,slot)){prepare_phase=7;return;}scan_cursor+=slot;
   if(scan_cursor==POOL_TONE_BYTES){if(!pool_native_map(word(HEAD+100),MAP)||!pool_stream_seek(EVENT_STREAM,identity,POOL_EVENTS_OFFSET)){prepare_phase=7;return;}prepare_phase=3;scan_cursor=0;}return;
  }
- if(prepare_phase==14){if(seq_native_launch_service()){prepare_phase=6;mx.cachevalid=1;mx.cacheslot=target;dirty=1;}return;}
+ if(prepare_phase==14){if(seq_native_launch_service()){
+   count=event_bytes();
+   if(syncmode==1&&!syncslave&&!linkpair&&count&&count<=1024){if(!pool_stream_seek(&tone_stream,identity,POOL_EVENTS_OFFSET)){prepare_phase=7;return;}scan_cursor=0;prepare_phase=15;}
+   else {prepare_phase=6;mx.cachevalid=1;mx.cacheslot=target;dirty=1;}
+  }return;}
+ if(prepare_phase==15){count=event_bytes()-scan_cursor;slot=count>16?16:count;
+  if(!pool_stream_read(&tone_stream,STAGED_EVENTS+scan_cursor,slot)){prepare_phase=7;return;}scan_cursor+=slot;
+  if(scan_cursor==event_bytes()){prepare_phase=6;mx.cachevalid=2;mx.cacheslot=target;dirty=1;}return;
+ }
  if(prepare_phase==3||prepare_phase==4||(prepare_phase>=8&&prepare_phase<=12)){
   slot=prepare_phase==12?6:prepare_phase>=8?prepare_phase-6:prepare_phase-3;count=word(HEAD+16+slot*2);limit=scan_cursor+16;if(limit>count)limit=count;
   found=count&&pool_object_scan(identity,offset(slot),limit,0,&scan_cursor,e);
@@ -90,12 +108,13 @@ static void prepare_once(void){uint8_t slot,e[4],found;uint16_t count,limit;
   if(prepare_phase==6){prepare_attacks();seq_native_launch_begin(target,first_drums,first_drum_overflow);prepare_phase=14;}
  }
 }
-void sparse_prepare_service(void) BANKED {if(preparing)return;preparing=1;prepare_once();preparing=0;}
+void sparse_prepare_service(void) BANKED {if(preparing||seqeventcache==3)return;preparing=1;prepare_once();preparing=0;}
 /* Quantize OFF still prepares before releasing the outgoing voices. Musical
    service runs between quanta; mx.pending is clear so no boundary can activate
    this request underneath the caller. The slot and loop budget are bounded. */
 void sparse_prepare_now(uint8_t slot) BANKED {uint16_t budget=1024;
  if(preparing||(page!=18&&!link_ui_hold)||!native()||slot>=8||slot==mx.slot||sparse_slots[slot]==POOL_NONE||sparse_slots[slot]==SPARSE_JOURNAL_REF)return;
+ if(seqeventcache==3)sparse_finish_install();
  demand=slot;preparing=1;
  while(budget--&&!cache_valid(slot)){prepare_once();if(prepare_phase==7)break;mixfill();}
  preparing=0;demand=255;
@@ -252,7 +271,7 @@ static void apply_metadata(void) __naked {__asm
  __endasm; }
 
 uint8_t sparse_prepared_apply(uint8_t slot) BANKED {
- if(!cache_valid(slot))return 0;apply_metadata();seqgrouptrack=255;seqmode=0;seqbpm=(syncmode>1&&syncslave)?seqglobalbpm:prepared_bpm;seqcachedbpm=prepared_bpm;seqdeadline=1;seqeventfull=0;*(uint8_t *)0xACCF=HEAD[99];return 1;
+ if(!cache_valid(slot))return 0;apply_metadata();seqgrouptrack=255;seqmode=0;seqbpm=(syncmode>1&&syncslave)?seqglobalbpm:prepared_bpm;seqcachedbpm=prepared_bpm;seqdeadline=1;seqeventfull=0;*(uint8_t *)0xACCF=HEAD[99];return mx.cachevalid==2?2:1;
 }
 uint8_t sparse_prepared_tones(uint8_t slot) BANKED {if(!cache_valid(slot))return 0;tones_apply_cached();seq_native_launch_installed(slot);return 1;}
 uint8_t sparse_prepared_stream(uint8_t slot,PoolStream *stream) BANKED {if(!cache_valid(slot))return 0;memcpy(stream,EVENT_STREAM,sizeof(PoolStream));return 1;}

@@ -224,7 +224,7 @@ void tones_decode_begin(void) BANKED;
 uint8_t tones_step(void) BANKED;
 static void prepare_once(void);
 void mixer_prepare_cancel(void) BANKED {
- if(sparse_enabled){prep.phase=0;mx.pending=255;mx.cachevalid=0;return;}
+ if(sparse_enabled){if(seqeventcache==3)sparse_finish_install();prep.phase=0;mx.pending=255;mx.cachevalid=0;return;}
  /* Capturing only changes journal holes. A started commit finishes from
     those private bytes in the background even after renderer scratch changes. */
  if(mx.magic==0xD3&&prep.phase==18){prep.pad|=8;mx.checking=0;mx.pending=255;mx.cachevalid=0;mx.presaved=0;return;}

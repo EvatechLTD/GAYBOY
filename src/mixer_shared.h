@@ -4,6 +4,9 @@ typedef struct {uint8_t magic,slot,pending,quant,focus,edit,browser,naming,lette
 extern __at (0xAC80) Mixer mx;
 #define MIXER_LINK_AVAILABLE (syncmode==1&&!syncslave&&linkstate==2)
 #define MIXER_LINK_VIEW (mixer_device&&MIXER_LINK_AVAILABLE)
+/* Independent quantized launches replace notes on the existing transport.
+   Legacy peers and NOW retain their explicit beat-one marker behavior. */
+#define MIXER_KEEP_SYNC_GRID (MIXER_LINK_AVAILABLE&&mx.quant&&!link_pair_phase)
 #define RECORD 2560U
 #define DATA 32U
 #define OLD_DRUM 1184U

@@ -95,7 +95,7 @@ void sync_pattern(void) BANKED {uint32_t phase,elapsed;uint16_t position,part;ui
     pair must never consume an unrelated later unpaired launch marker. */
  send(0xF2);send(tick|(link_pair_phase==6?64:0));send(position>>7);send(position&127);
 }
-void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte,guard;
+void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte,guard,reply;
  if(!playing&&syncmode==1&&!syncslave&&syncarmed){send(0xFC);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
  if(syncarmed){__critical {syncarmed=0;syncdue=0;TMA_REG=TIMA_REG=syncreload;}}
  /* Disarm the consumer before clearing its optional bit ring. */
@@ -128,16 +128,19 @@ void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte
  /* No musical clock is armed yet. A short explicit claim distinguishes
     simultaneous local starts from ordinary full-duplex byte echoes. */
  if(syncmode==1&&!syncbusy){
-  link_reset();link_claiming=1;send(0xF5);
+  link_reset();link_claiming=1;pending=wr;byte=0;send(0xF5);
   while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
   if(!linkcollision){delay(4);send(0xF7);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
   /* A listening peer has now pipelined its nonzero F6 acknowledgement.
      Check an all-zero guard as well: two internal claimants can sample
      only high bits during F5/F7 and otherwise resemble an unplugged cable.
      Keep this check in foreground; the steady serial ISR is unchanged. */
-  for(guard=0;guard<8&&!linkcollision;guard++){pending=wr;send(0);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
-   while(pending!=wr){if(!rx[pending++])linkcollision=1;}
+  for(guard=0;guard<8&&!linkcollision;guard++){send(0);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
+   while(pending!=wr){reply=rx[pending++];if(reply==0xF6)byte|=1;if(reply!=0xFF)byte|=2;}
   }
+  /* A valid listening peer may resume queued metadata containing zeroes
+     after its acknowledgement. Those are not competing clock claims. */
+  if(!syncrole&&byte==2)linkcollision=1;
   link_claiming=0;
   if(linkcollision){link_reset();linkstate=4;syncslave=1;seqplaying=0;native_claimed=native_peer_running=0;__critical {rd=wr;SB_REG=0;SC_REG=0x80;}dirty=1;return;}
  }

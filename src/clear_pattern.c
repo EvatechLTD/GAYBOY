@@ -88,7 +88,7 @@ void mixer_pattern_changed(void) BANKED;
 void seq_clear_release(uint8_t track) BANKED;
 void seq_clear_notes(uint8_t track) BANKED {uint8_t c,busy=seqservicing;seqservicing=1;
  sparse_journal_edit_barrier();
- if(seqeventcache==2)sparse_finish_install();if(track==255){seqrecordtrack=255;seqrecordlength=0;for(c=0;c<7;c++)seq_clear_release(c);seq_storage_clear();}
+ if(seqeventcache>=2)sparse_finish_install();if(track==255){seqrecordtrack=255;seqrecordlength=0;for(c=0;c<7;c++)seq_clear_release(c);seq_storage_clear();}
  else if(track<7){if(seqrecordtrack==track){seqrecordtrack=255;seqrecordlength=0;}seq_clear_release(track);seq_track_clear(track);}
  else {seqservicing=busy;return;}
  seqgrouptrack=255;seqapending=seqamoved=0;seqdrawvalid=0;seqviewtrack=255;seqdeadline=1;mixer_pattern_changed();seqservicing=busy;dirty=1;

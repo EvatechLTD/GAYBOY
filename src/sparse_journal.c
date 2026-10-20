@@ -64,7 +64,7 @@ static void journal_step(void) {uint8_t b[16],n,busy,state=journal_phase&127;uin
  if(!state||state==12)return;
  /* A prepared launch must never be called from the deep CRC/graph walk
     stack. Finish these background phases after the queued handoff. */
- if((mx.pending!=255||seqeventcache==2)&&(state==5||state==6||state==8||state==9||(state==10&&journal_position==POOL_PAGES)||(state==11&&journal_position+16>=POOL_TONE_BYTES)))return;
+ if((mx.pending!=255||seqeventcache>=2)&&(state==5||state==6||state==8||state==9||(state==10&&journal_position==POOL_PAGES)||(state==11&&journal_position+16>=POOL_TONE_BYTES)))return;
  size=event_bytes();
  if(state==1){n=size-journal_position>16?16:size-journal_position;if(n){busy=seqservicing;seqservicing=1;memcpy(b,live(journal_position),n);transfer(J_EVENTS+journal_position,b,n,1);journal_position+=n;seqservicing=busy;}
   if(journal_position==size){journal_phase=128|2;journal_position=0;transfer(4,b,12,0);journal_object=pool_crc(0xFFFF,b,6);journal_object=pool_crc(journal_object,b+8,4);}return;
@@ -107,7 +107,7 @@ void sparse_journal_service(void) BANKED {uint8_t busy=seqservicing;
  journal_phase|=128;journal_step();journal_phase&=127;seqservicing=busy;
 }
 
-uint8_t sparse_journal_flush(void) BANKED {mx.pending=255;if(seqeventcache==2)sparse_finish_install();if(journal_phase==12){if(!pool_reclaim())return 0;journal_phase=3;journal_position=0;}while(journal_phase&&journal_phase!=12){sparse_journal_service();mixfill();}return !journal_phase;}
+uint8_t sparse_journal_flush(void) BANKED {mx.pending=255;if(seqeventcache>=2)sparse_finish_install();if(journal_phase==12){if(!pool_reclaim())return 0;journal_phase=3;journal_position=0;}while(journal_phase&&journal_phase!=12){sparse_journal_service();mixfill();}return !journal_phase;}
 void sparse_journal_edit_barrier(void) BANKED {
  if((journal_phase&127)&&sparse_journal_slot==mx.slot){mx.pending=255;dirty=1;while((journal_phase&127)==1){sparse_journal_service();mixfill();}}
 }
