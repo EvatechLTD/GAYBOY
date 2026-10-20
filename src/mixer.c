@@ -5,6 +5,7 @@
 #include "tones.h"
 #include "sparse_store.h"
 extern uint8_t toneready,syncrole;
+extern volatile uint8_t padsampled;
 void mixer_pattern_changed(void) BANKED;
 void mixer_pattern_clean(void) BANKED;
 void mixer_prepare_focus(uint8_t slot) BANKED;
@@ -41,6 +42,7 @@ void mixer_layout_load(void) BANKED;
 void mixer_layout_render(void) BANKED;
 void mixer_link_render(void) BANKED;
 void mixer_link_input(uint8_t p,uint8_t edge) BANKED;
+uint8_t link_pending(void) BANKED;
 static uint8_t layout_hidden(uint8_t id){return mixer_hidden[(MIXER_LINK_VIEW?4:0)+(id>>3)]&(1U<<(id&7));}
 static uint8_t strip_visible(uint8_t c){return !layout_hidden(c)&&(experimental_mode||(c!=4&&c!=5));}
 static uint8_t firststrip(void){uint8_t c;for(c=0;c<20;c++)if(strip_visible(c))return c;return 255;}
@@ -189,7 +191,12 @@ static uint8_t longest_boundary(void){uint8_t c,track=255;uint16_t longest=0;
  if(track==255){for(c=0;c<7;c++)if((!experimental_mode?(c<4||c==6):seqmode?c==4:c!=4)&&seqlength[c]>longest){longest=seqlength[c];track=c;}}
  return track<7&&(uint16_t)seqposition[track]+1>=longest;
 }
-uint8_t mixer_boundary(void) BANKED {uint8_t interval;if(mx.magic!=0xD3)return 0;mx.boundary=(mx.boundary+1)&15;if(mx.pending==255||mixer_prepare_busy())return 0;if(link_pair_hold)return 0;interval=mx.quant&&mx.quant<5?1U<<mx.quant:1;if(mx.quant==5?longest_boundary():!(mx.boundary&(interval-1))){
+uint8_t mixer_boundary(void) BANKED {uint8_t interval;if(mx.magic!=0xD3)return 0;
+ /* Sample the held pad at the musical boundary, not after a slow redraw.
+    Retrigger live data only; switches and paired launches still prepare via
+    their normal request/ready path. No storage or cable work is added here. */
+ if(padsampled==J_A&&page==18&&!navopen&&!MIXER_LINK_VIEW&&mx.quant&&mx.pending==255&&mx.focus==30+mx.slot&&!(linkpair&&MIXER_LINK_AVAILABLE))mx.pending=mx.slot;
+ mx.boundary=(mx.boundary+1)&15;if(mx.pending==255||mixer_prepare_busy())return 0;if(link_pair_hold)return 0;interval=mx.quant&&mx.quant<5?1U<<mx.quant:1;if(mx.quant==5?longest_boundary():!(mx.boundary&(interval-1))){
  /* Both sides are prepared. Publish this boundary before installing the
     master's patch, so the slave installs alongside it rather than after it. */
  if(link_pair_phase==2){link_pair_phase=5;sync_pattern();}
@@ -313,7 +320,15 @@ void mixer_remote_apply(uint8_t c,uint8_t field,uint8_t value) BANKED {
 
 void mixer_tempo_edit(int16_t delta) BANKED {int16_t bpm;if(syncmode&&syncslave&&(syncmode!=1||syncrole||seqplaying))return;if(!syncmode){seqirqready=0;seqirqdirty=1;}if(seqplaying)seq_frame();bpm=(int16_t)seqbpm+delta;seqbpm=bpm<30?30:bpm>300?300:bpm;if(seqglobalbpm)seqglobalbpm=seqbpm;seqcachedbpm=0;seqdeadline=1;dirty=1;}
 static void warmfocus(void){mixer_prepare_focus(mx.focus>=30&&mx.focus<38?mx.focus-30:255);}
-void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;if(!edge)return;mixer_init();if(page==18&&padflash_off&&(edge&(J_A|J_B)))mixer_pad_restore();
+void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
+ /* Remote/paired launches re-arm only after the preceding request drains.
+    This is foreground input, never a clock/serial interrupt or frame timer.
+    NOW remains one-shot: an unquantized hold must not hammer the transport. */
+ if(!edge&&page==18&&p==J_A&&seqplaying&&mx.focus>=30&&mx.focus<38){
+  if(MIXER_LINK_VIEW){if(linkmirror.quant&&linkmirror.quant<=5&&linkmirror.pending==255&&!link_pending())edge=J_A;}
+  else if(linkpair&&MIXER_LINK_AVAILABLE&&mx.quant&&mx.pending==255&&!mx.error&&!mixer_prepare_busy()&&!link_pair_phase)edge=J_A;
+ }
+ if(!edge)return;mixer_init();if(page==18&&padflash_off&&(edge&(J_A|J_B)))mixer_pad_restore();
  if(page==18&&MIXER_LINK_VIEW){mixer_link_input(p,edge);return;}
  if((page==20||page==25)&&mx.naming){nameinput(edge);dirty=1;return;}
  if(page==24||page==25){if(sparse_enabled!=1)return;if(edge&J_UP)mx.browser=mx.browser?mx.browser-1:POOL_SONGS-1;if(edge&J_DOWN)mx.browser=(mx.browser+1)%POOL_SONGS;

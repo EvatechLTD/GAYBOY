@@ -352,3 +352,28 @@ dense direct-slave launch, legacy-peer, host staging/menu and quick launch-path
 checks passed, along with the live paired LONG/control/name-publication test.
 The earlier full-profile measurements above remain attributed
 to their earlier SHA rather than being restated as measurements of this ROM.
+
+### Held pad retrigger
+
+Holding A on a quantized pattern pad repeats the pattern. Local and directly
+operated slave pads sample the held button at musical boundaries and retrigger
+live events without SRAM reloads or extra serial work. This avoids missed short
+intervals while the UI redraws. LONG repeats at the longest populated sequence's
+end. NOW and the transport Play control stay one-shot.
+
+Release stops rearming. A launch already queued by the normal command path
+retains tap semantics and may finish after release. Leaving the pads, opening
+menus or holding another button suspends automatic rearming.
+
+Linked and PAIR holds reuse the existing command/ready path with one request
+in flight. These launches stay quantized, but cable preparation/acknowledgement
+may span short intervals: readiness takes precedence over repeating every such
+interval. No new protocol, serial transfer type, interrupt handler or clock
+source is introduced.
+
+Tests: `python tools/test_mixer_pad_hold.py` checks consecutive local boundaries
+for all four quantizations and LONG, release, NOW and transport behavior;
+`node tools/test_linked_mixer_hold.cjs` checks local/direct-slave/linked/PAIR
+holds at 300 BPM, boundary alignment, release, stack reserve, serial aborts,
+overflow and unchanged audio underruns. IRQ budgets and mixer navigation also
+pass. Current `build/GAYBOYMIXER-FIX.gb` SHA-256: `929a66a85b5a132cdfe5b682abfb4a10a90811dd0e3e96f51e82c26edc1888c8`.
