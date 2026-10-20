@@ -5,6 +5,7 @@ Only keys sent while one of the supplied windows is foreground are logged.
 import argparse, ctypes as C, ctypes.wintypes as W, json, os, re, subprocess, threading, time
 from pathlib import Path
 from decimal import Decimal
+from loopback_audio import LoopbackAudio
 
 u=C.windll.user32;k=C.windll.kernel32
 u.SetProcessDPIAware()
@@ -31,6 +32,8 @@ def record(config):
  state={**cfg,'status':'starting','recorder_pid':os.getpid(),'fps':30,'video':str(output),'keys':str(keys),'client_rects':[left,right],'video_size':[size[0]*2,size[1]],'clock':'key unix_ns minus video_start_unix_ns gives video-relative time; monotonic_ns also retained','video_start_unix_ns':None}
  def publish():meta.write_text(json.dumps(state,indent=2))
  publish()
+ audio=LoopbackAudio(folder/'loopback.wav').start()
+ state['audio']=audio.summary();publish()
  cmd=[cfg['ffmpeg'],'-hide_banner','-y','-f','gdigrab','-framerate','30','-draw_mouse','0','-offset_x',str(x),'-offset_y',str(y),'-video_size',f'{width}x{height}','-i','desktop','-filter_complex',filters,'-map','[v]','-an','-c:v','libx264','-preset','ultrafast','-crf','18','-pix_fmt','yuv420p','-r','30','-fps_mode','cfr','-progress',str(folder/'progress.txt'),str(output)]
  start_mono=time.perf_counter_ns();start_wall=time.time_ns();state.update(start_monotonic_ns=start_mono,start_unix_ns=start_wall)
  encoder=subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,creationflags=subprocess.CREATE_NO_WINDOW)
@@ -79,16 +82,28 @@ def record(config):
   u.UnhookWindowsHookEx(hook)
   for vk,(side,scan) in pressed.items():write_event(side,vk,scan,False,synthetic=True)
   log.close()
+  audio.stop();state['audio']=audio.summary()
   if encoder.poll() is None:
    encoder.stdin.write(b'q\n');encoder.stdin.flush()
    try:encoder.wait(timeout=20)
    except subprocess.TimeoutExpired:encoder.terminate();encoder.wait(timeout=5)
   state.update(status='finalizing',encoder_exit=encoder.returncode,key_event_count=event_count);publish()
   final=folder/'linked-30fps.mp4'
-  if encoder.returncode==0:
-   r=subprocess.run([cfg['ffmpeg'],'-hide_banner','-y','-i',str(output),'-c','copy','-movflags','+faststart',str(final)],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,creationflags=subprocess.CREATE_NO_WINDOW)
+  epoch=state.get('video_start_unix_ns')
+  audio_epoch=audio.first_sample_unix_ns
+  if encoder.returncode==0 and epoch and audio_epoch and audio.frames and not audio.error:
+   # WAV begins before the first video frame. Trim that lead-in, or pad a
+   # later audio start, using the actual capture timestamps rather than launch time.
+   offset=(audio_epoch-epoch)/1e9
+   audio_args=['-ss',str(-offset)] if offset<0 else ['-itsoffset',str(offset)]
+   state['audio_video_offset_seconds']=offset
+   mux=[cfg['ffmpeg'],'-hide_banner','-y','-i',str(output),*audio_args,'-i',str(audio.path),'-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','256k','-af','aresample=async=1:first_pts=0','-shortest','-movflags','+faststart',str(final)]
+   r=subprocess.run(mux,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,creationflags=subprocess.CREATE_NO_WINDOW)
+   (folder/'mux.log').write_bytes(r.stderr)
    if r.returncode==0:state['final_video']=str(final)
-  state['status']='finished' if encoder.returncode==0 else 'failed';state['stopped_unix_ns']=time.time_ns();publish()
+   else:state['finalization_error']='Audio/video mux failed; original WAV and MKV retained.'
+  else:state['finalization_error']='Audio capture or video capture failed; raw files retained.'
+  state['status']='finished' if state.get('final_video') else 'failed';state['stopped_unix_ns']=time.time_ns();publish()
   epoch=state.get('video_start_unix_ns')
   if epoch:
    events=[json.loads(line) for line in keys.read_text().splitlines()]

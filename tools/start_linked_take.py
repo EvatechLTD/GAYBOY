@@ -18,8 +18,13 @@ def launch(args):
  if not ffmpeg:raise RuntimeError('ffmpeg is not on PATH.')
  pythonw=Path(sys.executable).with_name('pythonw.exe')
  if not pythonw.is_file():raise RuntimeError('Missing Python background executable: '+str(pythonw))
+ from loopback_audio import LoopbackAudio
+ import pyaudiowpatch as pa
+ with pa.PyAudio() as audio:
+  device=audio.get_default_wasapi_loopback()
+  if not device.get('isLoopbackDevice'):raise RuntimeError('Output-loopback audio is unavailable.')
  if args.check:
-  print('Ready: ROM, reggae battery, BGB, ffmpeg and Python verified.');return
+  print('Ready: ROM, reggae battery, BGB, ffmpeg, Python and output audio verified: '+device['name']);return
  current=ROOT/'build/linked-test/current-recording.json'
  if current.exists():
   last=json.loads(current.read_text());config=Path(last['session'])
@@ -79,7 +84,7 @@ def launch(args):
     try:state=json.loads(status.read_text())
     except json.JSONDecodeError:state={}
     if state.get('status')=='recording':
-     print('Recording started at 30 fps with timed LEFT/RIGHT button logs.\nClose either emulator to save the take.\n'+str(folder));return
+     print('Recording started at 30 fps with stereo output audio and timed LEFT/RIGHT button logs.\nClose either emulator to save the take.\n'+str(folder));return
    if recorder.poll() is not None:raise RuntimeError('Recorder exited before capture started. See '+str(folder))
    time.sleep(.1)
   raise RuntimeError('Recording did not start within 15 seconds. See '+str(folder))

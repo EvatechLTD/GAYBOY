@@ -377,3 +377,18 @@ for all four quantizations and LONG, release, NOW and transport behavior;
 holds at 300 BPM, boundary alignment, release, stack reserve, serial aborts,
 overflow and unchanged audio underruns. IRQ budgets and mixer navigation also
 pass. Current `build/GAYBOYMIXER-FIX.gb` SHA-256: `929a66a85b5a132cdfe5b682abfb4a10a90811dd0e3e96f51e82c26edc1888c8`.
+
+### Recorded emulator takes
+
+Double-click `Record-Linked-Take.cmd` to create a timestamped linked take from
+the reggae battery. Closing either emulator finalizes `linked-30fps.mp4` with
+30 fps video and stereo AAC output audio, plus `keys-timed.json` for button
+animation. `loopback.wav` retains uncompressed output audio. The temporary
+MKV contains video only; use the finalized MP4 for playback with sound.
+
+Audio capture uses `PyAudioWPatch==0.2.12.9` and the default WASAPI output
+loopback, not a microphone input. Capture timestamps align the WAV with the
+first video frame before muxing. The launcher checks output-device availability
+and reports capture startup errors. The verified close-to-save take contained
+44.1 kHz stereo AAC with non-silent emulator output and matching video/audio
+durations (16.10/16.12 seconds).
