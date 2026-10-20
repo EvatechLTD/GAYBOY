@@ -7,8 +7,12 @@ ROOT=Path(__file__).resolve().parents[1]
 def launch(args):
  u=C.windll.user32;u.SetProcessDPIAware()
  u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
- rom=(args.rom or ROOT/'build/GAYBOYMIXER-FIX.gb').resolve()
- candidates=[ROOT/'saves/reggae.srm',ROOT.parent/'GAYBOY/saves/reggae.srm']
+ rom=(args.rom or next((p for p in [ROOT/'build/GAYBOYMIXER-FIX.gb',ROOT/'build/GAYBOY.gb'] if p.is_file()),ROOT/'build/GAYBOYMIXER-FIX.gb')).resolve()
+ # Linked worktrees can move into an archive; resolve shared saves through
+ # Git's common directory instead of assuming a sibling checkout location.
+ common=subprocess.check_output(['git','rev-parse','--git-common-dir'],cwd=ROOT,text=True).strip()
+ shared_root=(ROOT/common).resolve().parent
+ candidates=[ROOT/'saves/reggae.srm',shared_root/'saves/reggae.srm',ROOT.parent/'GAYBOY/saves/reggae.srm']
  battery=args.battery or next((p for p in candidates if p.is_file()),candidates[0])
  battery=battery.resolve();emulator=ROOT/'tools/bgb/bgb64.exe'
  ffmpeg=shutil.which('ffmpeg')
