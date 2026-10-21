@@ -68,7 +68,28 @@ void drum_name_input(uint8_t p,uint8_t edge) BANKED {
 
 uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED;
 void seq_clear_release(uint8_t c) BANKED;
-void seq_brush_toggle(void) BANKED {uint8_t c=seqtrack,e[4],fast;uint16_t cursor=0;
- while(seq_event_next_step(c,seqcursor[c],&cursor,e))if(e[1]==seqpitch[c]+1){fast=roll_note_feedback(c,e,1);if(seqplaying&&seqsource[c]==e[0])seq_clear_release(c);seq_event_erase(c,cursor-1);seqdrawvalid=fast;dirty=1;return;}
+void drum_brush_plot(void) BANKED;
+void drum_brush_erase(void) BANKED;
+void eval_seq_clamp_cursor(void) BANKED;
+static uint8_t brushmode;
+void seq_brush_reset(void) BANKED {brushmode=0;}
+static void brush_cell(uint8_t erase){uint8_t c=seqtrack,e[4],fast;uint16_t cursor=0;
+ if(c==6){if(erase)drum_brush_erase();else drum_brush_plot();return;}
+ while(seq_event_next_step(c,seqcursor[c],&cursor,e))if(e[1]==seqpitch[c]+1){if(erase){fast=roll_note_feedback(c,e,1);if(seqplaying&&seqsource[c]==e[0])seq_clear_release(c);seq_event_erase(c,cursor-1);seqdrawvalid=fast;dirty=1;}return;}
+ if(erase)return;
  e[0]=seqcursor[c];e[1]=seqpitch[c]+1;e[2]=eval_plotvel[c];e[3]=seqdefaultdur[c];fast=seq_event_total()<256?roll_note_feedback(c,e,0):0;if(!seq_event_put(c,65535U,e))fast=0;seqdrawvalid=fast;dirty=1;
+}
+void seq_brush_input(uint8_t edge) BANKED {uint8_t c=seqtrack,step=seqcursor[c],pitch=c==6?drumrow:seqpitch[c];
+ if(!brushmode){/* B may have created a provisional note before A arrived. */
+  if(seqapending==(c==6?2:1))brush_cell(1);
+  brushmode=1;
+ }
+ seqapending=seqdrag=0;seqbused=seqamoved=1;
+ if(brushmode==1&&(edge&(J_LEFT|J_RIGHT))){brushmode=edge&J_LEFT?3:2;brush_cell(brushmode==3);}
+ if((edge&J_LEFT)&&seqcursor[c])seqcursor[c]--;
+ if((edge&J_RIGHT)&&(uint16_t)seqcursor[c]+1<seqlength[c])seqcursor[c]++;
+ if(c==6){if((edge&J_UP)&&drumrow)drumrow--;if((edge&J_DOWN)&&drumrow<12)drumrow++;}
+ else{if((edge&J_UP)&&seqpitch[c]<127)seqpitch[c]++;if((edge&J_DOWN)&&seqpitch[c])seqpitch[c]--;eval_seq_clamp_cursor();}
+ if(brushmode>1&&(step!=seqcursor[c]||pitch!=(c==6?drumrow:seqpitch[c])))brush_cell(brushmode==3);
+ dirty=1;
 }

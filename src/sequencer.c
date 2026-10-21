@@ -1,8 +1,7 @@
 #pragma bank 10
 #include "api.h"
-void drum_brush_plot(void) BANKED;
-void drum_brush_toggle(void) BANKED;
-void seq_brush_toggle(void) BANKED;
+void seq_brush_input(uint8_t edge) BANKED;
+void seq_brush_reset(void) BANKED;
 void drum_name_input(uint8_t p,uint8_t edge) BANKED;
 void drum_velocity_input(uint8_t p,uint8_t edge) BANKED;
 void drum_velocity_status(void) BANKED;
@@ -331,19 +330,9 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   if(edge&(J_UP|J_DOWN)){seqselectused=1;seq_edit_value(10,edge&J_UP?-1:1);}return;
  }
  if((lastpad&J_SELECT)&&!seqselectused){if(page==8&&!seqhead&&!seqfocus&&seqgrouptrack==c){seqpopup=1;seqpopupchoice=seqpopuperror=0;seqselectused=1;seqapending=seqdrag=0;repeatsteps=1;dirty=1;return;}page=page==10?8:10;seqfocus=page==10?1:0;seqedit=seqhead=0;seqselectused=1;seqdrawvalid=0;dirty=1;return;}
- /* A+B toggles each entered cell; forming the chord preserves its start cell. */
- if(page==8&&!seqhead&&!seqfocus&&(p&(J_A|J_B))==(J_A|J_B)){
-  uint8_t previousstep=seqcursor[c],previouspitch=c==6?drumrow:seqpitch[c];
-  seqapending=seqdrag=0;seqbused=seqamoved=1;
-  if((edge&J_LEFT)&&seqcursor[c])seqcursor[c]--;
-  if((edge&J_RIGHT)&&(uint16_t)seqcursor[c]+1<seqlength[c])seqcursor[c]++;
-  if(c==6){if((edge&J_UP)&&drumrow)drumrow--;if((edge&J_DOWN)&&drumrow<12)drumrow++;}
-  else{if((edge&J_UP)&&seqpitch[c]<127)seqpitch[c]++;if((edge&J_DOWN)&&seqpitch[c])seqpitch[c]--;seq_clamp_cursor();}
-  if(edge&mask){if(previousstep!=seqcursor[c]||previouspitch!=(c==6?drumrow:seqpitch[c])){if(c==6)drum_brush_toggle();else seq_brush_toggle();}}
-  else if(edge&(J_A|J_B)){
-   if(c==6)drum_brush_plot();else{uint16_t cursor=0;uint8_t event[4],exists=0,fast;while(seq_event_next_step(c,seqcursor[c],&cursor,event))if(event[1]==seqpitch[c]+1){exists=1;break;}if(!exists){event[0]=seqcursor[c];event[1]=seqpitch[c]+1;event[2]=eval_plotvel[c];event[3]=seqdefaultdur[c];fast=seq_event_total()<256?roll_note_feedback(c,event,0):0;if(!seq_note_set(c,event[0],event[1],event[2],seqdefaultdur[c]))fast=0;seqdrawvalid=fast;}}
-  }dirty=1;return;
- }
+ /* Direction chooses a brush once per A+B hold. */
+ if((p&(J_A|J_B))!=(J_A|J_B))seq_brush_reset();
+ if(page==8&&!seqhead&&!seqfocus&&(p&(J_A|J_B))==(J_A|J_B)){seq_brush_input(edge);return;}
  if(page==8&&c==6&&seqhead==6){drum_name_input(p,edge);return;}
  if(page==8&&c==6&&seqhead==5){drum_velocity_input(p,edge);return;}
  if(page==8&&seqhead==6){
