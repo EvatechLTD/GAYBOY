@@ -23,4 +23,7 @@ uint8_t user_bank_rename(uint8_t bank,const uint8_t *name) BANKED;
 uint8_t user_preset_save(uint8_t slot,uint8_t instrument) BANKED;
 uint8_t user_preset_load(uint8_t slot,uint8_t instrument) BANKED;
 void tone_user_open(uint8_t mode) BANKED;
+uint8_t drum_factory_count(uint8_t instrument) BANKED;
+void drum_factory_name(uint8_t instrument,uint8_t index,uint8_t *name) BANKED;
+uint8_t drum_factory_load(uint8_t instrument,uint8_t index) BANKED;
 #endif

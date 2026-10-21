@@ -1,0 +1,50 @@
+DRUMSYNTH HARDWARE PRESETS
+
+Each HIHAT (NHH), SNARE (NSN) and PULSEKICK (PK) tone page starts with
+LOAD PRESET, SAVE PRESET and PRESET BANKS. Select cycles the three voices.
+Press A/B on an action. Up/Down browses presets; Left/Right changes banks.
+Select returns. Loading a drum sound while stopped auditions it once.
+Loading while the sequencer plays changes the patch for subsequent hits.
+
+The first bank is a permanent ROM factory bank for that voice:
+ PK HARDWARE 1: TR-808, TR-909, TR-606, TR-707, TR-626, TR-505, CR-78,
+                LINNDRUM, DMX, SP-1200, MPC60, SIM SDSV, RIMSHOT.
+ NHH HARDWARE 1: CLOSED, OPEN, 606 CH, 606 OH, 808 CH, 808 OH,
+                 METAL CH, METAL OH.
+ NSN HARDWARE 1: HARD SN, SOFT SN, 606 SN, 808 SN, 909 SN, CLAPISH,
+                 RIM TICK, METAL SN.
+
+PK's first twelve use the hardware-side note/sweep/envelope/duty settings
+from the kick A/B lab. RIMSHOT is a short, high swept pulse. Rim tick uses
+tonal noise. These are Game Boy hardware interpretations, not faithful
+models of the named machines or their sample libraries. CLAPISH is a
+single noise decay: it cannot reproduce a handclap's multiple attack bursts.
+Machine snare bodies and multi-oscillator hats also remain approximations.
+
+All factories disable software pitch/ADSR modulation and fine/coarse pitch
+offsets for the loaded voice. No shared ADSR/LFO settings or mixer levels
+are changed. Main sequencer gates and PK's existing length cap still apply,
+so its longer kicks are capped at 250 ms, unlike natural A/B lab tails.
+Open noise hats decay longer than closed hats, subject to sequencer gating.
+NHH and NSN still share the physical noise channel; simultaneous notes use
+the existing combined-noise behavior. No additional voices or DSP added.
+
+Factory banks are read-only and never initialize or overwrite user SRAM.
+Load a factory, edit it, then SAVE PRESET into one of the existing four
+global user banks (eight slots each). PRESET BANKS opens the factory browser
+or manages user banks: load, save, rename, delete, rename bank, clear bank.
+Replacement/deletion confirmation and existing save compatibility remain.
+
+METALLIC is bit 3 of NR43 ($FF22), the noise generator's LFSR width mode:
+ OFF = long 15-bit sequence, noise-like hiss.
+ ON  = short 7-bit sequence, more regular/tonal/buzzy output.
+It is a hardware setting, not a software filter, distortion or sample effect.
+Clock shift and divisor also shape the result. Noise hits retrigger the
+generator, avoiding the mid-note width-switch lockup described in Pan Docs.
+Source: https://gbdev.io/pandocs/Audio_Registers.html#ff22--nr43-channel-4-frequency--randomness
+
+Validation:
+ python tools/build_rom.py
+ python tools/test_drumsynth_presets.py
+ python tools/test_drumsynth_preset_ui.py
+ python tools/test_stripped_coarse.py

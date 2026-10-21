@@ -16,17 +16,19 @@ static uint8_t usermode,usertarget,userrow;
 #define PRESET_NAME ((uint8_t *)0xB000)
 static const char preset_chars[]=" ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_/.";
 static void preset_close(void){tonepresetopen=0;previewshape=255;dirty=1;}
-void tone_user_open(uint8_t mode) BANKED {mixer_prepare_cancel();sparse_finish_install();usertarget=eval_instrument();if(usertarget>7)return;usermode=mode;userrow=0;presetchoice=mode||usertarget>=4?100:program[usertarget];if(presetchoice>131)presetchoice=100;tonepresetopen=1;dirty=1;}
+void tone_user_open(uint8_t mode) BANKED {mixer_prepare_cancel();sparse_finish_install();usertarget=eval_instrument();if(usertarget>7)return;usermode=mode;userrow=0;presetchoice=mode||usertarget==4?100:usertarget>=5?0:program[usertarget];if(presetchoice>131)presetchoice=100;tonepresetopen=1;dirty=1;}
 void tone_preset_open(void) BANKED {tone_user_open(0);}
 static uint8_t user_bank(void){return (presetchoice-100)>>3;}
 static void preset_result(uint8_t ok){if(ok)preset_close();else{usermode|=128;dirty=1;}}
 static void preset_save(void){if(user_preset_reference(presetchoice-100)!=POOL_NONE){usermode=9;userrow=1;}else preset_result(user_preset_save(presetchoice-100,usertarget));}
-static void preset_load(void){if(presetchoice<100){load(usertarget,presetchoice);finepitch[usertarget]=0;choice=presetchoice;seq_irq_refresh(usertarget);preset_close();}else preset_result(user_preset_load(presetchoice-100,usertarget));}
+static void preset_loaded(uint8_t ok){if(ok&&usertarget>=5&&!seqplaying)drum_synth_audition();preset_result(ok);}
+static void preset_load(void){if(presetchoice<100){if(usertarget>=5)preset_loaded(drum_factory_load(usertarget,presetchoice));else{load(usertarget,presetchoice);finepitch[usertarget]=0;choice=presetchoice;seq_irq_refresh(usertarget);preset_close();}}else preset_loaded(user_preset_load(presetchoice-100,usertarget));}
 void tone_preset_render(void) BANKED {uint8_t mode=usermode&127,i,n,start;uint8_t name[9];char digits[4];memset(canvas,0,360);memset(canvas,96,20);text(0,0,mode==0?"LOAD PRESET":mode==1?"SAVE PRESET":mode==3||mode==4?"RENAME":"PRESET BANKS",1);
- if(mode<=1){if(presetchoice<100)text(1,2,banks[presetchoice/10],0);else{user_bank_name(user_bank(),name);text(1,2,(char *)name,0);}start=presetchoice<100?(presetchoice/10)*10:100+user_bank()*8;
-  for(i=0;i<(presetchoice<100?10:8);i++){n=start+i;digits[0]='0'+(n<100?n+1:n-99)/100;digits[1]='0'+((n<100?n+1:n-99)/10)%10;digits[2]='0'+(n<100?n+1:n-99)%10;digits[3]=0;text(0,4+i,digits,n==presetchoice);if(n<100)text(4,4+i,patch(n)->name,n==presetchoice);else{user_preset_name(n-100,name);text(4,4+i,(char *)name,n==presetchoice);}mixfill();}
+ if(mode<=1){if(presetchoice<100)text(1,2,usertarget>=5?(usertarget==7?"PK HARDWARE 1":usertarget==5?"NHH HARDWARE 1":"NSN HARDWARE 1"):banks[presetchoice/10],0);else{user_bank_name(user_bank(),name);text(1,2,(char *)name,0);}start=presetchoice<100?(usertarget>=5?(presetchoice>6?presetchoice-6:0):(presetchoice/10)*10):100+user_bank()*8;
+  for(i=0;i<(presetchoice<100&&usertarget<5?10:8);i++){n=start+i;if(n<100&&usertarget>=5&&n>=drum_factory_count(usertarget))break;digits[0]='0'+(n<100?n+1:n-99)/100;digits[1]='0'+((n<100?n+1:n-99)/10)%10;digits[2]='0'+(n<100?n+1:n-99)%10;digits[3]=0;text(0,4+i,digits,n==presetchoice);if(n<100&&usertarget<5)text(4,4+i,patch(n)->name,n==presetchoice);else{if(n<100)drum_factory_name(usertarget,n,name);else user_preset_name(n-100,name);text(4,4+i,(char *)name,n==presetchoice);}mixfill();}
   text(0,15,"U/D TONE  L/R BANK",0);text(0,17,mode?"A/B SAVE  SEL BACK":"A/B LOAD  SEL BACK",0);
- }else if(mode==2){for(i=0;i<USER_BANKS;i++){user_bank_name(i,name);text(2,4+i*2,(char *)name,userrow==i);}text(0,16,"USER BANKS ARE GLOBAL",0);text(0,17,"A/B OPEN  SEL BACK",0);
+  if(presetchoice<100&&usertarget>=5)text(0,16,"EDIT THEN SAVE USER",0);
+ }else if(mode==2){n=usertarget>=5;if(n)text(2,3,"HARDWARE FACTORY 1",userrow==0);for(i=0;i<USER_BANKS;i++){user_bank_name(i,name);text(2,4+i*2+n,(char *)name,userrow==i+n);}text(0,16,"USER BANKS ARE GLOBAL",0);text(0,17,"A/B OPEN  SEL BACK",0);
  }else if(mode==7){user_bank_name(user_bank(),name);text(1,2,(char *)name,0);for(i=0;i<8;i++){user_preset_name(user_bank()*8+i,name);text(1,3+i,(char *)name,userrow==i);}text(1,12,"RENAME BANK",userrow==8);text(1,13,"CLEAR BANK",userrow==9);text(0,17,"A/B OPEN  SEL BACK",0);
  }else if(mode==8){user_preset_name(presetchoice-100,name);text(1,2,(char *)name,0);text(2,5,"LOAD",userrow==0);text(2,7,"SAVE CURRENT TONE",userrow==1);text(2,9,"RENAME",userrow==2);text(2,11,"DELETE",userrow==3);text(0,17,"A/B SELECT  SEL BACK",0);
  }else if(mode==3||mode==4){text(1,4,"NAME",0);for(i=0;i<8;i++)canvas[6*20+4+i]=PRESET_NAME[i]-32+(userrow==i?96:0);text(2,9,"APPLY NAME",userrow==8);text(0,15,"A/B+ARROWS: EDIT",0);text(0,16,"L/R CURSOR DOWN APPLY",0);text(0,17,"SELECT CANCELS",0);
@@ -35,10 +37,15 @@ void tone_preset_render(void) BANKED {uint8_t mode=usermode&127,i,n,start;uint8_
 }
 void tone_preset_input(uint8_t edge) BANKED {extern uint8_t seqselectused;uint8_t mode=usermode&127,p=lastpad,bank,n,ok;int16_t value;uint8_t name[9];if(edge&J_SELECT){seqselectused=1;if(mode<=2)preset_close();else{usermode=mode==7?2:mode==8||mode==3||mode==6?7:8;userrow=0;}dirty=1;return;}if(!edge)return;usermode=mode;
  if(mode==3||mode==4){if((edge&J_START)&&userrow==8)edge|=J_A;if(userrow<8&&(p&(J_A|J_B))&&(edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN))){for(n=0;n<sizeof(preset_chars)-1&&preset_chars[n]!=PRESET_NAME[userrow];n++);value=n+(edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:-10);if(value<0)value+=sizeof(preset_chars)-1;if(value>=sizeof(preset_chars)-1)value-=sizeof(preset_chars)-1;PRESET_NAME[userrow]=preset_chars[value];}else if(!(p&(J_A|J_B))&&!(edge&J_START)){if(edge&J_LEFT)userrow=userrow?userrow-1:7;if(edge&J_RIGHT)userrow=userrow<7?userrow+1:0;if(edge&J_DOWN)userrow=8;if(edge&J_UP)userrow=0;}else if(userrow==8&&(edge&(J_A|J_B|J_START))){ok=mode==3?user_bank_rename(user_bank(),PRESET_NAME):user_preset_rename(presetchoice-100,PRESET_NAME);usermode=ok?7:mode|128;userrow=0;}dirty=1;return;}
- if(mode<=1){n=mode||usertarget>=4?100:0;if(edge&J_UP)presetchoice=presetchoice==n?131:presetchoice-1;if(edge&J_DOWN)presetchoice=presetchoice==131?n:presetchoice+1;
+ if(mode==0&&usertarget>=5){n=drum_factory_count(usertarget);
+  if(edge&J_UP)presetchoice=presetchoice==0?131:presetchoice==100?n-1:presetchoice-1;
+  if(edge&J_DOWN)presetchoice=presetchoice==131?0:presetchoice==(uint8_t)(n-1)?100:presetchoice+1;
+  if(edge&(J_LEFT|J_RIGHT)){bank=presetchoice<100?0:1+user_bank();bank=(bank+(edge&J_RIGHT?1:4))%5;presetchoice=bank?100+(bank-1)*8:0;}
+  if(edge&(J_A|J_B|J_START))preset_load();
+ }else if(mode<=1){n=mode||usertarget>=4?100:0;if(edge&J_UP)presetchoice=presetchoice==n?131:presetchoice-1;if(edge&J_DOWN)presetchoice=presetchoice==131?n:presetchoice+1;
   if(edge&(J_LEFT|J_RIGHT)){bank=presetchoice<100?presetchoice/10:10+user_bank();value=bank+(edge&J_RIGHT?1:-1);if(value<(n?10:0))value=13;if(value>13)value=n?10:0;presetchoice=value<10?value*10:100+(value-10)*8;}
   if(edge&(J_A|J_B|J_START)){if(mode)preset_save();else preset_load();}
- }else if(mode==2){if(edge&J_UP)userrow=(userrow+3)%4;if(edge&J_DOWN)userrow=(userrow+1)%4;if(edge&(J_A|J_B|J_START)){presetchoice=100+userrow*8;usermode=7;userrow=0;}
+ }else if(mode==2){n=usertarget>=5?5:4;if(edge&J_UP)userrow=(userrow+n-1)%n;if(edge&J_DOWN)userrow=(userrow+1)%n;if(edge&(J_A|J_B|J_START)){if(usertarget>=5&&!userrow){presetchoice=0;usermode=0;}else{presetchoice=100+(userrow-(usertarget>=5))*8;usermode=7;}userrow=0;}
  }else if(mode==7){if(edge&J_UP)userrow=userrow?userrow-1:9;if(edge&J_DOWN)userrow=(userrow+1)%10;if(edge&(J_A|J_B|J_START)){if(userrow<8){presetchoice=100+user_bank()*8+userrow;usermode=8;userrow=0;}else if(userrow==8){user_bank_name(user_bank(),name);memcpy(PRESET_NAME,name,9);usermode=3;userrow=0;}else{usermode=6;userrow=1;}}
  }else if(mode==8){if(edge&J_UP)userrow=(userrow+3)%4;if(edge&J_DOWN)userrow=(userrow+1)%4;if(edge&(J_A|J_B|J_START)){if(!userrow)preset_load();else if(userrow==1)preset_save();else if(userrow==2){user_preset_name(presetchoice-100,name);memcpy(PRESET_NAME,name,9);usermode=4;userrow=0;}else{usermode=5;userrow=1;}}
  }else{if(edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN))userrow^=1;if(edge&(J_A|J_B|J_START)){if(userrow){usermode=7;userrow=0;}else if(mode==9)preset_result(user_preset_save(presetchoice-100,usertarget));else{ok=mode==5?user_preset_remove(presetchoice-100):user_bank_clear(user_bank());usermode=ok?7:mode|128;userrow=0;}}}
