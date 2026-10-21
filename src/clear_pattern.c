@@ -70,7 +70,7 @@ void clear_render(void) BANKED {uint8_t row;seqflushpending=1;HIDE_SPRITES;
 static void close(void){page=origin;if(page==8){seqdrawvalid=0;seqviewtrack=255;}mx.padcache=0;dirty=1;}
 void clear_input(uint8_t edge) BANKED {uint8_t ok=1;
  if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)){clear_choice^=1;dirty=1;}
- if(edge&J_SELECT){seqselectused=1;close();return;}if(!(edge&(J_A|J_START)))return;if(clear_choice){close();return;}
+ if(edge&J_SELECT){seqselectused=1;close();return;}if(!(edge&(J_A|J_B|J_START)))return;if(clear_choice){close();return;}
  if(operation==1)ok=sparse_delete_song(slot);
  else if(operation==2)ok=sparse_clear_working_song();
  else if(operation==3)ok=sparse_paste_pad(slot);

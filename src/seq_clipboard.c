@@ -1,5 +1,6 @@
 #pragma bank 38
 #include "api.h"
+void roll_clear_transition(void) BANKED;
 extern uint16_t seqclock,seqdeadline;
 #define CLIP ((uint8_t *)0xB400)
 #define CACHE ((uint8_t *)0xB000)
@@ -34,16 +35,16 @@ uint8_t seq_region_paste(uint8_t step,uint8_t pitch) BANKED {
  if(meta[0]!=0xC9||meta[11]!=0x74||!count||count>512||meta[1]>6||((c==6)!=(meta[1]==6)))return 0;
  if(c==6&&meta[12])pitch=meta[7];
  if((uint16_t)step+getword(meta+4)>seqlength[c]||(c==6?(uint16_t)pitch+meta[6]>12:pitch<meta[6]))return 0;
- clip_part(16,CACHE,count*4,0);needed=count;
+ clip_part(16,CACHE,count*4,0);roll_clear_transition();seqfontdirty=0;needed=count;
  /* Validate every destination before making any changes. */
  for(i=0;i<count;i++){memcpy(e,CACHE+i*4,4);x=(uint16_t)step+e[0];y=c==6?(meta[12]?e[1]-1:(int16_t)pitch+e[1]-1):(int16_t)pitch-e[1]+1;duration=e[3]?e[3]:256;
   if(!e[1]||x>=seqlength[c]||x+duration>seqlength[c]||y<0||y>(c==6?12:127))return 0;
-  if(c!=6&&seq_note_get(c,x))needed--;
+  if(c!=6){uint16_t scan=0;uint8_t old[4];while(seq_event_next_step(c,x,&scan,old))if(old[1]==y+1){needed--;break;}}
   e[0]=x;e[1]=y+1;memcpy(CACHE+i*4,e,4);
  }
  if(total+needed>512){seqeventfull=1;return 0;}
- busy=seqservicing;seqservicing=1;
- for(i=0;i<count;i++){memcpy(e,CACHE+i*4,4);if(c==6)drum_clip_plot(e[0],e[1]-1,e[3]?e[3]:256,e[2]);else seq_note_set(c,e[0],e[1],e[2],e[3]?e[3]:256);mixfill();}
+ busy=seqservicing;seqservicing=1;if(c<5)evalpatch[c][EV_CHORD_HISTORY]=1;
+ for(i=0;i<count;i++){memcpy(e,CACHE+i*4,4);if(c==6)drum_clip_plot(e[0],e[1]-1,e[3]?e[3]:256,e[2]);else {uint16_t scan=0,found=65535;uint8_t old[4];while(seq_event_next_step(c,e[0],&scan,old))if(old[1]==e[1]){found=scan-1;break;}seq_event_put(c,found,e);}mixfill();}
  seqservicing=busy;seqgrouptrack=c;seqgroupx0=step;seqgroupx1=step+getword(meta+4)-1;
  seqgroupy0=c==6?pitch:pitch-meta[6];seqgroupy1=c==6?pitch+meta[6]:pitch;
  seqdrawvalid=0;dirty=1;return 1;

@@ -16,13 +16,12 @@ static void pan(uint8_t c,uint8_t source){uint8_t mask=(1<<c)|(0x10<<c),p=STEP->
 uint8_t e[4],n,frac,*p=STEP->params[C],vol,level;uint16_t f=0,base=0,units=STEP->units;int16_t pitch;NativeVoice *v=&STEP->voice[C]; \
  if(!audible(C)||!native_note(C,STEP->steps[C],e))break; \
  v->note=e[1];v->velocity=native_velocity(C,e[2]);if(!v->velocity){STEP->release|=1<<C;break;} \
- if(STEP->gates[C]==100)v->gate=native_duration(units,e[3]); \
- else v->gate=e[3]==1?((uint16_t)units*STEP->gates[C])/100:seq_gate_length(units,e[3],STEP->gates[C]);if(!v->gate)v->gate=1; \
+ v->gate=native_duration(units,e[3]);if(!v->gate)v->gate=1; \
  if(C<3){if(!STEP->bend[C])base=notes[e[1]-1+(C==2?12:0)];else{pitch=(int16_t)(e[1]-1)*128+STEP->bend[C];if(pitch<0)pitch=0;if(pitch>16256)pitch=16256;n=(pitch>>7)+(C==2?12:0);frac=pitch&127;base=notes[n];if(frac&&n<139)base+=((uint16_t)(notes[n+1]-base)*frac)>>7;}f=STEP->fine[C]?fine_preview_value(base,STEP->fine[C]):base;} \
- v->base=base;vol=((uint16_t)p[1]*v->velocity+1+(((uint16_t)p[1]*v->velocity)>>7))>>7; \
- if(C<2){v->regs[0]=(p[4]<<4)|(p[5]<<3)|p[6];v->regs[1]=(p[0]<<6)|p[7];v->regs[2]=!vol&&!p[2]?8:(vol<<4)|(p[2]<<3)|p[3];v->regs[3]=f;v->regs[4]=0x80|(p[8]<<6)|(f>>8);} \
- else if(C==2){level=v->velocity>84?1:v->velocity>42?2:3;if(p[15]){level+=p[15]-1;if(level>3)level=3;}else level=0;v->regs[0]=p[17]?0:0x80;v->regs[1]=p[16];v->regs[2]=level<<5;v->regs[3]=f;v->regs[4]=0x80|(p[8]<<6)|(f>>8);} \
- else {v->regs[0]=p[7];v->regs[1]=(vol<<4)|(p[2]<<3)|p[3];v->regs[2]=(p[18]<<4)|(p[19]<<3)|p[20];v->regs[3]=0x80|(p[8]<<6);} \
+ v->base=base;level=experimental_mode&&evalpatch[C][EV_LEVEL_MODE]==128?15:p[1];vol=((uint16_t)level*v->velocity+1+(((uint16_t)level*v->velocity)>>7))>>7; \
+ if(C<2){v->regs[0]=(p[4]<<4)|(p[5]<<3)|p[6];v->regs[1]=(p[0]<<6)|p[7];v->regs[2]=experimental_mode&&evalpatch[C][EV_LEVEL_MODE]==128?(vol<<4)|8:!vol&&!p[2]?8:(vol<<4)|(p[2]<<3)|p[3];v->regs[3]=f;v->regs[4]=0x80|(p[8]<<6)|(f>>8);} \
+ else if(C==2){level=v->velocity>84?1:v->velocity>42?2:3;if(experimental_mode&&evalpatch[C][EV_LEVEL_MODE]==128){}else if(p[15]){level+=p[15]-1;if(level>3)level=3;}else level=0;v->regs[0]=p[17]?0:0x80;v->regs[1]=p[16];v->regs[2]=level<<5;v->regs[3]=f;v->regs[4]=0x80|(p[8]<<6)|(f>>8);} \
+ else {v->regs[0]=p[7];v->regs[1]=experimental_mode&&evalpatch[C][EV_LEVEL_MODE]==128?(vol<<4)|8:(vol<<4)|(p[2]<<3)|p[3];v->regs[2]=(p[18]<<4)|(p[19]<<3)|p[20];v->regs[3]=0x80|(p[8]<<6);} \
  if(p[9]||p[22])STEP->release|=1<<C;else STEP->mask|=1<<C; \
  pan(C,C); \
 } while(0)

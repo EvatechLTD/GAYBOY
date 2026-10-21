@@ -65,14 +65,14 @@ static void generate(void){uint16_t i,n,needed=0,outside=0;uint8_t e[4],busy;
  seqservicing=busy;if(seqplaying)seq_frame();genpreview=1;generror=0;seqdrawvalid=0;mixer_pattern_changed();
 }
 void gen_input(uint8_t p,uint8_t edge) BANKED {int16_t value;uint8_t *cell=0,max=0,changed=0;
- if(edge&J_B){gen_cancel();return;}
- if(edge&J_SELECT){seq_transport();dirty=1;return;}
- if(edge&J_UP)genrow=genrow?genrow-1:9;if(edge&J_DOWN)genrow=(genrow+1)%10;
+ if(edge&J_SELECT){gen_cancel();return;}
+ 
+ if(!(p&(J_A|J_B))){if(edge&J_UP)genrow=genrow?genrow-1:9;if(edge&J_DOWN)genrow=(genrow+1)%10;}
  switch(genrow){case 0:cell=&gentype;max=3;break;case 1:cell=&genstyle;max=2;break;case 2:cell=&genroot;max=11;break;case 3:cell=&genscale;max=3;break;case 4:cell=&gendensity;max=10;break;case 5:cell=&genmovement;max=6;break;case 6:cell=&genregister;max=7;break;}
- if(cell&&(edge&(J_LEFT|J_RIGHT))){value=*cell+((edge&J_RIGHT)?1:-1);*cell=value<0?max:value>max?0:value;changed=1;}
- if(genrow==7&&(edge&(J_LEFT|J_RIGHT))){genseed=(genseed+((edge&J_RIGHT)?1:999))%1000;changed=1;}
+ if(cell&&(p&(J_A|J_B))&&(edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN))){value=*cell+(edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:-10);*cell=value<0?max:value>max?0:value;changed=1;}
+ if(genrow==7&&(p&(J_A|J_B))&&(edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN))){genseed=(genseed+(edge&J_UP?1:edge&J_DOWN?999:edge&J_RIGHT?10:990))%1000;changed=1;}
  if(changed)generate();
- if(edge&J_A){if(genrow==8){if(genpreview&&!generror){genopen=genpreview=0;seqdrawvalid=0;}}else if(genrow==9)gen_cancel();}
+ if(edge&(J_A|J_B|J_START)){if(genrow==8){if(genpreview&&!generror){genopen=genpreview=0;seqdrawvalid=0;}}else if(genrow==9)gen_cancel();}
  dirty=1;(void)p;
 }
 void gen_render(void) BANKED {
@@ -83,7 +83,7 @@ void gen_render(void) BANKED {
  gen_text(11,2,seqtrack==6?"DRUMS":types[gentype],0);gen_text(11,3,styles[genstyle],0);gen_text(11,4,roots[genroot],0);gen_text(11,5,names[genscale],0);
  gen_number(14,6,gendensity,2,0);gen_number(14,7,genmovement,2,0);gen_number(14,8,genregister,2,0);gen_number(12,9,genseed%1000,3,0);
  gen_text(0,14,generror?"FULL: NO CHANGE":genpreview?"LIVE PREVIEW":"USES COPY CLIPBOARD",0);
- gen_text(0,16,"L/R PREVIEW A KEEP",0);gen_text(0,17,"SELECT PLAY B CANCEL",0);seqflushpending=1;HIDE_SPRITES;
+ gen_text(0,16,genrow==0?"NOTE PATTERN FAMILY":genrow==1?"RHYTHM AND CONTOUR":genrow==2?"TONAL ROOT NOTE":genrow==3?"ALLOWED PITCH SET":genrow==4?"NUMBER OF NOTE HITS":genrow==5?"PITCH MOTION AMOUNT":genrow==6?"BASE NOTE REGISTER":genrow==7?"REPEATABLE VARIATION":genrow==8?"ACCEPT THIS PREVIEW":"RESTORE OLD PATTERN",0);gen_text(0,17,"A/B EDIT SELECT BACK",0);seqflushpending=1;HIDE_SPRITES;
 }
 
 
@@ -91,11 +91,11 @@ void gen_render(void) BANKED {
 extern uint8_t seqgate[7],seqbeats,seqdenom;
 void seq_settings_render(void) BANKED {
  const char *channels[]={"PULSE1","PULSE2","WAVE","NOISE","MONO5","WAVE2","DRUM"};
- uint8_t c=seqtrack,i;const char *labels[]={"BPM","LENGTH","GATE %","VELOCITY","DURATION","MUTE","BEATS","BEAT UNIT","MODE H0 M1","ZOOM STEPS","SWING %"};
+ uint8_t c=seqtrack,i;const char *labels[]={"BPM","LENGTH","GATE %","VELOCITY","DURATION","MUTE","BEATS","BEAT UNIT","VELOCITY VIEW","ZOOM STEPS","SWING %"};
  uint16_t values[11];
  if(genopen){gen_render();return;}
  mixfill();memset(canvas,0,sizeof(canvas));memset(canvas,96,20);gen_text(0,0,"SEQ SETTINGS",1);gen_text(0,2,channels[c],0);
- gen_text(0,17,"SELECT+A: GENERATE",0);
- values[0]=seqbpm;values[1]=seqlength[c];values[2]=seqgate[c];values[3]=seqdefaultvel[c];values[4]=seqdefaultdur[c];values[5]=!!(seqmuted&(1<<c));values[6]=seqbeats;values[7]=seqdenom;values[8]=seqmode;values[9]=seqcols;values[10]=seqswing;
- for(i=0;i<11;i++){if(i==2||(i==8&&!experimental_mode))continue;mixfill();gen_text(1,4+i,labels[i],seqfocus==i+1&&(seqedit||(lastpad&J_B)));gen_number(16,4+i,values[i],3,seqfocus==i+1);}
+ gen_text(0,16,seqfocus==1?"QUARTER NOTES / MIN":seqfocus==2?"PATTERN STEP COUNT":seqfocus==5?"NEW NOTE DURATION":seqfocus==6?"MUTE THIS TRACK":seqfocus==7?"BEATS IN EACH BAR":seqfocus==8?"BAR BEAT UNIT":seqfocus==9?"SHOW VELOCITY SLIDERS":seqfocus==10?"VISIBLE STEPS IN ROLL":"LONG/SHORT STEP RATIO",0);gen_text(0,17,"A/B EDIT SELECT+A GEN",0);
+ values[0]=seqbpm;values[1]=seqlength[c];values[2]=seqgate[c];values[3]=seqdefaultvel[c];values[4]=seqdefaultdur[c];values[5]=!!(seqmuted&(1<<c));values[6]=seqbeats;values[7]=seqdenom;values[8]=!seqvelocityhidden;values[9]=seqcols;values[10]=seqswing;
+ for(i=0;i<11;i++){if(i==2||i==3)continue;mixfill();gen_text(1,4+i,labels[i],seqfocus==i+1&&(seqedit||(lastpad&(J_A|J_B))));if(i==5)gen_text(16,4+i,values[i]?"ON":"OFF",seqfocus==i+1);else if(i==8)gen_text(10,4+i,values[i]?"ON":"OFF",seqfocus==i+1);else if(i==4&&c==6&&!values[i])gen_text(15,4+i,"AUTO",seqfocus==i+1);else gen_number(16,4+i,values[i],3,seqfocus==i+1);}
 }

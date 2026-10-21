@@ -21,7 +21,7 @@ void seq_pulse_fire(uint8_t c,const uint8_t *e) BANKED {uint8_t i,j,n,v,pan,mask
  else seqgateleft[c]=seq_gate_length(seqstepunits,e[3],seqgate[c]);
  if(!seqgateleft[c])seqgateleft[c]=1;
  pan=mx.magic==0xD3?mx.pan[c]:3;param[c][21]=pan;
- if(c||!pulsekickleft){mask=c?0x22:0x11;route&=~mask;if(!param[c][9]){if(pan&1)route|=mask&15;if(pan&2)route|=mask&240;}NR51_REG=route;}
+ if((c||!pulsekickleft)&&!(experimental_mode&&(mono_owned&(1<<c)))){mask=c?0x22:0x11;route&=~mask;if(!param[c][9]){if(pan&1)route|=mask&15;if(pan&2)route|=mask&240;}NR51_REG=route;}
  if(!syncmode)seqirqsuppress=fired;
  if(!keycount[c]){keycount[c]=1;keystack[c][0]=e[1]-1;keyvel[c][0]=v;play(c,e[1]-1,v);}
  else keyevent(c,e[1]-1,v);

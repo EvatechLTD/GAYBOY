@@ -5,10 +5,7 @@ extern const uint8_t limits[26];
 extern uint8_t edited[4],lastcc,lastvalue;
 void cc_apply(uint8_t c,uint8_t n,uint8_t x) BANKED {uint8_t i,v,mask;if(!syncmode){seqirqdirty=1;if(n==107)seqirqready=0;else if(n==50||n==63||n==120||n==123)seqirqready&=~(1<<c);}lastcc=n;lastvalue=x;edited[c]=1;dirty=1;
  if(n==120||n==123){keycount[c]=0;stop(c);held[c]=255;return;}if(n==64){if(c==2&&waveengine){enginesustain(x>=64);return;}sustain[c]=x>=64;if(!sustain[c]&&held[c]==255)stop(c);return;}
- if(!experimental_mode&&((n>=112&&n<=126)||n==118||n==119))return;
- if(n==122){if(waveengine==3)return;engineset(((uint16_t)x*3)>>7);return;}if(n==124){arprate=x>>4;return;}if(n==125||n==126){softshape[n-125]=x>>5;return;}
- if(n>=112&&n<=117){i=n-112;mods[c][i]=((uint16_t)x*(i==0?16:i==1?5:i==2?4:i==3?8:i==4?17:64))>>7;return;}
- if(n==118){tablemode[c]=x>>5;return;}if(n==119){tablelen[c]=(x>>4)+1;return;}
+ if(n>=112&&n<=126)return;
  if(n<41||n>119)return;
  if(n>=70&&n<=101){i=n-70;if(!custom){stagewave();custom=1;}mask=customwave[i>>1];v=x>>3;customwave[i>>1]=(i&1)?((mask&0xf0)|v):((mask&15)|(v<<4));wavepending=1;return;}
  if(n==67||n==68){if(c==2&&waveengine)return;if(c<3){if(n==67)rawfreq[c]=(rawfreq[c]&0x780)|x;else rawfreq[c]=(rawfreq[c]&127)|((uint16_t)(x>>3)<<7);if(c==0){if(!pulsekickleft){NR13_REG=rawfreq[c];NR14_REG=(param[c][8]<<6)|(rawfreq[c]>>8);}}else if(c==1){NR23_REG=rawfreq[c];NR24_REG=(param[c][8]<<6)|(rawfreq[c]>>8);}else{NR33_REG=rawfreq[c];NR34_REG=(param[c][8]<<6)|(rawfreq[c]>>8);}}return;}

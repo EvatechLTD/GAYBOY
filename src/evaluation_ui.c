@@ -1,0 +1,26 @@
+#pragma bank 20
+#include "api.h"
+#include "evaluation.h"
+#include "ui_fields.h"
+extern uint8_t globalmod[10],seqgate[7],drumsynthvoice,pulsekickpatch[8],noisepatch[2][5];
+#include "stripped_ui.h"
+void eval_preview_channel(uint8_t c) BANKED;
+uint8_t eval_value_named(uint8_t c,uint8_t id,uint8_t row,uint8_t inv) BANKED;
+static const char * const names[]={"PULSE1","PULSE2","WAVE","NOISE","","HIHAT","SNARE","PULSEKICK"};
+static const char * const params[]={"DUTY","LEVEL","ENV DIR","ENV RATE","SWP TIME","SWP DIR","SWP SHIFT","LENGTH","LENGTH ON","MUTE","MASTER R","VIN R","MASTER L","VIN L","WAVE","LEVEL","LENGTH","DAC","CLOCK","WIDTH","DIVISOR","PAN","DAC","SUSTAIN","STOP","BEND"};
+static const char * const kn[]={"LEVEL","PITCH","DUTY","FALL RATE","SWP TIME","SWP SHIFT","LENGTH","SWP DIR"};
+static const char * const nn[]={"LEVEL","CLOCK","DIVISOR","METALLIC","FALL RATE"};
+static const char * const shapes[]={"TRIANGLE","SAW","SQUARE","S/H","SINE"};
+static const char * const orders[]={"UP","DOWN","UP/DOWN","RANDOM","DOWN/UP","OUT-IN","IN-OUT","NO RPT","SHUFFLE","WALK","CONV/DIV"};
+void eval_render(void) BANKED {uint8_t c=eval_instrument(),r,y,id,inv,n,top=eval_hidden&128?2:5,visible=eval_hidden&128?14:10,start;int16_t v;const char *label,*s;
+ memset(canvas,0,360);memset(canvas,96,20);
+ if(page==2){const char *labels[]={"ATTACK","DECAY","SUSTAIN","RELEASE","LFO WAVE","LFO RATE","LFO DIV","LFO CLOCK","LFO TIMING","LFO PHASE"};field_text(0,0,20,"MOD",1,0);for(r=0;r<10;r++){y=2+r;inv=eval_row==r;field_text(0,y,12,labels[r],inv,0);s=0;if(r==4)s=shapes[globalmod[r]%5];else if(r==7)s=globalmod[r]?"TEMPO":"FREE";else if(r==8)s=globalmod[r]==1?"TRIPLET":globalmod[r]==2?"DOTTED":"WHOLE";else if(r==9)s=globalmod[r]?"FREE":"KEY";if(s)field_text(12,y,8,s,inv,1);else if(r==6){id=globalmod[6];field_ratio(y,id>8?1U<<(id-8):1,id<8?1U<<(8-id):1,inv);}else field_number(12,y,8,globalmod[r],inv);mixfill();}field_text(0,16,20,eval_row<4?"SHARED ADSR ALL PARTS":"SHARED LFO ALL PARTS",0,0);field_text(0,17,20,"A/B+ARROWS TO EDIT",0,0);return;}
+ field_text(0,0,12,names[c],1,0);field_text(12,0,8,eval_tab==3?"ARP":"TONE",1,1);if(!(eval_hidden&128))eval_preview_channel(c);
+ n=eval_tab==3?5:tone_count(c);if(eval_row>=n)eval_row=n-1;start=n>visible&&eval_row>visible-2?eval_row-(visible-2):0;
+ for(r=start,y=top;r<n&&r<start+visible;r++,y++){inv=r==eval_row;s=0;if(eval_tab==3){const char *labels[]={"CLOCK","RATE","TIMING","RETRIGGER","ORDER"};label=labels[r];v=evalpatch[c][r==1?EV_DIV:0];if(!r)s=evalpatch[c][EV_CLOCK]?"FREE":"TEMPO";else if(r==2)s=evalpatch[c][EV_TIMING]==1?"TRIPLET":evalpatch[c][EV_TIMING]==2?"DOTTED":"WHOLE";else if(r==3)s=evalpatch[c][EV_RETRIGGER]?"ON":"OFF";else if(r==4)s=orders[evalpatch[c][EV_ORDER]%11];field_text(0,y,12,label,inv,0);if(s)field_text(12,y,8,s,inv,1);else if(!evalpatch[c][EV_CLOCK])field_ratio(y,v>8?1U<<(v-8):1,v<8?1U<<(8-v):1,inv);else field_number(12,y,8,evalpatch[c][6]|((uint16_t)evalpatch[c][7]<<8),inv);}
+ else{id=tone_id(c,r);label=id==102?"FINE":id==103?"LOAD PRESET":id==104?"SAVE PRESET":id==105?"PRESET BANKS":id==106?"PAN":c<4?params[id]:c==7?kn[id]:nn[id];
+ if(id==102){field_text(0,y,5,label,0,0);v=c<3?finepitch[c]:(int16_t)(evalpatch[c][EV_FINE]|((uint16_t)evalpatch[c][EV_FINE+1]<<8));field_number(5,y,5,v,inv&&eval_col==0);field_number(10,y,5,(int8_t)evalpatch[c][EV_DEPTH],inv&&eval_col==1);field_text(16,y,4,evalpatch[c][EV_SOURCES]&1?"LFO":"ADSR",inv&&eval_col==2,0);}
+ else{field_text(0,y,12,label,inv,0);if(!eval_value_named(c,id,y,inv)){v=c<4?param[c][id]:c==7?pulsekickpatch[id]:noisepatch[c-5][id];if(c==2&&id==15)v=v?4-v:0;field_number(12,y,8,v,inv);}}}mixfill();}
+ field_text(0,16,20,eval_tab==3?"SELECT+L/R TONE/ARP":tone_id(c,eval_row)==102?(eval_col==1?"SIGNED MOD STRENGTH":eval_col==2?"SHARED ADSR OR LFO":"DIRECT PITCH TICKS"):"A/B+ARROWS TO EDIT",0,0);field_text(0,17,20,"RELEASE: NAVIGATE",0,0);
+}
+void eval_native_footer(uint8_t id) BANKED {(void)id;}

@@ -26,6 +26,7 @@ void sync_pattern(void) BANKED;
 void sync_init(void) BANKED;
 void sync_render(void) BANKED;
 void sync_input(uint8_t edge) BANKED;
+void sync_ui_input(uint8_t p,uint8_t edge) BANKED;
 uint8_t sync_receive(uint8_t b) BANKED;
 uint16_t sync_advance(uint16_t ticks) BANKED;
 void sync_transport(uint8_t playing) BANKED;

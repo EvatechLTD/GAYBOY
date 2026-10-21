@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <string.h>
 #include "experimental.h"
+#include "evaluation.h"
+#include "voice_owners.h"
 #include "sequencer.h"
 #include "sync.h"
 #include "storage.h"
@@ -118,7 +120,7 @@ extern uint8_t experimental_mode;
 void global_set(uint8_t enabled) BANKED;
 extern uint8_t pageconfig;
 void page_menu_settings_render(void) BANKED;
-void page_menu_settings_input(uint8_t edge) BANKED;
+void page_menu_settings_input(uint8_t p,uint8_t edge) BANKED;
 void global_render(void) BANKED;
 void native_render(void) BANKED;
 void native_input(uint8_t p,uint8_t edge) BANKED;
@@ -158,7 +160,8 @@ void wavepoint(uint8_t x,uint8_t y);
 uint8_t previewsample(uint8_t shape,uint8_t width,uint8_t i);
 void mono_preview(void);
 uint8_t mono_id(uint8_t id);
-void mono_render(void);
+void mono_render(void) BANKED;
+void eval_preview_mono(void) BANKED;
 void ui_render(void) BANKED;
 void ui_flush(void) BANKED;
 void ui_init(void) BANKED;
@@ -199,6 +202,6 @@ void monoenable(void);
 Preset *patch(uint8_t n) BANKED;
 void mixer_settings_open(void) BANKED;
 void mixer_settings_render(void) BANKED;
-void mixer_settings_input(uint8_t edge) BANKED;
+void mixer_settings_input(uint8_t p,uint8_t edge) BANKED;
 void sync_setting_edit(uint8_t row,uint8_t edge) BANKED;
 #endif

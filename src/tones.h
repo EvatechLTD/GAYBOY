@@ -4,9 +4,12 @@
 #define TONE_SIZE 288U
 #define TONE_PACK ((uint8_t *)0xBD00)
 #define TONE_RAW ((uint8_t *)0xBA00)
-#define TONE_RAW_BYTES 442U
+#define TONE_RAW_BYTES 168U
 #define TONE_CACHED_RAW ((uint8_t *)0xB600)
-#define TONE_KICK_RAW (TONE_RAW+464U)
+#define TONE_CACHED_FX ((uint8_t *)0xBE00)
+/* Mixer-only second half; capture invalidates preparation before reusing RAW. */
+#define STAGED_EVENT_ADDRESS(n) ((uint8_t *)((n)<1024U?0xB020U+(n):0xBA00U+(n)-1024U))
+#define TONE_KICK_RAW (TONE_RAW+168U)
 void tones_capture(void) BANKED;
 void tones_pack(void) BANKED;
 uint8_t tones_decode(void) BANKED;

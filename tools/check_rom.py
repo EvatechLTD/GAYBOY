@@ -11,7 +11,12 @@ for n,v in s.items():
  if n.startswith('l__CODE_'):assert v<=0x4000,(n,v)
 assert s['s__HEAP_END']<=0xD800,'Shared state overlaps audio lookup tables'
 # DSP tables must leave a real stack window above the final fixed table.
-regions=[(s[n],s[n]+size,n) for n,size in [('_softlut',64),('_explut',32),('_expwet',256),('_expalpha',256),('_expreslut',256),('_expinterp',256),('_expfeedback',256)]]
+regions=[(s[n],s[n]+size,n) for n,size in [('_softlut',64),('_explut',32),('_expwet',256),('_expalpha',256),('_expreslut',256),('_expinterp',256),('_expfeedback',256)] if n in s]
+if '_evalpatch' in s:
+ for name,size in [('_chord',48 if '_globalmod' in s else 80),('_arpindex',5),('_arpnote',5),('_arpcount',5),('_arpcycle',5),('_arpvel',5),('_arpstride',5),('_arpclock',20),('_arpfirstvel',20),('_releaseleft',8)]:
+  if name not in s:continue
+  assert 0xD860 <= s[name] and s[name]+size <= 0xD900, ('Evaluation runtime outside reserved DSP gap',name)
+  regions.append((s[name],s[name]+size,name))
 regions.sort()
 for a,b in zip(regions,regions[1:]):assert a[1]<=b[0],('DSP lookup overlap',a,b)
 assert max(end for _,end,_ in regions)<=0xDE00,'DSP tables leave less than512bytes for stack'
