@@ -203,16 +203,17 @@ void drum_render(void) BANKED {
   drumleft[visible]=rollx[a>seqbase?a-seqbase:0]+1;if(!eval_drum_allowed(event)){drumdim[visible>>3]|=1<<(visible&7);fastghostrows|=1U<<row;}drumright[visible]=rollx[b<viewend?b-seqbase:seqcols];drumnext[visible]=drumheads[row];drumheads[row]=visible;visible++;mixfill();if(roll_navigation_abort())return;
  }
  for(t=0;t<seqgridheight/8;t++){
-  memcpy(rollrow,rollbackground,320);drum_label(t<13?DRUM_VOICE_ROW(t):t,rollrow);
+  target=DRUM_SCREEN_INDEX(t);if(target==255){memset(rollrow,0,320);roll_upload(t);continue;}
+  memcpy(rollrow,rollbackground,320);drum_label(DRUM_VOICE_ROW(target),rollrow);
   /* Every note in a drum row has the same six-pixel body. Composite one
      scanline, then copy that finished grid scanline; never redraw each pixel. */
-  scan=1;last=6;target=t;
+  scan=1;last=6;
   k=target<13?drumheads[target]:255;while(k!=255){
    if(drumleft[k]<boundary)drum_span(scan,drumleft[k],drumright[k]<boundary?drumright[k]:boundary,drumdim[k>>3]&(1<<(k&7))?2:3);
    if(drumright[k]>boundary)drum_span(scan,drumleft[k]>boundary?drumleft[k]:boundary,drumright[k],2);
    mixfill();if(roll_navigation_abort())return;k=drumnext[k];
   }
-  drum_replicate(scan,last);if(t<13)drum_span(7,24,160,1);mixfill();if(roll_navigation_abort())return;
+  drum_replicate(scan,last);if(target<13)drum_span(7,24,160,1);mixfill();if(roll_navigation_abort())return;
   if(seqgrouptrack==6)roll_invert_selection(t);
   roll_upload(t);service();
  }

@@ -1,6 +1,7 @@
 #pragma bank 13
 #pragma opt_code_speed
 #include "api.h"
+#include "drum_rows.h"
 /* Foreground-only VRAM copy. Keep the STAT check and byte write together:
    the PCM ISR can otherwise return after the safe LCD window has ended.
    Interrupts run between bytes, never across a complete tile/map upload. */
@@ -337,7 +338,7 @@ void roll_invert_selection(uint8_t row) BANKED {
  a=seqgroupx0;b=(uint16_t)seqgroupx1+1;
  if(a<seqbase)a=seqbase;if(b>(uint16_t)seqbase+seqcols)b=(uint16_t)seqbase+seqcols;if(a>=b)return;
  a=rollx[a-seqbase];b=rollx[b-seqbase];
- if(seqtrack==6){top=(uint16_t)seqgroupy0*8;bottom=((uint16_t)seqgroupy1+1)*8;}
+ if(seqtrack==6){top=(uint16_t)DRUM_SCREEN_ROW(seqgroupy0)*8;bottom=((uint16_t)DRUM_SCREEN_ROW(seqgroupy1)+1)*8;}
  else{top=((int16_t)rolltop-seqgroupy1)*seqheight;bottom=((int16_t)rolltop-seqgroupy0+1)*seqheight;}
  if(top<(int16_t)row*8)top=(uint16_t)row*8;if(bottom>(int16_t)(row+1)*8)bottom=(uint16_t)(row+1)*8;
  for(y=top;y<bottom;y++){roll_audio();for(x=a;x<b;x=end){end=(x|7)+1;if(end>b)end=b;mask=(uint8_t)(255>>(x&7))& (uint8_t)(255<<(8-((end-1)&7)-1));off=(x>>3)*16+((y&7)<<1);rollrow[off]^=mask;rollrow[off+1]^=mask;}}
@@ -350,14 +351,14 @@ static void roll_box_pixels(uint8_t *box,uint8_t track,uint8_t x0,uint8_t x1,uin
  uint16_t a=x0,b=(uint16_t)x1+1;int16_t top,bottom;
  memset(box,0,4);if(track!=seqtrack)return;
  if(a<seqbase)a=seqbase;if(b>(uint16_t)seqbase+seqcols)b=(uint16_t)seqbase+seqcols;if(a>=b)return;
- if(seqtrack==6){top=(uint16_t)y0*8;bottom=((uint16_t)y1+1)*8;}
+ if(seqtrack==6){top=(uint16_t)DRUM_SCREEN_ROW(y0)*8;bottom=((uint16_t)DRUM_SCREEN_ROW(y1)+1)*8;}
  else{top=((int16_t)seqtop[seqtrack]-y1)*seqheight;bottom=((int16_t)seqtop[seqtrack]-y0+1)*seqheight;}
  if(top<0)top=0;if(bottom>seqgridheight)bottom=seqgridheight;if(top>=bottom)return;
  box[0]=rollx[a-seqbase];box[1]=rollx[b-seqbase];box[2]=top;box[3]=bottom;
 }
 static uint8_t roll_box_mask(uint8_t left,uint8_t right,uint8_t x){
- uint8_t end=x+8;if(left>=end||right<=x)return 0;
- return (uint8_t)(255>>(left>x?left-x:0))&(uint8_t)(255<<(right<end?end-right:0));
+ static const uint8_t masks[9]={255,127,63,31,15,7,3,1,0};uint8_t end=x+8;if(left>=end||right<=x)return 0;
+ return masks[left>x?left-x:0]^masks[right<end?right-x:8];
 }
 static void roll_xor_tile(uint8_t *pixels,uint8_t mask) __naked { __asm
  push bc
@@ -459,15 +460,18 @@ uint8_t roll_selection_update(void) BANKED {
  ENABLE_RAM_MBC5;SWITCH_RAM_MBC5(0);
  if(rollcache[0]!=168){memset(refs,0,240);roll_selection_count(seqscreen,360);}
  rollpinslazy=0;roll_selection_pins();roll_pin_bases();
- seqtileoverflow=0;rollbuilding=1;rollreplace=0;memset(rollpending,0,15);HIDE_SPRITES;
+ seqtileoverflow=0;if(!rollbuilding)memset(rollpending,0,15);rollbuilding=1;rollreplace=0;HIDE_SPRITES;
  /* Horizontal masks are shared by every selected scanline. The row staging
     buffer is otherwise unused by this path; no extra persistent RAM. */
- for(x=0;x<20;x++){rollrow[x]=roll_box_mask(old[0],old[1],x*8);rollrow[20+x]=roll_box_mask(next[0],next[1],x*8);rollrow[40+x]=rollrow[x]^rollrow[20+x];}
+ memset(rollrow,0,60);first=old[0]<next[0]?old[0]:next[0];last=old[1]>next[1]?old[1]:next[1];
+ if(old[2]==next[2]&&old[3]==next[3]){if(old[0]==next[0])first=old[1]<next[1]?old[1]:next[1];if(old[1]==next[1])last=old[0]>next[0]?old[0]:next[0];}
+ for(x=first>>3;x<((last+7)>>3);x++){rollrow[x]=roll_box_mask(old[0],old[1],x*8);rollrow[20+x]=roll_box_mask(next[0],next[1],x*8);rollrow[40+x]=rollrow[x]^rollrow[20+x];}
  for(row=0;row<seqgridheight/8;row++){
+  if(seqtrack==6&&row==3)continue;
   oldon=row*8>=old[2]&&row*8<old[3];newon=row*8>=next[2]&&row*8<next[3];
   if(!oldon&&!newon)continue;
   if(oldon&&newon&&old[0]==next[0]&&old[1]==next[1])continue;
-  if(oldon&&newon){offset=40;first=old[0]<next[0]?old[0]:next[0];last=old[1]>next[1]?old[1]:next[1];}
+  if(oldon&&newon){offset=40;first=old[0]<next[0]?old[0]:next[0];last=old[1]>next[1]?old[1]:next[1];if(old[0]==next[0])first=old[1]<next[1]?old[1]:next[1];if(old[1]==next[1])last=old[0]>next[0]?old[0]:next[0];}
   else if(oldon){offset=0;first=old[0];last=old[1];}else{offset=20;first=next[0];last=next[1];}
   first>>=3;last=(last+7)>>3;
   for(x=first;x<last;x++){
@@ -608,7 +612,7 @@ void seq_playhead(void) BANKED {
    rollplayx=x;rollplaypos=seqposition[c];rollplaybase=seqbase;rollplaycols=seqcols;rollplaytrack=c;
   }on=1;
  }else if(rollplayx!=255){sprite=shadow_OAM;for(i=0;i<17;i++,sprite++)sprite->x=0;rollplayx=255;}
- if(c==6){seqheight=8;seqgridheight=seqcols==16&&!seqvelocityhidden?112:128;cursor_y=drumrow*8;}else cursor_y=((int16_t)seqtop[c]-seqpitch[c])*seqheight;
+ if(c==6){seqheight=8;seqgridheight=seqcols==16&&!seqvelocityhidden?112:128;cursor_y=DRUM_SCREEN_ROW(drumrow)*8;}else cursor_y=((int16_t)seqtop[c]-seqpitch[c])*seqheight;
  ch=seqhead==5?24:seqheight;limit=seqhead==5?136:seqgridheight;if(seqhead==5)cursor_y=112;
  if((!seqhead||seqhead==5||seqhead==6)&&!seqfocus&&cursor_y>=0&&cursor_y<limit){
   i=seqcursor[c]-seqbase;top=cursor_y+8;

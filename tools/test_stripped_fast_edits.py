@@ -25,7 +25,7 @@ for rownum,velocity in ((0,False),(5,False),(0,True),(5,True)):
   enter_app(p,S);put('drumrow',rownum);put('seqvelocityhidden',not velocity);put('seqdrawvalid',0);put('dirty',1);p.tick(180)
   # Explicit one-step hats, including sampled hats. Long paint is checked separately.
   put('seqdefaultdur',1,12);put('seqdefaultdur',0,13)
-  x=28;y=rownum*8+3;assert tilepixel(x,y)==0
+  x=28;y=(rownum+(1 if rownum>=3 and '--baseline' not in sys.argv else 0))*8+3;assert tilepixel(x,y)==0
   before=grid();latencies={};events=[]
   if '_roll_note_feedback' in S:
    ptr=S['_seq_event_put'];p.hook_register(ptr>>16,ptr&65535,lambda _:events.append((p._cycles(),tilepixel(x,y))),None)

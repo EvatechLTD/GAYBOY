@@ -257,6 +257,8 @@ void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_i
  if(page!=18){for(i=0;i<8;i++){getname(i,name);num(0,2+i,i+1,mx.browser==i);text(4,2+i,name[0]?name:"EMPTY",mx.browser==i);mixfill();}if(page==20){text(0,11,"NAME",0);text(0,12,mx.name,0);text(0,14,"A NAME WITH KEYBOARD",0);text(0,15,"B SAVE",0);}else {text(0,12,"A LOAD INTO PAD",0);num(16,12,file_target+1,0);}if(mx.error)text(0,16,sparse_enabled?"NOT ENOUGH SPACE":"TOO MANY NOTES (>512)",0);storage_footer();return;}
  if(fader_pattern!=mx.slot){fader_pattern=mx.slot;fader_ready_frame=sys_time+2;}
  if(ui_font_upload_pending){ui_transition_begin();ui_font_upload_pending=0;}mixerfontdirty=1;
+ /* A new strip viewport replaces pending graphics requests from the old one. */
+ fader_pending=0;
  text(15,0,"LOCAL",1);text(8,0,seqplaying?"STOP":"PLAY",mx.focus!=0);text(0,1,"BPM",0);if(seqglobalbpm)num(4,1,seqglobalbpm,mx.focus==64);else text(4,1,"OFF",mx.focus==64);
  {const char *quant=mx.quant==0?"NOW":mx.quant==1?"1/8":mx.quant==2?"1/4":mx.quant==3?"1/2":mx.quant==5?"LONG":"1/1";uint8_t x=20-7-strlen(quant);text(x,1,"LAUNCH",0);text(x+7,1,quant,mx.focus==1);}mixfill();
  /* Six vertical strips fit beside the shared control labels. */

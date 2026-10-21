@@ -1,4 +1,5 @@
 #pragma bank 19
+#pragma opt_code_speed
 #include "api.h"
 #include "evaluation.h"
 #include "mixer_shared.h"

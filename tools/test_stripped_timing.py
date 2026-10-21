@@ -55,9 +55,11 @@ try:
     hits=[];p.hook_register(0,S['_play'],lambda _:hits.append(p._cycles()) if p.register_file.A==0 else None,None)
     p.button_press('select');press('a');p.button_release('select');p.tick(30);assert get('seqplaying')
     reports={}
-    for phase in (('idle','navigation','editing') if '--editing' in sys.argv else ('idle','navigation')):
+    for phase in (('idle','navigation','editing') if '--editing' in sys.argv or '--groups' in sys.argv else ('idle','navigation')):
         if phase=='editing':
-            put('seqtrack',6);put('drumrow',2);put('seqcursor',0,6);put('seqdrawvalid',0);put('dirty',1);p.tick(180)
+            put('seqtrack',6);put('drumrow',0 if '--groups' in sys.argv else 2);put('seqcursor',0,6);
+            if '--groups' in sys.argv:put('seqgrouptrack',6);put('seqgroupx0',0);put('seqgroupx1',15);put('seqgroupy0',0);put('seqgroupy1',1)
+            put('seqdrawvalid',0);put('dirty',1);p.tick(180)
             p.button_press('b');p.tick(6)
         hits.clear()
         for i in range(240):
@@ -78,7 +80,7 @@ try:
         reports[phase+'_max_error_ms']=float(abs(intervals-expected).max())
         reports[phase+'_intervals_ms']=intervals.tolist()
     reports['mode']='arp' if mode else 'mono';reports['pcm_underruns']=word('mixunderruns')
-    Path(('build/stripped-baseline/' if '--baseline' in sys.argv else 'build/')+'stripped-timing-'+reports['mode']+('-dense' if '--dense' in sys.argv else '')+('-editing' if '--editing' in sys.argv else '')+'.json').write_text(json.dumps(reports,indent=2))
+    Path(('build/stripped-baseline/' if '--baseline' in sys.argv else 'build/')+'stripped-timing-'+reports['mode']+('-dense' if '--dense' in sys.argv else '')+('-groups' if '--groups' in sys.argv else '-editing' if '--editing' in sys.argv else '')+'.json').write_text(json.dumps(reports,indent=2))
     print('Measured baseline playback timing' if '--baseline' in sys.argv else 'PASS: playback timing',reports)
     assert ('--baseline' in sys.argv or reports['navigation_max_error_ms']<25) and reports['pcm_underruns']<5 and reports.get('editing_max_error_ms',0)<25
 finally:p.stop(save=False)

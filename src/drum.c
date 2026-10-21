@@ -624,7 +624,7 @@ uint16_t drum_find(uint8_t step,uint8_t row){uint16_t i,count=seq_event_count(6)
 void drum_erase(uint16_t index,uint8_t row){uint8_t e[4],fast=0;(void)row;eval_message=0;if(index!=65535U){if(seq_event_get(6,index,e))fast=roll_note_feedback(6,e,1);seq_event_erase(6,index);if(fast)roll_drum_erase_handles(index);}seqdrawvalid=fast;dirty=1;}
 void drum_age_sync(void) BANKED {}
 /* The event pool's insertion order is the plot age. */
-uint8_t roll_drum_group_refresh(int8_t dy) BANKED;
+uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED;
 void roll_edit_batch(uint8_t enabled) BANKED;
 uint8_t roll_group_add(uint8_t c,const uint8_t *e,uint16_t index) BANKED;
 uint8_t roll_replace_feedback(uint8_t c,const uint8_t *old,const uint8_t *next,uint16_t index) BANKED;
@@ -644,14 +644,16 @@ void drum_velocity_edit(int8_t delta) BANKED {uint8_t e[4];uint16_t n=drum_find(
 uint8_t drum_selected_event(const uint8_t *e){return seqgrouptrack==6&&e[1]&&e[0]>=seqgroupx0&&e[0]<=seqgroupx1&&DRUM_VIEW_ROW(e[1]-1)>=seqgroupy0&&DRUM_VIEW_ROW(e[1]-1)<=seqgroupy1;}
 uint8_t drum_group_size(int8_t delta){uint16_t i,t,count=seq_event_count(6);uint8_t e[4],old[4],voices,pcm=0,fast=seqdrawvalid;int16_t d;
  for(i=0;i<count;i++){seq_event_get(6,i,e);if(drum_selected_event(e)){if(e[1]<=10)pcm=1;d=drum_duration(e)+delta;if(d<1||d>seqlength[6]-e[0])return 0;}}
- for(i=0;i<count;i++){seq_event_get(6,i,e);if(drum_selected_event(e)){e[3]=(uint8_t)(drum_duration(e)+delta);seq_event_put(6,i,e);}if(!(i&7))service();}seqdrawvalid=roll_drum_group_refresh(0);return 1;
+ for(i=0;i<count;i++){seq_event_get(6,i,e);if(drum_selected_event(e)){e[3]=(uint8_t)(drum_duration(e)+delta);seq_event_put(6,i,e);}if(!(i&7))service();}seqdrawvalid=roll_drum_group_refresh(0,0,delta);return 1;
 }
-uint8_t drum_group_move(int8_t dx,int8_t dy){uint16_t i,j,count=seq_event_count(6);uint8_t e[4],other[4],old[4],fast=seqdrawvalid;int16_t dst,row;
+uint8_t drum_group_move(int8_t dx,int8_t dy){uint16_t i,j,count=seq_event_count(6),selected=0;uint8_t e[4],other[4],old[4],fast=seqdrawvalid;int16_t dst,row;
  if((int16_t)seqgroupx0+dx<0||seqgroupx1+dx>=seqlength[6]||(int16_t)seqgroupy0+dy<0||seqgroupy1+dy>12)return 0;
- for(i=0;i<count;i++){seq_event_get(6,i,e);if(!drum_selected_event(e))continue;dst=e[0]+dx;row=DRUM_VIEW_ROW(e[1]-1)+dy;if(e[1]<=10){if(row<3)return 0;}else if(row>=3)return 0;if(dst+drum_duration(e)>seqlength[6])return 0;
+ for(i=0;i<count;i++){seq_event_get(6,i,e);if(!drum_selected_event(e))continue;dst=e[0]+dx;row=DRUM_VIEW_ROW(e[1]-1)+dy;if(e[1]<=10){if(row<3)return 0;}else if(row>=3)return 0;if(dst+drum_duration(e)>seqlength[6])return 0;selected++;
+ }
+ if(selected<count)for(i=0;i<count;i++){seq_event_get(6,i,e);if(!drum_selected_event(e))continue;dst=e[0]+dx;row=DRUM_VIEW_ROW(e[1]-1)+dy;
   for(j=0;j<count;j++){seq_event_get(6,j,other);if(drum_selected_event(other)||!other[1])continue;if((row>=3&&other[1]<=10)||(other[1]==DRUM_VOICE_ROW(row)+1)){if(dst<(uint16_t)other[0]+drum_duration(other)&&other[0]<dst+drum_duration(e))return 0;}}
  }
- for(i=0;i<count;i++){seq_event_get(6,i,e);if(drum_selected_event(e)){e[0]+=dx;e[1]=DRUM_VOICE_ROW(DRUM_VIEW_ROW(e[1]-1)+dy)+1;seq_event_put(6,i,e);}if(!(i&7))service();}seqdrawvalid=roll_drum_group_refresh(dy)?2:0;seqgroupx0+=dx;seqgroupx1+=dx;seqgroupy0+=dy;seqgroupy1+=dy;return 1;
+ for(i=0;i<count;i++){seq_event_get(6,i,e);if(drum_selected_event(e)){e[0]+=dx;e[1]=DRUM_VOICE_ROW(DRUM_VIEW_ROW(e[1]-1)+dy)+1;seq_event_put(6,i,e);}if(!(i&7))service();}seqdrawvalid=roll_drum_group_refresh(dx,dy,0)?2:0;seqgroupx0+=dx;seqgroupx1+=dx;seqgroupy0+=dy;seqgroupy1+=dy;return 1;
 }
 uint8_t seq_top_entry(void) BANKED;
 void drum_input(uint8_t p,uint8_t edge) BANKED {uint8_t s=seqcursor[6],row=drumrow,e[4];uint16_t n,dur;int16_t dst,r;drum_init();
