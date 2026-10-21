@@ -1,0 +1,146 @@
+TWINK: GAYBOY TO STANDALONE MONOSYNTH LINK ARCHITECTURE
+2026-10-21 | Proposal; no firmware changes in this brief.
+
+Purpose
+-------
+A master DMG-01 running GAYBOY sequences a second Game Boy running the
+standalone MONOSYNTH instrument. GAYBOY owns patterns, note timing, gates,
+swing and transport. MONOSYNTH owns synthesis, patch storage, local sound
+editing and tempo-synchronised modulation. It requires no pattern sequencer.
+The link carries control only; audio remains on each machine's own output.
+
+Roles and integration
+---------------------
+Add a dedicated MONOSYNTH link mode, separate from native linked-mixer sync.
+GAYBOY always supplies the serial clock; MONOSYNTH always listens using the
+external clock. Negotiate protocol version and capabilities before sounding
+notes. Never interpret a legacy linked-mixer peer as a synth receiver.
+
+Initially route one selectable GAYBOY note track to LINK MONO. Preserve its
+existing pitch, velocity, gate, swing, mute and pattern editing. Selecting
+external output suppresses that track's local voice. Audition uses the same
+output route. Track mute, solo exclusion and route changes release owned notes.
+
+The archived synth already exposes monoevent() with note-on/off and held-note
+handling. Feed validated messages through a small adapter to that interface;
+define explicit retrigger and legato semantics rather than assuming existing
+note-on behaviour supports slides. Use the synth's own patch and parameter
+interfaces for later remote control.
+
+Musical clock and heartbeat
+---------------------------
+Send an unswung musical clock at 24 pulses per quarter note. At 120 BPM this
+is 48 pulses/second. Swing changes event timing on the master, not this clock.
+Each pulse both advances musical phase and proves that the master is alive.
+
+Send explicit tempo on connection and tempo changes, including while stopped.
+Specify a shared fixed-point BPM representation and supported range before
+implementation. The receiver can establish tempo immediately and interpolate
+phase with its local timer between pulses. Clock arrivals correct phase with
+bounded adjustment; do not restart the LFO on every pulse.
+
+Transport messages:
+  START: establish a fresh session/phase origin and run beat advancement.
+  CONTINUE: resume from an explicitly supplied preserved musical position.
+  STOP: release sequenced notes and stop transport phase advancement.
+  HEARTBEAT: maintain presence while stopped without advancing musical phase.
+  POSITION: periodically establish absolute pulse position for gap recovery.
+  TEMPO: establish the current tempo independently of transport state.
+
+STOP must still permit envelope release tails. A free-running modulation mode
+may continue at the last tempo while stopped; transport-locked modulation holds
+its phase. This is a modulation setting, not an implicit side effect of traffic.
+
+Offer straight, dotted and triplet divisions, initially whole note through
+1/32. Separate transport reset, note retrigger and free-running phase choices.
+Transport position and note-triggered LFO phase are distinct state.
+
+Wire format and bandwidth
+-------------------------
+Use compact MIDI-like framing with explicit status bytes and seven-bit data.
+Do not enable running status initially. Reserve one-byte realtime codes for
+clock, stopped heartbeat, stop and panic; allow these between framed messages.
+Specify an unambiguous status table, payload lengths, version, session identity
+and integrity check before coding. Reject incomplete, malformed or stale-session
+messages. A new status resynchronises the parser. Stage control changes until
+their complete message is validated; checksummed control frames prevent a
+corrupted parameter value from being applied silently.
+
+Initial musical messages: NOTE ON (pitch, velocity), NOTE OFF (pitch), LEGATO
+PITCH and PANIC. Later messages: PARAMETER (stable ID, absolute value), PATCH
+SELECT and optional timestamped event bundles. Define ordering for simultaneous
+release/retrigger events and the existing held-note stack explicitly.
+
+DMG internal serial clock is 8192 bits/second, approximately 1024 bytes/second
+before software gaps. Three bytes take about 2.93 ms on the wire. At 300 BPM,
+24-PPQN clock consumes 120 bytes/second. Budget notes, transport, framing and
+status against the remainder; do not promise measured latency from wire time.
+
+The current native link's spare-bit forward channel provides only about
+36 bits/second at 120 BPM. It is suitable for occasional mixer metadata, not
+this note stream. MONOSYNTH mode therefore sends actual serial event bytes
+rather than embedding notes in the existing native clock stream.
+
+Scheduling and audio safety
+---------------------------
+Start with immediate event execution. Keep a bounded master transmit queue.
+Prioritise panic, transport stop and note releases, while preserving intentional
+note ordering. Reserve deadlines for musical clock so parameter traffic cannot
+starve it. Coalesce unsent edits to the same parameter and rate-limit automation.
+Do not wait for an acknowledgement before each musical event.
+
+The receiver serial ISR rearms reception promptly and queues incoming bytes.
+Parse and dispatch in a frequently serviced audio-safe path, never behind screen
+drawing or patch file work. Do not execute expensive synthesis/patch operations
+inside the ISR. Bound interrupt masking and provide enough inter-byte spacing
+for receiver rearming. Measure these constraints on the actual DMG audio engine.
+
+Full-duplex return bytes may report identity, capabilities, health and overflow.
+They describe previously prepared receiver state, not an instantaneous reply to
+the byte currently arriving. Master-generated transfers drive all return traffic.
+
+If measurements require tighter alignment, add a short timestamped input queue
+and shared-clock execution. This is scheduled input, not a sequencer. Account
+for the same lookahead in local GAYBOY events so the two audio outputs align.
+
+Fault handling
+--------------
+Derive the running timeout from the expected pulse interval, with a minimum
+wall-clock allowance; choose the tolerated missed-pulse count after hardware
+tests. Stopped heartbeat has its own documented interval and timeout. Valid
+clock/heartbeat messages refresh presence; arbitrary bytes do not.
+
+On clock loss, clear held-note ownership and release the voice, show LINK LOST,
+and let free-running modulation use the last known tempo. If a release cannot
+complete safely, fall back to a hard cut. A fresh handshake and position/transport
+state are required before accepting new notes after reconnect. Never replay
+queued notes from the old session.
+
+A dropped clock is detected/reconciled by periodic absolute position; a pulse
+alone cannot identify how many were lost. Ring overflow, invalid musical state
+or persistent parser failures trigger a safe release and resynchronisation.
+Repeated panic/stop is safe. Patch loading must release or safely queue input
+and report busy; it must not silently lose note-offs. Defer live patch changes
+until their timing and audio costs are characterised.
+
+Delivery and validation
+-----------------------
+1. Implement negotiated roles, one external track, note/velocity/gate,
+   retrigger/legato, audition, stop/panic and visible connection state.
+2. Include 24-PPQN clock, tempo, position, stopped heartbeat and recovery in
+   that first usable version; expose tempo-sync LFO divisions locally.
+3. Measure two real DMGs at low/high supported BPM under maximum synth load,
+   UI redraw and dense retriggers. Check local-versus-remote audio timing,
+   clock jitter, sustain, release, ties, swing and tempo changes.
+4. Exercise unplug/replug, powered-off peer, malformed/truncated traffic,
+   receiver overflow, long stopped sessions and reconnect during a held note.
+5. Add parameter locks and remote patch selection only after musical timing
+   passes. Introduce lookahead scheduling if measured jitter warrants it.
+
+Hardware reference
+------------------
+GBDK hardware definitions (serial clock and transfer control):
+https://gbdk.org/docs/api/gb_2hardware_8h.html
+
+Repository references: src/link_serial.c, src/link_control.c,
+docs/linked-mixer.md, monosynth/src/mono.h, monosynth/src/main.c.
