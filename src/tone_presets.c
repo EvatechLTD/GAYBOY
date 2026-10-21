@@ -60,33 +60,46 @@ static void finder_text(uint8_t x,uint8_t y,const char *t,uint8_t inverse){uint8
 /* Finder categories keep existing page/action IDs; 28..34 jump to tracks. */
 const uint8_t finderitems[5][14]={
  {18,8,45,16,27,4,44,255},
- {38,21,43,22,46,42,36,37,35,26,40,41,39,255},
+ {38,21,43,22,46,42,36,37,35,26,40,41,39,47},
  {28,29,30,31,32,33,34,10,255},
  {11,12,13,14,15,17,7,9,23,1,2,3,5,6},
  {19,20,24,25,255}};
-const uint8_t findercount[5]={7,13,8,14,4};
+const uint8_t findercount[5]={7,14,8,14,4};
 const char * const findertracks[]={"P1","P2","WAVE","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
 extern uint8_t mixer_layout_dirty;
 uint8_t pageconfig;
 static uint8_t pageslot;
-uint8_t finder_allowed(uint8_t item){if(item==255||item==7||item==9||item==14||item==32||item==33||item==5||item==6)return 0;if(item>=28&&item<=34&&!eval_visible(item-28))return 0;if(page==18&&MIXER_LINK_VIEW&&(item==19||item==20))return 0;if(item==45)return 1;if(pageconfig==2)return item!=18&&item!=8&&item!=16;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
+__at (0xA4EC) uint8_t theorytrack;
+uint8_t finder_allowed(uint8_t item){if(item==47)return page==8&&(theorytrack<4||theorytrack==6);if(item==255||item==7||item==9||item==14||item==32||item==33||item==5||item==6)return 0;if(item>=28&&item<=34&&!eval_visible(item-28))return 0;if(page==18&&MIXER_LINK_VIEW&&(item==19||item==20))return 0;if(item==45)return 1;if(pageconfig==2)return item!=18&&item!=8&&item!=16;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
 static void page_defaults(void);
 static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?11:findercount[navcategory];}
 static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==2?16:pool_root[100+i-3];}
 void finder_first(void) BANKED {uint8_t i,item;mx.error=0;navchoice=255;for(i=0;i<finder_count();i++){item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 void finder_step(int8_t delta) BANKED {uint8_t i,n=finder_count(),tries,item;mx.error=0;for(i=0;i<n;i++)if(finder_item(i)==navchoice)break;for(tries=0;tries<n;tries++){i=delta<0?(i?i-1:n-1):(i+1)%n;item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 static const char * const finderedit[]={"CLEAR TRACK","COPY TRACK","PASTE TRACK","SELECT ALL","CLEAR SONG","COPY PATTERN","PASTE PATTERN","DELETE NOTES","CUT"};
-static const char *finder_label(uint8_t item){if(item==46)return "DUPLICATE";if(item==45)return "MIXER SETTINGS";if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
+static const char *finder_label(uint8_t item){if(item==47)return "THEORY";if(item==46)return "DUPLICATE";if(item==45)return "MIXER SETTINGS";if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
 static const char *shortcut_label(uint8_t item);
-void ui_menu(void) BANKED {uint8_t i,row=4,inv,rank=0,n=0,start;const char *labels[]={"PAGE","EDT","SEQ","INS","FIL"};const uint8_t x[]={0,5,9,13,17};
- memset(canvas,0,sizeof(canvas));
- for(i=0;i<5;i++)finder_text(x[i],0,labels[i],navcategory==i);
- memset(canvas+20,13,20);finder_text(0,2,navcategory==0?"PAGE":navcategory==1?"EDIT":navcategory==2?"SEQUENCER":navcategory==3?"INSTRUMENTS":"FILE",0);
+__at (0xA4D0) static uint8_t menuvalid;
+__at (0xA4D1) static uint8_t menucat;
+__at (0xA4D2) static uint8_t menuconfig;
+__at (0xA4D3) static uint8_t menuerror;
+__at (0xA4D4) static uint8_t menuitems[12];
+__at (0xA4E0) static uint8_t menuinv[12];
+void ui_menu(void) BANKED {uint8_t i,row=4,inv,rank=0,n=0,start,full,item,index;const char *labels[]={"PAGE","EDT","SEQ","INS","FIL"};const uint8_t x[]={0,5,9,13,17};
+ full=menuvalid!=79||menucat!=navcategory||menuconfig!=pageconfig||navchoice==255;
+ if(full){memset(canvas,0,sizeof(canvas));memset(menuitems,255,12);memset(menuinv,0,12);
+  for(i=0;i<5;i++)finder_text(x[i],0,labels[i],navcategory==i);
+  memset(canvas+20,13,20);finder_text(0,2,navcategory==0?"PAGE":navcategory==1?"EDIT":navcategory==2?"SEQUENCER":navcategory==3?"INSTRUMENTS":"FILE",0);
+  finder_text(0,17,pageconfig==2?"A ASSIGN   SEL BACK":"START/A OK  SEL BACK",0);
+ }
  for(i=0;i<finder_count();i++){if(finder_item(i)==navchoice)break;if(finder_allowed(finder_item(i)))rank++;}start=rank>11?rank-11:0;
- for(i=0;i<finder_count();i++){uint8_t item=finder_item(i);if(!finder_allowed(item))continue;if(n++<start||row>=16)continue;inv=navchoice==item;if(inv)memset(canvas+row*20,96,20);finder_text(1,row,navcategory==0?shortcut_label(item):finder_label(item),inv);row++;}
+ for(i=0;i<finder_count();i++){item=finder_item(i);if(!finder_allowed(item))continue;if(n++<start||row>=16)continue;inv=navchoice==item;index=row-4;
+  if(full||menuitems[index]!=item||menuinv[index]!=inv){memset(canvas+row*20,inv?96:0,20);finder_text(1,row,navcategory==0?shortcut_label(item):finder_label(item),inv);menuitems[index]=item;menuinv[index]=inv;}row++;
+ }
+ for(;row<16;row++)if(menuitems[row-4]!=255){memset(canvas+row*20,0,20);menuitems[row-4]=255;}
  if(navchoice==255)finder_text(1,5,"NO ACTIONS HERE",0);
- if(mx.error==2)finder_text(0,16,"CANNOT DO THAT HERE",0);
- finder_text(0,17,pageconfig==2?"A ASSIGN   SEL BACK":"START/A OK  SEL BACK",0);
+ if(full||menuerror!=mx.error){memset(canvas+16*20,0,20);if(mx.error==2)finder_text(0,16,"CANNOT DO THAT HERE",0);}
+ menuvalid=79;menucat=navcategory;menuconfig=pageconfig;menuerror=mx.error;
 }
 
 /* Settings use reserved root bytes, outside pattern/song payloads and audio RAM.
@@ -106,7 +119,7 @@ void page_menu_settings_render(void) BANKED {uint8_t i;page_defaults();if(pageco
  finder_text(0,14,"A/B: ASSIGN ITEM",0);finder_text(0,15,"EMPTY ITEM TO REMOVE",0);finder_text(0,16,"A/B+ARROWS: REORDER",0);finder_text(0,17,"SELECT: BACK",0);
 }
 static void page_save(void){if(sparse_enabled==1&&!pool_commit())mx.error=2;}
-void page_menu_settings_input(uint8_t p,uint8_t edge) BANKED {uint8_t other,item;page_defaults();
+void page_menu_settings_input(uint8_t p,uint8_t edge) BANKED {if(!edge&&!(seqbused>=2&&!(p&(J_A|J_B))))return;uint8_t other,item;page_defaults();
  if(edge&J_SELECT){pageconfig--;dirty=1;return;}
  if(pageconfig==2){
   if(edge&J_LEFT){navcategory=navcategory?navcategory-1:4;finder_first();}

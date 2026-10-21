@@ -1,5 +1,7 @@
 #pragma bank 10
 #include "api.h"
+void native_edit_flush(void) BANKED;
+void native_velocity_edit(int8_t delta) BANKED;
 void seq_brush_input(uint8_t edge) BANKED;
 void seq_brush_reset(void) BANKED;
 void drum_name_input(uint8_t p,uint8_t edge) BANKED;
@@ -227,7 +229,7 @@ void seq_track_view(void) BANKED;
 void seq_mute(void){mixer_pattern_changed();if(!syncmode){seqirqready=0;seqirqdirty=1;}seqmuted^=1<<seqtrack;if(seqmuted&(1<<seqtrack))seq_off(seqtrack);dirty=1;}
 void seq_solo(void){mixer_pattern_changed();uint8_t c;if(!syncmode){seqirqready=0;seqirqdirty=1;}seqsolo^=1<<seqtrack;for(c=0;c<SEQ_TRACKS;c++)if(!seq_audible(c))seq_off(c);dirty=1;}
 void seq_edit_value(uint8_t field,int16_t delta){uint8_t c=seqtrack;uint16_t step=c==6?65535:seq_hit(c,seqcursor[c],seqpitch[c]),current;int16_t value,lo=1,hi=127;
- if(field==4&&seqhead==5&&c<SEQ_NOTE_TRACKS)step=seq_note_get(c,seqcursor[c])?seqcursor[c]:65535;
+ if(field==4&&seqhead==5&&c<4){native_velocity_edit(delta);return;}
  if(field==4&&seqhead==5&&c==6){drum_velocity_edit(delta);return;}
  if(field==11){seq_swing_edit(delta);return;}
  if(field==10){int16_t z=(int16_t)seqzoom+delta;seqzoom=z<0?0:z>3?3:z;seq_dimensions();seq_clamp_cursor();seqdrawvalid=0;dirty=1;return;}
@@ -272,7 +274,7 @@ void seq_move(uint8_t edge){uint8_t c=seqtrack,e[4],other[4],old[4],fast;uint16_
  for(i=0;i<seq_event_count(c);i++){seq_event_get(c,i,e);if(e[1]==seqpitch[c]+1&&e[0]==seqaanchor){source=i;break;}}if(source==65535)return;
  dur=e[3]?e[3]:256;dst=e[0];pitch=e[1];if(edge&J_LEFT)dst--;if(edge&J_RIGHT)dst++;if(edge&J_UP)pitch++;if(edge&J_DOWN)pitch--;
  if(dst<0||dst+dur>seqlength[c]||pitch<SEQ_NOTE_MINIMUM(c)+1||pitch>seq_note_maximum(c)+1)return;
- if(dst!=e[0])for(i=0;i<seq_event_count(c);i++){if(i==source)continue;seq_event_get(c,i,other);if(other[1]&&dst<other[0]+(other[3]?other[3]:256)&&other[0]<dst+dur)return;seq_audio();}
+ if(dst!=e[0])for(i=0;i<seq_event_count(c);i++){if(i==source)continue;seq_event_get(c,i,other);if(other[1]&&((!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY])||other[1]==pitch)&&dst<other[0]+(other[3]?other[3]:256)&&other[0]<dst+dur)return;seq_audio();}
  if(seqplaying&&seqsource[c]==e[0])seq_off(c);memcpy(old,e,4);e[0]=dst;e[1]=pitch;fast=roll_replace_feedback(c,old,e,source);if(!seq_event_put(c,source,e))fast=0;
  seqaanchor=dst;seqcursor[c]=dst+seqaoffset;seqpitch[c]=pitch-1;seq_clamp_cursor();seqdrawvalid=fast;dirty=1;
 }
@@ -320,16 +322,15 @@ static void seq_popup_render(void){uint8_t y;memcpy(canvas,seqscreen,360);
 uint8_t seq_top_entry(void) BANKED {uint8_t col=seqcursor[seqtrack]-seqbase;uint8_t width=seqtrack==6?136:144;uint16_t x=(seqtrack==6?24:16)+((uint16_t)col*width+width/2)/seqcols;return x<68&&seqtrack!=6?1:x<84?2:x<100?3:4;}
 void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DOWN|J_LEFT|J_RIGHT;
  if(eval_confirm){eval_input(p,edge);return;}if(genopen){gen_input(p,edge);return;}
- if(page==10&&(edge&J_A)&&(p&J_SELECT)){gen_open();seqselectused=1;return;}
  if(seqpopup){seq_popup_input(edge);return;}
  if(!(p&J_B)||!(p&J_RIGHT)||(p&(J_A|J_SELECT|J_START))||page!=8||seqhead||seqfocus)seqlengthpause=0;
  if(seqrecordtrack!=255&&(!(p&J_B)||(p&(J_START|J_SELECT))))seq_record_finish();
  if(edge&J_SELECT){seqselectused=0;seqpopupstep=seqcursor[c];seqpopuppitch=c==6?drumrow:seqpitch[c];}if(edge&J_B){seqbused=0;seqdrag=0;}if(!(p&J_B))seqdrag=0;
  if(p&J_SELECT){seqapending=0;seqdrag=0;if(edge&J_A){seqselectused=1;seq_transport();}if(edge&J_B){seqselectused=seqbused=1;seq_mute();}
-  if(edge&(J_LEFT|J_RIGHT)){seqselectused=1;seqtrack=seq_track_page(!(edge&J_LEFT));seq_track_view();if(!seqplaying)seqmode=seqtrack==4;if(seqtrack<4||seqtrack==5){selected=seqtrack==5?4:seqtrack;choice=selected<4?program[selected]:0;}dirty=1;}
+  if(edge&(J_LEFT|J_RIGHT)){seqselectused=1;seqtrack=seq_track_page(!(edge&J_LEFT));seq_dimensions();seq_track_view();if(!seqplaying)seqmode=seqtrack==4;if(seqtrack<4||seqtrack==5){selected=seqtrack==5?4:seqtrack;choice=selected<4?program[selected]:0;}dirty=1;}
   if(edge&(J_UP|J_DOWN)){seqselectused=1;seq_edit_value(10,edge&J_UP?-1:1);}return;
  }
- if((lastpad&J_SELECT)&&!seqselectused){if(page==8&&!seqhead&&!seqfocus&&seqgrouptrack==c){seqpopup=1;seqpopupchoice=seqpopuperror=0;seqselectused=1;seqapending=seqdrag=0;repeatsteps=1;dirty=1;return;}page=page==10?8:10;seqfocus=page==10?1:0;seqedit=seqhead=0;seqselectused=1;seqdrawvalid=0;dirty=1;return;}
+ if((lastpad&J_SELECT)&&!seqselectused){if(page==8&&!seqhead&&!seqfocus&&seqgrouptrack==c){seqpopup=1;seqpopupchoice=seqpopuperror=0;seqselectused=1;seqapending=seqdrag=0;repeatsteps=1;dirty=1;return;}page=page==10?8:10;if(page==8){seq_dimensions();seq_track_view();}seqfocus=page==10?1:0;seqedit=seqhead=0;seqselectused=1;seqdrawvalid=0;dirty=1;return;}
  /* Direction chooses a brush once per A+B hold. */
  if((p&(J_A|J_B))!=(J_A|J_B))seq_brush_reset();
  if(page==8&&!seqhead&&!seqfocus&&(p&(J_A|J_B))==(J_A|J_B)){seq_brush_input(edge);return;}
@@ -401,7 +402,7 @@ void seq_tiles(void){uint8_t tile,y,lo,hi,buf[16];
   buf[y*2]=lo;buf[y*2+1]=hi;}ui_upload_tile(244+tile,buf,0);seq_audio();}
  seqtilesready=1;previewshape=255;
 }
-void seq_open(void) BANKED {seqpopup=0;seqlengthpause=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;seqtrack=seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_clamp_cursor();dirty=1;}
+void seq_open(void) BANKED {seqpopup=0;seqlengthpause=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;seqtrack=seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_track_view();seq_clamp_cursor();dirty=1;}
 void seq_name(uint8_t pitch,char *s){uint8_t n=pitch%12,oct=pitch/12;s[0]="CCDDEFFGGAAB"[n];s[1]=(0x54A&(1U<<n))?'#':' ';if(!oct){s[2]='-';s[3]='1';}else{s[2]='0'+oct-1;s[3]=' ';}s[4]=0;}
 void seq_field(uint8_t field,uint8_t x,uint8_t y,const char *label,uint16_t value,uint8_t digits){uint8_t inv=seqfocus==field;seq_audio();seq_text(x,y,label,inv&&(seqedit||(lastpad&J_B)));seq_number(x+3+(field==3||field==6),y,value,digits,inv);}
 uint8_t roll_selection_update(void) BANKED;
@@ -414,6 +415,7 @@ void seq_render(void) BANKED {
  if(c!=6&&!(seqviewinitialized&(1<<c))){seqviewinitialized|=1<<c;seq_track_view();seqdrawvalid=navigation=0;}seq_clamp_cursor();
  if((c!=6&&seqviewtop!=seqtop[c])||seqviewbase!=seqbase||seqviewcols!=seqcols||seqviewtrack!=c)seqdrawvalid=0;
  if(navopen){seqdrawvalid=0;memcpy(canvas,seqscreen,360);seqflushpending=1;HIDE_SPRITES;return;}
+ if(c<4)native_edit_flush();
  if(seqdrawvalid==2){if(roll_selection_update()){seqflushpending=1;seqdrawvalid=1;}else seqdrawvalid=0;}
  if(seqdrawvalid){seq_audio();}
  else{roll_feedback_cancel();seqflushpending=1;seq_meterbuild();if(c==6)drum_render();else seq_pixels(navigation);if(rollcancelled){seqflushpending=0;seqdrawvalid=0;dirty=1;return;}seq_audio();memcpy(seqscreen,canvas,360);seqdrawvalid=1;}

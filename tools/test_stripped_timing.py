@@ -15,10 +15,13 @@ p = PyBoy(str(ROM), window='null', sound_emulated=True, cgb=False,
 p.set_emulation_speed(0)
 
 def get(name, offset=0):
-    return p.memory[S['_' + name]+offset]
+    address=S['_' + name]+offset
+    return p.memory[0,address] if 0xa000<=address<0xc000 else p.memory[address]
 
 def put(name, value, offset=0):
-    p.memory[S['_' + name]+offset] = value & 255
+    address=S['_' + name]+offset
+    if 0xa000<=address<0xc000:p.memory[0,address]=value&255
+    else:p.memory[address]=value&255
 
 def word(name):
     return get(name) | get(name, 1) << 8
@@ -42,17 +45,18 @@ try:
     put('evalpatch',mode);put('evalpatch',bool(mode),13);put('evalpatch',4,2);put('evalpatch',1,4)
     put('evalpatch',8,9);put('evalpatch',1,8);put('globalmod',128,5)
     pulses=[[step,n,127,4 if mode else 1] for step in (0,4,8,12) for n in ((61,65,68) if mode else (70,))]
-    events=pulses+[[0,49,127,16]]+[[step,11 if step%4==0 else 12,100,1] for step in range(0,16,2)]+[[0,1,100,1],[8,2,100,1],[0,13,100,1],[8,13,100,1]]
-    if '--dense' in sys.argv:put('evalpatch',0,13);events=pulses+[[0,49,127,16]]+[[step,11+step%2,100,1] for step in range(256-len(pulses)-1)]
+    steady=[[step,73,100,1] for step in (0,4,8,12)] if '--native' in sys.argv else []
+    events=pulses+steady+[[0,49,127,16]]+[[step,11 if step%4==0 else 12,100,1] for step in range(0,16,2)]+[[0,1,100,1],[8,2,100,1],[0,13,100,1],[8,13,100,1]]
+    if '--dense' in sys.argv:put('evalpatch',0,13);events=pulses+steady+[[0,49,127,16]]+[[step,11+step%2,100,1] for step in range(256-len(pulses)-len(steady)-1)]
     offset=0
     for c in range(7):
-        n=len(pulses) if c==0 else 1 if c==2 else len(events)-len(pulses)-1 if c==6 else 0
+        n=len(pulses) if c==0 else len(steady) if c==1 else 1 if c==2 else len(events)-len(pulses)-len(steady)-1 if c==6 else 0
         put('seqeventoffsets',offset,c*2);put('seqeventoffsets',0,c*2+1);put('seqeventcounts',n,c*2);put('seqeventcounts',0,c*2+1);offset+=n
     p.memory[0x4000]=1
     for i,e in enumerate(events):p.memory[0xa000+768+i*4:0xa000+772+i*4]=e
     p.memory[0x4000]=0
     put('page',8);put('selected',0);put('seqtrack',0);put('seqhead',0);put('dirty',1);p.tick(60)
-    hits=[];p.hook_register(0,S['_play'],lambda _:hits.append(p._cycles()) if p.register_file.A==0 else None,None)
+    hits=[];p.hook_register(0,S['_play'],lambda _:hits.append(p._cycles()) if p.register_file.A==(1 if '--native' in sys.argv else 0) else None,None)
     p.button_press('select');press('a');p.button_release('select');p.tick(30);assert get('seqplaying')
     reports={}
     for phase in (('idle','navigation','editing') if '--editing' in sys.argv or '--groups' in sys.argv or '--velocity' in sys.argv else ('idle','navigation')):
@@ -60,6 +64,9 @@ try:
             put('seqtrack',6);put('seqhead',5 if '--velocity' in sys.argv else 0);put('seqfocus',0);put('drumrow',0 if '--groups' in sys.argv or '--velocity' in sys.argv else 2);put('seqcursor',0,6);
             if '--velocity' in sys.argv:put('drumvelrow',0);put('seqvelocityhidden',0);put('seqgrouptrack',255)
             if '--groups' in sys.argv:put('seqgrouptrack',6);put('seqgroupx0',0);put('seqgroupx1',15);put('seqgroupy0',0);put('seqgroupy1',1)
+            if '--native' in sys.argv:
+                put('seqtrack',0);put('seqhead',5 if '--velocity' in sys.argv else 0);put('seqcursor',0);put('seqpitch',60 if mode else 69);put('seqviewinitialized',127)
+                if '--groups' in sys.argv:put('seqgrouptrack',0);put('seqgroupy0',60 if mode else 69);put('seqgroupy1',67 if mode else 69)
             put('seqdrawvalid',0);put('dirty',1);p.tick(180)
             p.button_press('b');p.tick(6)
         hits.clear()
@@ -77,11 +84,11 @@ try:
             p.tick(1)
         if phase=='editing':p.button_release('b');p.tick(6)
         intervals=np.diff(hits)/4194304*1000;assert len(intervals)>=6,intervals
-        expected=125 if mode else 500
+        expected=500 if '--native' in sys.argv else 125 if mode else 500
         reports[phase+'_max_error_ms']=float(abs(intervals-expected).max())
         reports[phase+'_intervals_ms']=intervals.tolist()
-    reports['mode']='arp' if mode else 'mono';reports['pcm_underruns']=word('mixunderruns')
-    Path(('build/stripped-baseline/' if '--baseline' in sys.argv else 'build/')+'stripped-timing-'+reports['mode']+('-dense' if '--dense' in sys.argv else '')+('-velocity' if '--velocity' in sys.argv else '-groups' if '--groups' in sys.argv else '-editing' if '--editing' in sys.argv else '')+'.json').write_text(json.dumps(reports,indent=2))
+    reports['mode']='arp' if mode else 'mono';reports['clock_probe_track']=1 if '--native' in sys.argv else 0;reports['pcm_underruns']=word('mixunderruns')
+    Path(('build/stripped-baseline/' if '--baseline' in sys.argv else 'build/')+'stripped-timing-'+reports['mode']+('-dense' if '--dense' in sys.argv else '')+('-native' if '--native' in sys.argv else '')+('-velocity' if '--velocity' in sys.argv else '-groups' if '--groups' in sys.argv else '-editing' if '--editing' in sys.argv else '')+'.json').write_text(json.dumps(reports,indent=2))
     print('Measured baseline playback timing' if '--baseline' in sys.argv else 'Measured playback timing',reports)
     assert ('--baseline' in sys.argv or reports['navigation_max_error_ms']<25) and reports['pcm_underruns']<5 and reports.get('editing_max_error_ms',0)<25
 finally:p.stop(save=False)

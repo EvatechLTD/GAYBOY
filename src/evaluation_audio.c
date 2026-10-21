@@ -33,5 +33,11 @@ uint8_t eval_drum_duty(uint8_t c,uint8_t base) BANKED {(void)c;return base;}
 uint8_t eval_drum_pan(uint8_t c) BANKED {uint8_t p=evalpatch[c][EV_PAN];return (p&128?p&3:3)&mixer_pan(6);}
 void eval_audio_resume_channel(uint8_t c) BANKED {uint16_t f;uint8_t v;if(c>=2||!active[c])return;f=pitchvalue(c);v=level(c,param[c][1],velocity[c]);if(!c)NR10_REG=(param[0][4]<<4)|(param[0][5]<<3)|param[0][6];REG(c?0xff16:0xff11)=(param[c][0]<<6)|param[c][7];REG(c?0xff17:0xff12)=(v<<4)|(evalpatch[c][EV_LEVEL_MODE]==128?8:(param[c][2]<<3)|param[c][3]);REG(c?0xff18:0xff13)=f;REG(c?0xff19:0xff14)=128|(f>>8);pulsevolume[c]=v;}
 void eval_audio_resume_pulse1(void) BANKED {eval_audio_resume_channel(0);}
-void eval_audio_resume_wave(void) BANKED {uint16_t f;uint8_t v;if(!active[2]||mixrunning||drumon[0]||drumon[1])return;TAC_REG=0;waveengine=0;TMA_REG=TIMA_REG=240;IF_REG&=~TIM_IFLAG;v=level(2,param[2][15]?4-param[2][15]:0,velocity[2]);f=pitchvalue(2);NR30_REG=0;wave();NR30_REG=128;NR32_REG=(v?4-v:0)<<5;NR33_REG=f;NR34_REG=128|(f>>8);route=(route&~0x44)|(param[2][21]&1?4:0)|(param[2][21]&2?0x40:0);NR51_REG=route;if(seqplaying)TAC_REG=4;}
+void eval_audio_resume_wave(void) BANKED {uint16_t f;uint8_t v,pan;
+ if(waveengine!=3||!drumtail||mixrunning||drumon[0]||drumon[1])return;
+ TAC_REG=0;waveengine=0;TMA_REG=TIMA_REG=240;IF_REG&=~TIM_IFLAG;
+ if(active[2]){v=level(2,param[2][15]?4-param[2][15]:0,velocity[2]);f=pitchvalue(2);NR30_REG=0;wave();NR30_REG=128;NR32_REG=(v?4-v:0)<<5;NR33_REG=f;NR34_REG=128|(f>>8);pulsevolume[2]=v;}else NR30_REG=0;
+ pan=mixer_pan(2);route=(route&~0x44)|(pan&1?4:0)|(pan&2?0x40:0);NR51_REG=route;
+ if(syncarmed)sync_timer_config();if(seqplaying||syncarmed)TAC_REG=4;
+}
 void eval_audio_resume_noise(void) BANKED {uint8_t v;if(!active[3]||drumnoiseowned)return;v=level(3,param[3][1],velocity[3]);NR42_REG=(v<<4)|(evalpatch[3][EV_LEVEL_MODE]==128?8:(param[3][2]<<3)|param[3][3]);NR43_REG=eval_drum_pitch(3,(param[3][18]<<4)|(param[3][19]<<3)|param[3][20]);NR44_REG=128;route=(route&~0x88)|(param[3][21]&1?8:0)|(param[3][21]&2?0x80:0);NR51_REG=route;pulsevolume[3]=v;}

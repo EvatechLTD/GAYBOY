@@ -116,6 +116,7 @@ extern uint8_t eval_prepare_due;
 extern uint8_t mixer_layout_dirty;
 void mixer_layout_service(void) BANKED;
 void mixer_poll_input(void) BANKED;
+void eval_audio_resume_wave(void) BANKED;
 void mixfill(void){if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&!seqnativelaunchfired&&syncr!=syncw&&!synctxwait)sync_control_service();if(rd!=wr&&!seqnativelaunchfired&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
@@ -123,6 +124,7 @@ void mixfill(void){if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill(
  if(seqplaying&&!seqservicing&&seqeventcache>=2){seqservicing=1;sparse_service();seqservicing=0;}
  if((rd==wr||seqnativelaunchfired||(syncmode==1&&!syncslave))&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
  
+ if(waveengine==3&&drumtail&&!mixrunning&&!drumon[0]&&!drumon[1])eval_audio_resume_wave();
  if(padread==padwrite&&sparse_enabled==1&&seqplaying&&!seqservicing&&(page==18||link_ui_hold))sparse_prepare_service();}
 /* Intro audio can interrupt graphics in any ROM bank. Restore that bank before
    returning; the normal workstation timer is installed after the intro exits. */

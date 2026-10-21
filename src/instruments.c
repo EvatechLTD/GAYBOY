@@ -42,7 +42,7 @@ uint8_t ui_repeat(uint8_t p,uint8_t edge) BANKED {uint8_t axis,interval,resetmas
  if(navopen||(p&J_START)||(edge&resetmask)){repeataxis=0;mixphase=0;return edge;}
  if(axis!=repeataxis||(edge&axis)){repeataxis=axis;repeatstart=repeatlast=now;mixphase=0;return edge;}
  elapsed=now-repeatstart;
- if(page==18||(page==8&&seqtrack==6&&seqhead==5&&(p&(J_A|J_B)))){uint8_t rate,index;
+ if(page==18||(page==8&&seqhead==5&&(p&(J_A|J_B)))){uint8_t rate,index;
   if(elapsed>=240)rate=71;
   else{index=elapsed/15;rate=mixrates[index]+(uint16_t)(mixrates[index+1]-mixrates[index])*(elapsed%15)/15;}
   steps=now-repeatlast;if(steps>60)steps=60;repeatlast=now;

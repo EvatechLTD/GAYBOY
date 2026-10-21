@@ -239,7 +239,7 @@ uint8_t sync_local_stop_allowed(void) BANKED {
  return syncmode!=1||syncrole||!native_peer_running||(uint16_t)(frames()-native_claim_time)>=6;
 }
 
-void sync_ui_input(uint8_t p,uint8_t edge) BANKED {int8_t d=0,target,current;
+void sync_ui_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;int8_t d=0,target,current;
  if((p&J_SELECT)&&(edge&(J_A|J_B))){seq_transport();dirty=1;return;}
  if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))&&focus&&syncmode!=1){sync_input(J_RIGHT);return;}
  if(!(p&(J_A|J_B))){if(edge&(J_UP|J_DOWN))focus^=1;}

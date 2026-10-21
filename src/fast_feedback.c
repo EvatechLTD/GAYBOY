@@ -34,7 +34,7 @@ void drum_feedback_span(uint8_t left,uint8_t right) BANKED;
 __at (0xA800) uint16_t fastcells[13][32];
 __at (0xA540) uint8_t fastcoverorigin[13][32];
 __at (0xA410) static uint8_t feedbackvel[16];
-__at (0xA420) static uint16_t feedbackpending;
+__at (0xA420) uint16_t feedbackpending;
 __at (0xA422) static uint8_t feedbackphase;
 __at (0xA423) static uint8_t feedbacktrack;
 __at (0xA424) static uint8_t feedbackbase;
@@ -112,7 +112,7 @@ run_done$:
 static void feedback_region(uint8_t left,uint8_t right,uint8_t top,uint8_t bottom,uint8_t erase,uint8_t bar){uint8_t t,x,i,lo,hi,mask,id,n,old,pixels[16],base0,base1,bit,color,sx,first,last,from,barmask,pad;uint16_t at,step;uint16_t *refs=(uint16_t *)rollonsets;
  for(t=top>>3;t<((bottom+7)>>3);t++)for(x=left>>3;x<((right+7)>>3);x++){
   at=(uint16_t)(t+1)*20+x;old=canvas[at];n=feedback_index(old);if(n==255){seqtileoverflow=1;return;}memcpy(pixels,rolltiles[n],16);lo=left>x*8?left-x*8:0;hi=right<(x+1)*8?right-x*8:8;mask=feedback_masks[lo]^feedback_masks[hi];first=top>t*8?top-t*8:0;last=bottom<(t+1)*8?bottom-t*8:8;base0=base1=0;
-  if(bar){pad=seqtrack==6&&right-left<6?1:2;feedback_run(pixels,mask,first,last-first,0,0);if(t==14&&!first)feedback_run(pixels,mask,0,1,0,mask);if(bar>1){if(seqtrack!=6&&t==16&&last==8)feedback_run(pixels,mask,7,1,0,mask);from=136-(bar-1)>t*8?136-(bar-1)-t*8:0;if(from<first)from=first;if(from<last&&left+pad<right-pad&&left+pad<(x+1)*8&&right-pad>x*8){lo=left+pad>x*8?left+pad-x*8:0;hi=right-pad<(x+1)*8?right-pad-x*8:8;barmask=feedback_masks[lo]^feedback_masks[hi];feedback_run(pixels,barmask,from,last-from,barmask,barmask);}}}
+  if(bar){pad=seqtrack==6&&right-left<6?1:2;feedback_run(pixels,mask,first,last-first,0,0);if(t==14&&!first)feedback_run(pixels,mask,0,1,0,mask);if(bar>1){from=136-(bar-1)>t*8?136-(bar-1)-t*8:0;if(from<first)from=first;if(from<last&&left+pad<right-pad&&left+pad<(x+1)*8&&right-pad>x*8){lo=left+pad>x*8?left+pad-x*8:0;hi=right-pad<(x+1)*8?right-pad-x*8:8;barmask=feedback_masks[lo]^feedback_masks[hi];feedback_run(pixels,barmask,from,last-from,barmask,barmask);}if(seqtrack!=6&&t==16&&last==8)feedback_run(pixels,mask,7,1,0,mask);}}
   else{if(erase){uint8_t *base=seqtrack==6?(uint8_t *)0xBD40:rollbackground;base0=base[(uint16_t)x*16+2];base1=base[(uint16_t)x*16+3];}else base0=base1=255;feedback_run(pixels,mask,first,last-first,base0&mask,base1&mask);}
   if(!bar&&rollcache[5]==seqtrack){bit=feedback_selection_mask(x*8,t*8+first)&mask;for(i=first;i<last;i++){pixels[i*2]^=bit;pixels[i*2+1]^=bit;}}
   id=roll_feedback_intern(pixels);if(seqtileoverflow)return;if(old!=id){refs[n]--;refs[feedback_index(id)]++;canvas[at]=seqscreen[at]=id;}mixfill();
@@ -168,7 +168,7 @@ static uint8_t feedback_drum_resize(const uint8_t *old,const uint8_t *next){
 static uint8_t feedback_native_resize(uint8_t c,const uint8_t *old,const uint8_t *next){
  uint16_t a=old[0]+(old[3]?old[3]:256U),b=next[0]+(next[3]?next[3]:256U),at;
  uint8_t left,right,top,bottom,k,first,last,width,erase=b<a;int16_t y;
- if(!feedback_ready(c)||c>=3||eval_mode(c)||evalpatch[c][EV_CHORD_HISTORY])return 0;
+ if(!feedback_ready(c)||c>=4||eval_mode(c)||evalpatch[c][EV_CHORD_HISTORY])return 0;
  y=((int16_t)seqtop[c]-(old[1]-1))*seqheight;if(y<0||y+seqheight>seqgridheight)return 0;
  if(a<=seqbase||b<=seqbase||old[0]>=(uint16_t)seqbase+seqcols)return 0;
  first=(erase?b:a)>=(uint16_t)seqbase+seqcols?seqcols:(erase?b:a)-seqbase;last=(erase?a:b)>=(uint16_t)seqbase+seqcols?seqcols:(erase?a:b)-seqbase;
@@ -302,7 +302,7 @@ uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED {
 /* Slider edits touch only the scanlines between the previous and new heights. */
 uint8_t roll_velocity_bar(uint8_t col,uint8_t oldheight,uint8_t height) BANKED {
  uint8_t left,right,top,bottom,row,width;uint16_t at;
- if(!feedback_ready(6)||seqvelocityhidden||col>=seqcols)return 0;
+ if(!feedback_ready(seqtrack)||seqvelocityhidden||col>=seqcols)return 0;
  if(oldheight==height)return 1;
  left=rollx[col];right=rollx[col+1];top=oldheight==255?112:136-(oldheight>height?oldheight:height);bottom=oldheight==255?136:136-(oldheight<height?oldheight:height);
  roll_feedback_begin();feedback_region(left,right,top,bottom,0,1+height);

@@ -1,7 +1,7 @@
 """Real DMG input: deferred A+B brush, direction lock and both button orders."""
 from pathlib import Path
 prefix=Path('tools/test_stripped_ui.py').read_text().split('\ntry:')[0]
-for track,rownum in ((6,2),(6,3),(0,0)):
+for track,rownum in ((6,2),(6,3),(0,0),(1,0),(2,0),(3,0)):
  for order in ('ab','ba','same'):
   exec(prefix)
   try:

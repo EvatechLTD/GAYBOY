@@ -73,6 +73,7 @@ void ui_menu_step(int8_t delta) BANKED;
 void finder_first(void) BANKED;
 void finder_step(int8_t delta) BANKED;
 void ui_menu(void) BANKED;
+extern __at (0xA4EC) uint8_t theorytrack;
 void ui_channel(uint8_t c){uint8_t i;auditionstop();if(monomode||polymode){panic();monomode=polymode=0;TAC_REG=waveengine?4:0;route=0;for(i=0;i<4;i++)if(!param[i][9]){if(param[i][21]&1)route|=1<<i;if(param[i][21]&2)route|=0x10<<i;}globals();}
  eval_row=eval_col=eval_tab=0;seqtrack=c==4?5:c;selected=c;choice=c<4?program[c]:0;cursor[1]=cursor[2]=cursor[4]=cursor[5]=cursor[6]=0;tablefield=0;
 }
@@ -84,6 +85,8 @@ void ui_restore_seq_tiles(void){extern uint8_t seqtilesready;uint8_t tile,y,c,v,
 }
 
 void ui_render(void) BANKED {uint8_t i,n,start,inv;if(page>=18)seqflushpending=1;
+ if(navopen||(page!=1&&page!=2&&page!=17)||tonepresetopen)*(uint8_t *)0xA475=0;
+ if(!navopen)*(uint8_t *)0xA4D0=0;
  if(navopen){HIDE_SPRITES;seqflushpending=1;ui_menu();return;}
  {if(page!=18&&mixerfontdirty){if(page!=8)ui_restore_seq_tiles();mixerfontdirty=0;}}
  if(page!=8)HIDE_SPRITES;if(page!=8&&seqfontdirty)ui_restore_seq_tiles();
@@ -132,6 +135,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
   if((edge&(J_A|J_B))||(sticky_start&&(edge&J_START))||(!sticky_start&&((lastpad&J_START)&&!(p&J_START)))){
    if(navchoice==255)return;
    navopen=0;seqdrawvalid=0;
+   if(navchoice==47){seqtrack=theorytrack;page=8;seqhead=seqfocus=0;gen_open();dirty=1;return;}
    if(navchoice==45){page=28;mixer_settings_open();dirty=1;return;}
    if(navchoice==21||navchoice==22||navchoice==26||navchoice>=35){if(!finder_edit_action(navchoice))navopen=1;dirty=1;return;}
    if(page==9&&navchoice!=9)noise_close();
@@ -145,7 +149,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
  if(tonepresetopen){tone_preset_input(edge);return;}
  if((edge&J_START)&&page==16&&pageconfig==2){global_input(p,edge);return;}
  if((edge&J_START)&&((page==8&&seqpopup)||((page==8||page==10)&&genopen&&genrow>=8))){seq_input(p,edge);return;}
- if((edge&J_START)&&!navblocked){if(page==8)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();if(page==18){mixer_view_capture();mixer_prepare_cancel();}tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
+ if((edge&J_START)&&!navblocked){theorytrack=page==8?seqtrack:255;if(page==8)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();if(page==18){mixer_view_capture();mixer_prepare_cancel();}tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
 
  if(page==28){mixer_settings_input(p,edge);return;}if(page==27){sync_ui_input(p,edge);return;}if(page==23){kits_input(p,edge);return;}if(page>=18){mixer_input(p,edge);return;}if(page==17){eval_input(p,edge);return;}if(page==16){global_input(p,edge);return;}if(page==8||page==10){seq_input(p,edge);return;}
  if(page==2||selected<4&&(page==1||page==6)){eval_input(p,edge);return;}if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%4;choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}

@@ -42,7 +42,7 @@ static void settings_adjust(int8_t delta){int8_t current,target;
  else if(mx.focus==1&&!link_pair_phase){linkpair=delta>0;mixer_layout_dirty=1;}
  else if(mx.focus==2||mx.focus==3){current=mx.focus==2?syncmode:syncmode==1?syncrole:syncslave;target=current+delta;if(target<0)target=0;if(target>(mx.focus==2?5:syncmode==1?2:1))target=mx.focus==2?5:syncmode==1?2:1;while(current!=target){sync_setting_edit(mx.focus-2,current<target?J_RIGHT:J_LEFT);current+=current<target?1:-1;}}
 }
-void mixer_settings_input(uint8_t p,uint8_t edge) BANKED {uint8_t device,*cell,mask,id;int8_t d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;
+void mixer_settings_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;uint8_t device,*cell,mask,id;int8_t d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;
  if(mx.edit){device=mx.focus==5;if(edge&J_SELECT){mx.edit=0;dirty=1;return;}id=layout_cursor<4?layout_cursor:layout_cursor+2;cell=mixer_hidden+device*4+(id>>3);mask=1U<<(id&7);
   if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))){*cell^=mask;mixer_layout_dirty=1;}
   else if(p&(J_A|J_B)){if(d){if(d>0)*cell&=~mask;else *cell|=mask;mixer_layout_dirty=1;}}

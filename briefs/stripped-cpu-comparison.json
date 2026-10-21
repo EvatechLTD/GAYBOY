@@ -2,7 +2,7 @@
   "baseline_tag": "stripped-baseline-20261020",
   "baseline_commit": "e7a66e6",
   "baseline_rom_sha256": "cd7d430b5f84a54d0e47fa8a04a30ebb82120ff209987e73d1d24b354f61ffb0",
-  "current_rom_sha256": "98dda697e779624114e1150bc7eb4bb16e3da0ec106a75abc7e04447da7c56b3",
+  "current_rom_sha256": "c879747148ae66000ed902507f44d6e7ff3c7a09005b067fc8123d3f85cd7684",
   "measurements": {
     "event_lookup_mean_ms": {
       "baseline": 73.45104217529297,
@@ -70,7 +70,7 @@
     },
     "dense_arp_worst_error_ms": {
       "baseline": 35.30120849609375,
-      "optimized": 25.037765502929688
+      "optimized": 23.400306701660156
     },
     "dense_arp_pcm_underruns": {
       "baseline": 0,
@@ -78,7 +78,7 @@
     },
     "wram_ordinary_bytes": {
       "baseline": 3687,
-      "optimized": 3726
+      "optimized": 3727
     },
     "event_index_and_wave_shadow_cartridge_ram_bytes": {
       "baseline": 0,

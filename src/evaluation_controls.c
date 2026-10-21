@@ -6,7 +6,7 @@ extern const uint8_t limits[26];
 #include "user_presets.h"
 extern uint8_t globalmod[10],seqgate[7],drumsynthvoice,pulsekickpatch[8],noisepatch[2][5];
 #include "stripped_ui.h"
-void eval_input(uint8_t p,uint8_t e) BANKED {uint8_t c=eval_instrument(),id=0,n,col=1,*cell,hi;int16_t d=delta(e),v;
+void eval_input(uint8_t p,uint8_t e) BANKED {if(!e)return;uint8_t c=eval_instrument(),id=0,n,col=1,*cell,hi;int16_t d=delta(e),v;
  if(page==2){c=0;n=10;}else{n=eval_tab==3?5:tone_count(c);id=eval_tab==3?0:tone_id(c,eval_row);if(id==102||id==107)col=3;}
  if(page!=2&&(p&J_SELECT)&&(e&(J_LEFT|J_RIGHT))){uint8_t part=page==17?4:selected;part=(part+(e&J_RIGHT?1:4))%5;if(part==4){page=17;drumsynthvoice=0;}else {page=1;selected=part;choice=program[part];}eval_tab=eval_row=eval_col=0;previewshape=255;dirty=1;return;}
  if(page==17&&(e&J_SELECT)){drumsynthvoice=(drumsynthvoice+1)%3;eval_row=eval_col=0;dirty=1;return;}
