@@ -51,7 +51,7 @@ __at (0xFFC6) volatile uint8_t synctxwait;
 __at (0xFFC7) volatile uint8_t synctick;
 __at (0xFFC8) volatile uint8_t syncstart;
 __at (0xFFC9) volatile uint8_t synctxbyte;
-static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUINOBOY","POCKET OPERATOR","GATE"};
+static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE"};
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
 void link_clock_abort(void) NONBANKED;
 void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED;
@@ -208,7 +208,7 @@ void sync_render(void) BANKED {memset(canvas,0,360);memset(canvas,96,20);drawtex
  drawtext(1,6,"ROLE",focus==1);drawtext(8,6,syncmode==1&&!syncrole?"AUTO":syncslave?"SLAVE":"MASTER",focus==1);
  if(syncmode==1&&!syncrole&&seqplaying)drawtext(8,7,syncslave?"> SLAVE":"> MASTER",0);
  drawtext(1,8,"GLOBAL BPM",0);drawnumber(13,8,seqglobalbpm?seqglobalbpm:seqbpm);
- drawtext(0,11,"U/D SELECT L/R EDIT",0);drawtext(0,13,"A PLAY / STOP",0);
+ drawtext(0,11,"A/B+ARROWS TO EDIT",0);drawtext(0,13,"SELECT+A PLAY / STOP",0);
  if(linkstate==4)drawtext(0,16,"START CLASH - RETRY",0);
  if(syncmode>=4)drawtext(0,15,"PULSE ADAPTER NEEDED",0);
  else if(syncmode==3)drawtext(0,15,"LSDJ SYNC MODE",0);
@@ -237,4 +237,12 @@ void sync_setting_edit(uint8_t row,uint8_t edge) BANKED {uint8_t saved=focus;if(
    runs only on a local transport press, never on clock or instrument paths. */
 uint8_t sync_local_stop_allowed(void) BANKED {
  return syncmode!=1||syncrole||!native_peer_running||(uint16_t)(frames()-native_claim_time)>=6;
+}
+
+void sync_ui_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;int8_t d=0,target,current;
+ if((p&J_SELECT)&&(edge&(J_A|J_B))){seq_transport();dirty=1;return;}
+ if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))&&focus&&syncmode!=1){sync_input(J_RIGHT);return;}
+ if(!(p&(J_A|J_B))){if(edge&(J_UP|J_DOWN))focus^=1;}
+ else{d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;if(d){current=!focus?syncmode:syncmode==1?syncrole:syncslave;target=current+d;if(target<0)target=0;if(target>(!focus?5:syncmode==1?2:1))target=!focus?5:syncmode==1?2:1;while(current!=target){sync_input(current<target?J_RIGHT:J_LEFT);current+=current<target?1:-1;}}}
+ dirty=1;
 }

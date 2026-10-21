@@ -1,5 +1,5 @@
 from pathlib import Path
-import argparse, concurrent.futures, hashlib, subprocess, sys, time
+import argparse, concurrent.futures, hashlib, re, subprocess, sys, time
 root=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser();parser.add_argument('--demo-seed',type=Path);options=parser.parse_args()
 # Concurrent sessions share object names; serialize compilation and linking.
@@ -16,20 +16,37 @@ else:
  import fcntl
  fcntl.flock(build_lock,fcntl.LOCK_EX)
 compiler=root/'tools/gbdk/bin/lcc.exe'; out=root/'build/objects';out.mkdir(exist_ok=True)
-names='seq_launch seq_native sparse_prepare control seq_irq seq_pulse sync_clock link_serial link_control sync sparse_seed clear_pattern sparse_pool sparse_store sparse_journal pattern_io kits drum_samples32 drum_samples33 drum_samples34 drum_samples35 drum_samples36 main ui legacy experimental exp_waves5 exp_waves6 exp_waves7 exp_waves8 exp_coefficients exp_maps storage sequencer seq_gen seq_clipboard tones tones_native tone_presets noiselab instruments seq_pixels finepitch global drum drum_samples drum_samples19 drum_samples20 mixer mixer_layout mixer_pads mixer_link intro intro_demo cinema cinema0 cinema1 cinema2 cinema5 train_motion0 train_motion1 train_window zoom0 zoom1 zoom2'.split()
+names='native_feedback drum_velocity coarse_pitch fast_feedback drum_grid evaluation_sequencer evaluation_controls user_presets evaluation evaluation_audio evaluation_ui evaluation_mono resident control seq_pulse sync_clock link_serial link_control sync clear_pattern pattern_io kits drum_samples32 drum_samples33 drum_samples34 drum_samples35 drum_samples36 main ui legacy stripped_compat storage sequencer seq_gen seq_clipboard tones tone_presets instruments seq_pixels finepitch global drum drum_samples drum_samples19 drum_samples20 mixer mixer_layout mixer_pads mixer_link intro intro_demo cinema cinema0 cinema1 cinema2 cinema5 train_motion0 train_motion1 train_window zoom0 zoom1 zoom2'.split()
 names += ['intro_damage'+str(stage) for stage in range(1,11)]
 if options.demo_seed:
  from make_sparse_seed import generate
  generate(options.demo_seed,root/'build/sparse_seed.c')
-from generate_native_scatter import generate as generate_native_scatter
-generate_native_scatter()
 from generate_startup_font import generate as generate_startup_font
 generate_startup_font(root/'src/ui_tiles.h',root/'src/ui_startup_font.h')
 headers=b''.join(p.read_bytes() for p in sorted((root/'src').glob('*.h')))
 flags=['-Wf--opt-code-size','-Wa-l']
+
+def source_dependencies(source):
+ # Include every local header transitively, including inactive branches. This
+ # keeps cache invalidation conservative without recompiling unrelated pages.
+ pending=[source];seen=set();parts=[]
+ while pending:
+  path=pending.pop().resolve()
+  if path in seen:continue
+  seen.add(path);data=path.read_bytes()
+  parts.append((path.relative_to(root).as_posix(),data))
+  for name in re.findall(rb'^\s*#\s*include\s*"([^"\r\n]+)"',data,re.M):
+   child=path.parent/name.decode()
+   if not child.exists():child=root/'src'/name.decode()
+   if child.exists():pending.append(child)
+ return b''.join(name.encode()+b'\0'+data+b'\0' for name,data in sorted(parts))
 def compile_one(name):
  src=root/('build/sparse_seed.c' if name=='sparse_seed' and options.demo_seed else 'src/'+name+'.c');obj=out/(name+'.o');stamp=out/(name+'.sha256')
- digest=hashlib.sha256(src.read_bytes()+headers+str(compiler.stat().st_mtime_ns).encode()+str(flags).encode()).hexdigest()
+ toolchain=str(compiler.stat().st_mtime_ns).encode()+str(flags).encode()
+ digest=hashlib.sha256(b'deps-v1\0'+source_dependencies(src)+toolchain).hexdigest()
+ # Migrate a verified old cache entry without changing its object code.
+ legacy=hashlib.sha256(src.read_bytes()+headers+toolchain).hexdigest()
+ if obj.exists() and stamp.exists() and stamp.read_text()==legacy:stamp.write_text(digest)
  if obj.exists() and stamp.exists() and stamp.read_text()==digest:return
  r=subprocess.run([str(compiler),*flags,'-c','-o',str(obj),str(src)],cwd=root,capture_output=True,text=True)
  if r.stdout:print(r.stdout,end='',flush=True)

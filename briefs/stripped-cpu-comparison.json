@@ -1,0 +1,98 @@
+{
+  "baseline_tag": "stripped-baseline-20261020",
+  "baseline_commit": "e7a66e6",
+  "baseline_rom_sha256": "cd7d430b5f84a54d0e47fa8a04a30ebb82120ff209987e73d1d24b354f61ffb0",
+  "current_rom_sha256": "c879747148ae66000ed902507f44d6e7ff3c7a09005b067fc8123d3f85cd7684",
+  "measurements": {
+    "event_lookup_mean_ms": {
+      "baseline": 73.45104217529297,
+      "optimized": 1.7791986465454102
+    },
+    "unchanged_wave_mean_ms": {
+      "baseline": 1.1072158813476562,
+      "optimized": 0.06866455078125
+    },
+    "first_wave_upload_ms": {
+      "baseline": 1.1072158813476562,
+      "optimized": 1.5659332275390625
+    },
+    "index_prepare_ms": {
+      "baseline": 0.003814697265625,
+      "optimized": 36.651611328125
+    },
+    "navigation_sound_invalidations": {
+      "baseline": 6,
+      "optimized": 0
+    },
+    "navigation_saves": {
+      "baseline": 6,
+      "optimized": 0
+    },
+    "navigation_generation_delta": {
+      "baseline": 6,
+      "optimized": 0
+    },
+    "note_edit_saved": {
+      "baseline": true,
+      "optimized": true
+    },
+    "plot_visible_ms": {
+      "baseline": 117.2018051147461,
+      "optimized": 66.96891784667969
+    },
+    "delete_visible_ms": {
+      "baseline": 133.9435577392578,
+      "optimized": 83.71257781982422
+    },
+    "mixed_pcm_mono_worst_error_ms": {
+      "baseline": 2.2535324096679688,
+      "optimized": 3.2091140747070312
+    },
+    "mixed_pcm_mono_pcm_underruns": {
+      "baseline": 0,
+      "optimized": 0
+    },
+    "dense_mono_worst_error_ms": {
+      "baseline": 29.9530029296875,
+      "optimized": 3.9339065551757812
+    },
+    "dense_mono_pcm_underruns": {
+      "baseline": 0,
+      "optimized": 0
+    },
+    "mixed_pcm_arp_worst_error_ms": {
+      "baseline": 20.98369598388672,
+      "optimized": 21.907806396484375
+    },
+    "mixed_pcm_arp_pcm_underruns": {
+      "baseline": 0,
+      "optimized": 0
+    },
+    "dense_arp_worst_error_ms": {
+      "baseline": 35.30120849609375,
+      "optimized": 23.400306701660156
+    },
+    "dense_arp_pcm_underruns": {
+      "baseline": 0,
+      "optimized": 0
+    },
+    "wram_ordinary_bytes": {
+      "baseline": 3687,
+      "optimized": 3727
+    },
+    "event_index_and_wave_shadow_cartridge_ram_bytes": {
+      "baseline": 0,
+      "optimized": 1040
+    }
+  },
+  "notes": [
+    "Microbenchmarks measure individual paths, not overall CPU utilization.",
+    "A full 256-note address index is built once at transport start or after note edits/pattern switches; stopped editing uses direct reads.",
+    "Projects below32 events skip index construction.",
+    "Dense fixture includes256 events with pulse, wave and noise drums; mixed fixture also includes PCM samples and pulse kick.",
+    "Wave upload is skipped only while content matches; custom edits and PCM takeover force a refresh.",
+    "No active PCM attack busy-wait existed in the baseline. The inactive legacy launch wait was removed.",
+    "Required envelope/trigger/length writes remain to preserve hardware behavior.",
+    "All measurements use DMG emulation; physical hardware testing remains outstanding."
+  ]
+}

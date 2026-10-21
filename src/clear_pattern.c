@@ -70,7 +70,7 @@ void clear_render(void) BANKED {uint8_t row;seqflushpending=1;HIDE_SPRITES;
 static void close(void){page=origin;if(page==8){seqdrawvalid=0;seqviewtrack=255;}mx.padcache=0;dirty=1;}
 void clear_input(uint8_t edge) BANKED {uint8_t ok=1;
  if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)){clear_choice^=1;dirty=1;}
- if(edge&J_SELECT){seqselectused=1;close();return;}if(!(edge&(J_A|J_START)))return;if(clear_choice){close();return;}
+ if(edge&J_SELECT){seqselectused=1;close();return;}if(!(edge&(J_A|J_B|J_START)))return;if(clear_choice){close();return;}
  if(operation==1)ok=sparse_delete_song(slot);
  else if(operation==2)ok=sparse_clear_working_song();
  else if(operation==3)ok=sparse_paste_pad(slot);
@@ -104,11 +104,12 @@ uint8_t finder_edit_allowed(uint8_t item) BANKED {
  if(item==40)return page==18&&sparse_enabled==1&&(edit_pad()==mx.slot||sparse_slots[edit_pad()]!=POOL_NONE);
  if(item==41)return page==18&&sparse_enabled==1&&pool_reference(POOL_PATTERN_CLIP)!=POOL_NONE;
  if(!edit_grid())return 0;
- if(item==21||item==42||item==43)return seqgrouptrack==seqtrack;
+ if(item==21||item==42||item==43||item==46)return seqgrouptrack==seqtrack;
  if(item==22)return seq_clip_kind()==2;
  if(item==37)return seq_clip_kind()==1;
  return item==35||item==36||item==38;
 }
+uint8_t seq_region_duplicate(void) BANKED;
 uint8_t finder_edit_action(uint8_t item) BANKED {uint8_t ok=1;
  if(!finder_edit_allowed(item))return 0;
  if(item==26||item==35){clear_open();return 1;}
@@ -124,5 +125,6 @@ uint8_t finder_edit_action(uint8_t item) BANKED {uint8_t ok=1;
  if(item==21||item==43){sparse_finish_install();ok=seq_region_copy(item==43);if(ok&&item==43)mixer_pattern_changed();}
  if(item==22){sparse_journal_edit_barrier();sparse_finish_install();ok=seq_region_paste(seqcursor[seqtrack],seqtrack==6?drumrow:seqpitch[seqtrack]);if(ok)mixer_pattern_changed();}
  if(item==42)seq_delete_selection();
+ if(item==46)ok=seq_region_duplicate();
  if(!ok)mx.error=2;seqdrawvalid=0;mx.padcache=0;dirty=1;return ok;
 }

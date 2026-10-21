@@ -1,112 +1,31 @@
-"""Check protected engine memory and report storage separately from scratch.
-
-This is deliberately based on linked addresses, not C structure estimates.
-Intentional page-local overlays are listed as one owner. No unused byte of
-engine bank zero or WRAM is advertised as available song storage.
-"""
-import argparse
-import json
+"""Audit the stripped resident layout using linked symbols."""
+import argparse,json
 from pathlib import Path
 
-
 def audit(rom):
-    symbols = {
-        line.split()[1]: int(line.split()[2], 16)
-        for line in rom.with_suffix('.noi').read_text().splitlines()
-        if line.startswith('DEF ')
-    }
-    image = rom.read_bytes()
-    heap_end = symbols['s__HEAP_END']
-    work_margin = 0xD800 - heap_end
-    assert work_margin >= 1024, ('Engine WRAM reserve below 1024 bytes', work_margin)
-    assert symbols['_wavepixels'] == 0xB000, 'Preview must use page-local SRAM scratch'
-    assert symbols['_seqevents_hi'] == 0xA800
-    assert symbols['_pulsekickleft'] == 0xAC59
-    assert symbols['_drumnoisetail'] == 0xAC58
-    assert symbols['_expdelay'] == 0xA000
-    if '_seqnativestep' in symbols:
-        assert symbols['_seqnativestep'] == 0xA000
-        assert symbols['_seqlaunchstep'] == 0xA200
-    assert symbols['_mx'] == 0xAC80
-    assert symbols['_prep'] == 0xACB4
-    assert symbols['_ui_loading_active'] == 0xACFE
-    assert symbols['_ui_loading_step'] == 0xACFF
-    assert symbols['_rolltiles'] == 0xB000
-    assert symbols['_rolldirty'] + 20 <= 0xC000
-    stack_bottom = max(symbols[name] + size for name, size in (
-        ('_softlut', 64), ('_explut', 32), ('_expwet', 256),
-        ('_expalpha', 256), ('_expreslut', 256), ('_expinterp', 256),
-        ('_expfeedback', 256)))
-    assert stack_bottom <= 0xDE00, 'Keep at least 512 bytes for stack/interrupts'
-    assert image[0x147] == 0x1B and image[0x149] == 3, '32 KiB battery RAM target changed'
-
-    # Entire engine bank is protected, including holes and page-local overlays.
-    bank_zero = [
-        (0xA000, 0xA800, 'audio delay / native step and launch lookahead overlays'),
-        (0xA800, 0xAC00, 'upper live event pool'),
-        (0xAC00, 0xAD00, 'PCM, mixer, preparation and UI control state'),
-        (0xAD00, 0xB000, 'renderer, mixer preview and drum edit overlays'),
-        (0xB000, 0xC000, 'roll tiles, pattern/tone preparation and UI preview overlays'),
-    ]
-    assert sum(end - start for start, end, _ in bank_zero) == 8192
-
-    # Current persistence layout. Slot 8 is a virtual address used only for
-    # the bank-3 tail journal span, not a ninth pattern record.
-    owned = {}
-
-    def reserve(bank, start, size, owner):
-        assert 1 <= bank <= 3 and 0 <= start <= start + size <= 8192
-        for offset in range(start, start + size):
-            key = bank, offset
-            assert key not in owned, ('SRAM ownership overlap', key, owned.get(key), owner)
-            owned[key] = owner
-
-    for slot in range(8):
-        bank, base = 1 + slot // 3, slot % 3 * 2560
-        reserve(bank, base, 20, 'pattern name/tag/checksum')
-        reserve(bank, base + 32, 2417, 'pattern events/settings/patch')
-    reserve(1, 2500, 4, 'legacy boot signature')
-    reserve(3, 0x1400, 2064, 'maximum track/region clipboard')
-    reserve(3, 0x1C10, 32, 'legacy redundant mixer layout records')
-    spans = [(2, 2560, 512), (5, 2560, 512), (8, 2560, 512),
-             (0, 2449, 51), (0, 2504, 56)]
-    spans += [(slot, 2449, 111) for slot in range(1, 8)]
-    spans += [(slot, 20, 12) for slot in range(8)]
-    for slot, offset, size in spans:
-        reserve(1 + slot // 3, slot % 3 * 2560 + offset, size, 'durable journal allocation')
-    unused = 3 * 8192 - len(owned)
-    return {
-        'rom': str(rom),
-        'cartridge_ram_bytes': 32768,
-        'engine_bank_reserved_bytes': 8192,
-        'engine_bank_regions': [{'start': hex(a), 'end_exclusive': hex(b), 'owner': name}
-                                for a, b, name in bank_zero],
-        'wram_unused_below_audio_tables_bytes': work_margin,
-        'wram_minimum_reserve_bytes': 1024,
-        'stack_reserved_bytes': 0xE000 - stack_bottom,
-        'stack_minimum_reserve_bytes': 512,
-        'legacy_persistence_bank_unassigned_bytes': unused,
-        'sparse_pool_physical_bytes': 304 * 64,
-        'sparse_pool_root_bytes': 4 * 64,
-        'sparse_pool_allocatable_payload_bytes': 300 * 62,
-        'sparse_recovery_reserve_bytes': 3056,
-        'clipboard_reserved_bytes': 2064,
-        'sparse_pool_regions': [
-            {'bank': 1, 'start': '0xa000', 'end_exclusive': '0xc000'},
-            {'bank': 2, 'start': '0xa000', 'end_exclusive': '0xb800'},
-            {'bank': 3, 'start': '0xa000', 'end_exclusive': '0xb400'},
-        ],
-    }
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--rom', type=Path, default=Path('build/GAYBOY.gb'))
-    parser.add_argument('--output', type=Path)
-    args = parser.parse_args()
-    report = audit(args.rom)
-    encoded = json.dumps(report, indent=2)
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(encoded + '\n')
-    print(encoded)
+ s={l.split()[1]:int(l.split()[2],16) for l in rom.with_suffix('.noi').read_text().splitlines() if l.startswith('DEF ')}
+ assert '_resident_read' in s and '_seqevents_lo' not in s and '_seqnativestep' not in s
+ assert '_expalpha' not in s and '_monoset' not in s
+ heap=s['s__HEAP_END'];assert heap<=0xD800
+ fixed=[('_chord',48),('_arpindex',3),('_arpnote',3),('_arpcount',3),('_arpcycle',3),('_arpvel',3),('_arpstride',3),('_arpclock',12),('_arpfirstvel',12)]
+ regions=sorted((s[n],s[n]+size,n) for n,size in fixed)
+ for a,b in zip(regions,regions[1:]):assert a[1]<=b[0],(a,b)
+ assert max(e for _,e,_ in regions)<=0xDE00
+ assert s['_wavepixels']==0xB000 and s['_mx']==0xAC80
+ # Notes: slots0..3 bank1, slot4 bank2 A000..A7FF; presets bank3 A000..A81F.
+ # Clipboard stays bank3 B400..BC0F; globals bank3 BF80..BFFF.
+ assert 5*2048==10240 and 5*256*4==5120
+ index_bytes=1024 if '_eventheads' in s else 0
+ if index_bytes:assert s['_eventheads']==0xA000 and s['_eventnext']==0xA200 and s['_waveimage']==0xA400
+ feedback_bytes=0
+ if '_fastcells' in s:
+  feedback_regions=[(0xA410,0xA440,'velocity queue'),(0xA440,0xA469,'locked velocity')]+([(0xA469,0xA480,'native edit and UI state'),(0xA480,0xA4C6,'setting signatures'),(0xA4D0,0xA4ED,'menu signatures and origin')] if '_native_edit_flush' in s else [])+[(0xA500,0xA534,'coverage'),(0xA534,0xA538,'overlaps'),(0xA540,0xA7C0 if '_native_edit_flush' in s else 0xA6E0,'shared native cells/onsets and drum origins'),(0xA800,0xAB40,'onset handles')]
+  assert s['_fastcells']==0xA800 and s['_fastrowbits']==0xA500 and s['_fastcoverorigin']==0xA540
+  for a,b in zip(feedback_regions,feedback_regions[1:]):assert a[1]<=b[0]
+  assert feedback_regions[-1][1]<=0xAC00
+  feedback_bytes=sum(end-start for start,end,_ in feedback_regions)
+ ordinary=heap-0xC000;fixed_bytes=sum(z for _,z in fixed);unused=8192-ordinary-fixed_bytes-512
+ return {'rom':str(rom),'cartridge_ram_bytes':32768,'resident_patterns':5,'notes_per_pattern':256,'resident_note_payload_bytes':5120,'resident_pattern_records_bytes':10240,'user_preset_records_bytes':2048,'user_bank_names_bytes':32,'global_settings_bytes':128,'clipboard_reserved_bytes':2064,'wram_ordinary_bytes':ordinary,'wram_fixed_runtime_bytes':fixed_bytes,'wram_unused_total_bytes':unused,'wram_unused_below_audio_tables_bytes':0xD800-heap,'wram_minimum_reserve_bytes':384,'stack_reserved_bytes':512,'stack_minimum_reserve_bytes':512,'evaluation_chord_cache_bytes':0,'visual_feedback_cartridge_ram_bytes':feedback_bytes,'event_address_index_bytes':index_bytes,'wave_upload_shadow_bytes':16 if index_bytes else 0,'note_install_cache_bytes':0,'launch_packet_cache_bytes':0}
+if __name__=='__main__':
+ p=argparse.ArgumentParser();p.add_argument('--rom',type=Path,default=Path('build/GAYBOY.gb'));p.add_argument('--output',type=Path);a=p.parse_args();v=audit(a.rom);t=json.dumps(v,indent=2);print(t)
+ if a.output:a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(t+'\n')

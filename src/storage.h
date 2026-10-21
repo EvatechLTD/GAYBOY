@@ -4,7 +4,7 @@
    each track retain insertion order so DRUM can evict the most recently plotted hit.
    byte0 step0..255, byte1 note1..128 / drum row1..12, byte2 velocity0..127,
    byte3 actual duration1..255, or0 for256 steps. A rest has no event. */
-#define SEQ_EVENT_CAPACITY 512U
+#define SEQ_EVENT_CAPACITY 256U
 #define SEQ_EVENT_APPEND 65535U
 extern uint8_t seqevents_lo[256][4];
 extern __at (0xA800) uint8_t seqevents_hi[256][4];
