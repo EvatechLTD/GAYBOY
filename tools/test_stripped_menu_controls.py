@@ -13,10 +13,10 @@ try:
   menu(23);p.tick(30);print('Baseline Kits:',v('page'),v('navopen'),repr(line(0)),repr(published(0)));assert line(0)!=published(0)
  else:
   assert v('sticky_start')==0
-  menu(23);p.tick(30);assert line(0)==published(0) and 'KITS' in published(0),(line(0),published(0))
+  menu(48);p.tick(30);assert line(0)==published(0) and 'LOAD KIT' in published(0),(line(0),published(0))
   press('down');assert v('kitchoice')==2
   press('a');assert v('drumkit')==2
-  press('b');p.tick(30)
+  menu(48);press('b');p.tick(30)
   menu(34);p.tick(180);assert v('page')==8
   press('select');assert v('page')==10,v('page')
   press('select');assert v('page')==8,v('page');p.tick(180)
@@ -24,9 +24,9 @@ try:
   p.button_press('select');p.tick(3);press('a');p.button_release('select');p.tick(20);assert v('page')==8 and v('seqplaying')
   p.button_press('select');p.tick(3);press('a');p.button_release('select');p.tick(20);assert not v('seqplaying') and v('page')==8
   # Hold-to-browse: cancellation followed by Start release has no selection.
-  original=v('page');p.button_press('start');p.tick(20);assert v('navopen');put('navchoice',23);press('select');assert not v('navopen');p.button_release('start');p.tick(20);assert v('page')==original
+  original=v('page');p.button_press('start');p.tick(20);assert v('navopen');put('navchoice',48);press('select');assert not v('navopen');p.button_release('start');p.tick(20);assert v('page')==original
   menu(16);put('eval_row',5);put('dirty',1);p.tick(10);assert 'STICKY START' in text(0);press('a');assert v('sticky_start')==1 and v('pool_root',124)==1
-  press('start');assert v('navopen');put('navchoice',23);press('start');p.tick(20);assert v('page')==23 and 'KITS' in published(0)
+  menu(34);put('seqhead',0);press('start');assert v('navopen');put('navchoice',48);press('start');p.tick(20);assert v('page')==23 and 'LOAD KIT' in published(0)
   # Sticky menu supports Select cancellation as well.
   press('start');put('navchoice',16);press('select');assert not v('navopen') and v('page')==23
   menu(16);put('eval_row',5);put('dirty',1);p.tick(10);press('b');assert v('sticky_start')==0

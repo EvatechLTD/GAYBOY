@@ -31,19 +31,22 @@ def check_pcm(_):
   assert actual==expected,(bank,pos,actual,expected)
   checked.append(bank)
 a=S['_drum_pack'];p.hook_register(a>>16,a&65535,check_pcm,None)
-choose(23)
-assert v('page')==23
-while v('kitchoice'):press('up')
 kit_banks=[32,33,34,35,36,39,62]
 for kit in range(1,8):
- press('down');press('a');assert v('drumkit')==kit
+ put('seqhead',0);choose(48)
+ while v('kitchoice')!=kit:press('down')
+ press('a');assert v('drumkit')==kit and v('page')==8
+ put('drumrow',3);put('seqhead',6);choose(50)
+ assert v('kitchoice')==kit
  for slot in range(8):
   press('b');assert v('drumbankvoice')==kit_banks[kit-1] or v('drumbankvoice',1)==kit_banks[kit-1]
   p.tick(55);press('right')
- p.screen.image.save(f'build/kit-{kit}.png')
-choose(8);p.tick(30);assert not v('seqtileoverflow')
-choose(23);press('down');press('a');assert v('drumkit')==0
+ p.screen.image.save(f'build/kit-{kit}.png');press('select');p.tick(80)
+ assert v('page')==8 and not v('seqtileoverflow')
+put('seqhead',0);choose(48)
+while v('kitchoice'):press('up')
+press('a');assert v('drumkit')==0 and v('page')==8
 assert set(checked)==set(kit_banks),set(checked)
 assert full_level,'No full-level single-hit blocks verified'
 p.stop(save=False)
-print('PASS: Start menu KITS, seven presets, all 56 auditions, bank selection, roll return, Amen restore')
+print('PASS: File kit/sample browsers, seven presets, all 56 auditions, bank selection, roll return, Amen restore')

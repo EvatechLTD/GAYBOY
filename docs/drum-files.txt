@@ -1,0 +1,70 @@
+DRUM SEQUENCER FILE CONTEXT
+
+Kits now live in the File group, with actions determined when Start opens
+the Finder. KITS is removed from the Instruments group and old quick-menu
+KITS shortcuts are discarded.
+
+From the drum grid or velocity strip:
+  Start -> File -> LOAD KIT or SAVE KIT.
+
+From a highlighted PCM channel name (Left at the grid's left edge):
+  Start -> File -> LOAD SAMPLE.
+The File heading shows the current sample name. The browser identifies
+the destination channel number and name. Up/Down chooses a source kit;
+Left/Right chooses a sound within that kit. B auditions without changing
+assignments; A assigns only that channel and returns to the sequencer.
+Select cancels. Existing A/B on channel names still opens row velocity.
+The three hardware DrumSynth names continue to use their existing preset
+controls; they are not PCM sample destinations.
+
+LOAD KIT: Up/Down chooses a kit; Left/Right switches between the factory
+and user groups. There are eight factory entries including Amen and eight
+battery-backed user slots. A loads; B auditions the first sample without
+changing the engine. Select returns. Loading a factory kit installs its
+sample assignments and default drum patches/mix settings.
+
+SAVE KIT: Up/Down chooses USER KIT 1..8. A saves the current drum engine.
+Replacing an occupied slot requires A on the replacement screen; B or
+Select cancels replacement. Slots have fixed names. Kits include:
+  - all ten PCM channel source-kit/source-sample assignments;
+  - both noise patches and the pulse-kick patch;
+  - drum engine and DrumSynth eval settings, gains, fine/coarse modulation;
+  - shared modulation settings used by DrumSynth;
+  - drum mute/solo masks, drum channel volume and pan.
+Shared modulation settings also drive melodic instruments, so loading a
+user kit restores those shared values. Notes and melodic patches are kept.
+Samples reference the bundled ROM library; kits do not duplicate PCM data.
+
+Custom sample assignments also persist with each resident pattern and
+survive a battery reboot. Original patterns without an assignment extension
+fall back to their original factory kit's channel mapping.
+
+STORAGE AND IMPLEMENTATION
+
+src/drum_kit.h defines the mapping and file APIs. Live mappings cache ROM
+bank, offset and length for each PCM destination, avoiding banked lookups
+on each sequencer onset. Both regular and native sample preparation use
+the selected assignments. Row labels and mixer names follow the source.
+
+Resident tone snapshots expand from 320 to 352 bytes. The first 320 bytes
+keep their layout. Bytes 320..341 hold 'D', version 1, ten source kit IDs,
+and ten source slot IDs. The remainder is reserved. Resident note data
+still starts at byte 768; no pattern capacity is removed.
+
+Eight 160-byte user kit records occupy SRAM bank 2 A800..ACFF, after the
+fifth resident pattern's A000..A7FF area. User presets, clipboard and global
+settings retain their regions. Records contain DKT1, fixed slot name,
+base kit ID, assignment extension, noise/kick patches, eval/coarse settings,
+mix settings, shared modulation and a 16-bit rotating checksum. Save writes
+the initial magic byte last. Empty/invalid records do not load.
+
+Validation:
+  python tools/build_rom.py
+  python tools/test_drum_file_context.py
+  python tools/test_kits.py
+
+The context regression drives actual menus and buttons, auditions and
+plots assigned sources, checks unaffected channel assignments, saves and
+reloads custom drum state, cancels replacement, rejects an empty slot,
+and reboots from a captured battery image. The kit regression auditions
+all 56 non-Amen factory sounds and compares fetched PCM against ROM data.

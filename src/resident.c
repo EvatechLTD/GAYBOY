@@ -241,3 +241,7 @@ void seq_irq_launch(void) BANKED {}
 void seq_irq_tick(uint8_t elapsed) NONBANKED {(void)elapsed;}
 
 uint8_t sparse_load_pad_pattern(uint8_t index,uint8_t pad) BANKED {uint8_t b[16];uint16_t at;if(index>=5||pad>=5)return 0;if(index==pad)return 1;for(at=0;at<2048;at+=16){resident_read(index,at,b,16);resident_write(pad,at,b,16);}if(pad==mx.slot)sparse_restore(pad);return 1;}
+
+/* User kits occupy free bank 2 A800..ACFF, outside the five resident pools. */
+void resident_kit_read(uint8_t slot,uint8_t *data) BANKED {if(slot<DRUM_KIT_SLOTS)io(2,0xA800U+(uint16_t)slot*DRUM_KIT_BYTES,data,DRUM_KIT_BYTES,0);}
+void resident_kit_write(uint8_t slot,const uint8_t *data) BANKED {uint8_t zero=0;if(slot>=DRUM_KIT_SLOTS)return;io(2,0xA800U+(uint16_t)slot*DRUM_KIT_BYTES,&zero,1,1);io(2,0xA801U+(uint16_t)slot*DRUM_KIT_BYTES,(uint8_t *)data+1,DRUM_KIT_BYTES-1,1);io(2,0xA800U+(uint16_t)slot*DRUM_KIT_BYTES,(uint8_t *)data,1,1);}

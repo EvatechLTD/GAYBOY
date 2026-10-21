@@ -12,6 +12,7 @@
 #include "sparse_store.h"
 #include "clear_pattern.h"
 #include "drum.h"
+#include "drum_kit.h"
 #include "mixer.h"
 #include "noiselab.h"
 void ui_upload_tile(uint8_t tile,const uint8_t *data,uint8_t sprite) BANKED;

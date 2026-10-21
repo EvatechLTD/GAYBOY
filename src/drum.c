@@ -62,6 +62,12 @@ __at (0xAE40) uint8_t drumright[192];
 __at (0xAF00) uint8_t drumnext[192];
 __at (0xAFC0) uint8_t drumheads[13];
 uint8_t drumkit=1;
+uint8_t drummapkit=255,drumsourcekit[10],drumsourceslot[10],drumsourcebank[10];
+uint16_t drumsourceoffset[10],drumsourcelength[10];
+void drum_map_factory(uint8_t kit) BANKED {uint8_t i;if(kit>7)kit=1;drumkit=kit;for(i=0;i<10;i++){drumsourcekit[i]=kit;drumsourceslot[i]=i;drumsourcebank[i]=(kit?kitbank[kit-1]:amenbank)[i];drumsourceoffset[i]=(kit?kitoffset[kit-1]:amenoffset)[i];drumsourcelength[i]=(kit?kitlength[kit-1]:amenlength)[i];}drummapkit=kit;}
+void drum_map_assign(uint8_t dest,uint8_t kit,uint8_t sample) BANKED {if(dest>=10||kit>7||sample>=(kit?8:10))return;if(!DRUM_MAPPED)drum_map_factory(drumkit);drumsourcekit[dest]=kit;drumsourceslot[dest]=sample;drumsourcebank[dest]=(kit?kitbank[kit-1]:amenbank)[sample];drumsourceoffset[dest]=(kit?kitoffset[kit-1]:amenoffset)[sample];drumsourcelength[dest]=(kit?kitlength[kit-1]:amenlength)[sample];}
+void drum_map_capture(uint8_t *out) BANKED {if(!DRUM_MAPPED)drum_map_factory(drumkit);out[0]='D';out[1]=1;memcpy(out+2,drumsourcekit,10);memcpy(out+12,drumsourceslot,10);}
+void drum_map_restore(const uint8_t *in) BANKED {uint8_t i;drum_map_factory(drumkit);if(in[0]!='D'||in[1]!=1)return;for(i=0;i<10;i++)if(in[2+i]>7||in[12+i]>=10||in[2+i]&&in[12+i]>=8){/* Factory rows 9/10 are intentional silent placeholders. */if(in[2+i]!=drumkit||in[12+i]!=i)return;}for(i=0;i<10;i++){uint8_t k=in[2+i],s=in[12+i];drumsourcekit[i]=k;drumsourceslot[i]=s;drumsourcebank[i]=(k?kitbank[k-1]:amenbank)[s];drumsourceoffset[i]=(k?kitoffset[k-1]:amenoffset)[s];drumsourcelength[i]=(k?kitlength[k-1]:amenlength)[s];}}
 uint8_t drumenabled,drumrow,druminit,drumsynthrow,drumsynthvoice;
 uint16_t drumanchor=65535U;
 uint8_t drumbused,drumnoiseowned;
@@ -103,22 +109,24 @@ void drum_mixer_refresh(void) BANKED {uint8_t i,pan;if(!drum_audible(12))kick_st
 static const uint16_t drumstepsamples[271]={5730,5545,5371,5209,5055,4911,4775,4645,4523,4407,4297,4192,4092,3997,3906,3820,3736,3657,3581,3508,3438,3370,3305,3243,3183,3125,3069,3015,2963,2913,2865,2818,2772,2728,2685,2644,2604,2565,2527,2491,2455,2421,2387,2354,2322,2292,2261,2232,2203,2175,2148,2122,2096,2071,2046,2022,1998,1975,1953,1931,1910,1889,1868,1848,1828,1809,1790,1772,1754,1736,1719,1701,1685,1668,1652,1637,1621,1606,1591,1577,1562,1548,1534,1521,1507,1494,1481,1469,1456,1444,1432,1420,1409,1397,1386,1375,1364,1353,1342,1332,1322,1312,1302,1292,1282,1273,1263,1254,1245,1236,1227,1219,1210,1202,1193,1185,1177,1169,1161,1153,1146,1138,1130,1123,1116,1109,1101,1094,1087,1081,1074,1067,1061,1054,1048,1041,1035,1029,1023,1017,1011,1005,999,993,987,982,976,971,965,960,955,949,944,939,934,929,924,919,914,909,904,900,895,890,886,881,877,872,868,863,859,855,850,846,842,838,834,830,826,822,818,814,810,807,803,799,795,792,788,784,781,777,774,770,767,764,760,757,753,750,747,744,740,737,734,731,728,725,722,719,716,713,710,707,704,701,698,695,693,690,687,684,682,679,676,674,671,668,666,663,661,658,656,653,651,648,646,643,641,639,636,634,631,629,627,625,622,620,618,616,613,611,609,607,605,603,601,598,596,594,592,590,588,586,584,582,580,578,576,574,573};
 uint16_t drum_step_samples(void){uint16_t q;if(seqbpm>=30&&seqbpm<=300)return drumstepsamples[seqbpm-30];q=17190U/seqbpm;return q*10+((17190U-q*seqbpm)*10)/seqbpm;}
 uint8_t drum_auto(uint8_t sample){uint16_t samples=drum_step_samples();uint8_t dur=(drumlength[sample]*2+samples-1)/samples;return dur?dur:1;}
-void drum_start(uint8_t sample,uint8_t vel,uint8_t dur){uint8_t c,pan;
- (void)vel;(void)dur;drum_enable();if(!drumenabled){drumenabled=1;drumon[0]=drumon[1]=0;}c=!drumon[0]?0:!drumon[1]?1:drumlast^1;drumlast=c;
+static void drum_start_source(uint8_t sample,uint8_t bank,uint16_t offset,uint16_t length){uint8_t c,pan;
+ drum_enable();if(!drumenabled){drumenabled=1;drumon[0]=drumon[1]=0;}c=!drumon[0]?0:!drumon[1]?1:drumlast^1;drumlast=c;
  pan=mixer_pan(6);route=(route&~0x44)|((pan&1)?4:0)|((pan&2)?0x40:0);NR51_REG=route;
- __critical {drumsamplevoice[c]=sample;drumpos[c]=drumoffset[sample];drumbankvoice[c]=drumbank[sample];drumend[c]=drumpos[c]+drumlength[sample];drumon[c]=1;mixrunning=1;if(!experimental_mode)active[2]=1;}
+ __critical {drumsamplevoice[c]=sample;drumpos[c]=offset;drumbankvoice[c]=bank;drumend[c]=offset+length;drumon[c]=1;drumtail=0;mixrunning=1;if(!experimental_mode)active[2]=1;}
 }
+void drum_start(uint8_t sample,uint8_t vel,uint8_t dur){(void)vel;(void)dur;drum_start_source(sample,drumbank[sample],drumoffset[sample],drumlength[sample]);}
+void drum_source_audition(uint8_t kit,uint8_t sample) BANKED {if(kit>7||sample>=(kit?8:10))return;drum_start_source(sample,(kit?kitbank[kit-1]:amenbank)[sample],(kit?kitoffset[kit-1]:amenoffset)[sample],(kit?kitlength[kit-1]:amenlength)[sample]);}
 /* PCM stores two samples per byte. Cap the source at the plotted gate;
    longer notes still stop naturally at the end of the sample. */
 uint16_t drum_play_length(uint8_t sample,uint8_t duration){uint32_t bytes=(uint32_t)drum_step_samples()*(duration?duration:256U)/2;return bytes<drumlength[sample]?(uint16_t)bytes:drumlength[sample];}
 /* Precompute source addresses outside the attack deadline. Flat six-byte
    record: sample, ROM bank, start LE16, end LE16. */
 void seq_native_sample_value(const uint8_t *e,uint8_t *out,uint8_t kit,uint16_t bpm) BANKED {
- uint8_t sample=e[1]-1;uint16_t start=(kit?kitoffset[kit-1]:amenoffset)[sample],length=(kit?kitlength[kit-1]:amenlength)[sample],samples,q;uint32_t bytes;
+ uint8_t sample=e[1]-1,mapped=kit==drumkit&&DRUM_MAPPED;uint16_t start=(mapped?drumsourceoffset:kit?kitoffset[kit-1]:amenoffset)[sample],length=(mapped?drumsourcelength:kit?kitlength[kit-1]:amenlength)[sample],samples,q;uint32_t bytes;
  if(bpm>=30&&bpm<=300)samples=drumstepsamples[bpm-30];else{q=17190U/bpm;samples=q*10+((17190U-q*bpm)*10)/bpm;}
  if(e[3]==1)bytes=samples>>1;else if(e[3]==2)bytes=samples;else if(e[3]==4)bytes=(uint32_t)samples<<1;else if(e[3]==8)bytes=(uint32_t)samples<<2;else bytes=(uint32_t)samples*(e[3]?e[3]:256U)/2;
  length=start+(bytes<length?(uint16_t)bytes:length);
- out[0]=sample;out[1]=(kit?kitbank[kit-1]:amenbank)[sample];out[2]=start;out[3]=start>>8;out[4]=length;out[5]=length>>8;
+ out[0]=sample;out[1]=(mapped?drumsourcebank:kit?kitbank[kit-1]:amenbank)[sample];out[2]=start;out[3]=start>>8;out[4]=length;out[5]=length>>8;
 }
 void seq_native_sample(const uint8_t *e,uint8_t *out) BANKED {seq_native_sample_value(e,out,drumkit,seqbpm);}
 

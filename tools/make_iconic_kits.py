@@ -69,7 +69,7 @@ for title, bank in [('SLAP808',39),('SLAM909',62)]:
 kitmeta=''
 for i,(name,typ) in enumerate([('bank','uint8_t'),('offset','uint16_t'),('length','uint16_t')]):
  kitmeta+=f'const {typ} kit{name}[{len(metadata)}][10]={{'+','.join('{'+arr(m[i])+'}' for m in metadata)+'};\n'
- kitmeta+=f'#define drum{name} (drumkit?kit{name}[drumkit-1]:amen{name})\n'
+ kitmeta+=f'#define drum{name} (DRUM_MAPPED?drumsource{name}:drumkit?kit{name}[drumkit-1]:amen{name})\n'
 (prepared/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 
 recipefile.write_text(json.dumps(dict(recipe=recipe,filter=chain,peak_dbfs=-1,maximum_seconds=.65,tail_fade_samples=80),indent=2)+'\n')
