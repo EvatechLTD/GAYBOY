@@ -1,0 +1,4 @@
+<IfModule mod_headers.c>
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' https: blob:; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'"
+</IfModule>
+AddType application/wasm .wasm

@@ -1,5 +1,16 @@
+# GAYBOY now lives on Y2KCRISIS. Keep old shared asset links working.
+RewriteEngine On
+RewriteRule ^(?:index\.html)?$ https://y2kcrisis.com/gayboy [R=301,L,NE]
+RewriteRule ^(.+)$ https://y2kcrisis.com/apps/gayboy/$1 [R=301,L,NE]
+
 <IfModule mod_headers.c>
 # Allow the local emulator's WebAssembly without allowing JavaScript eval.
-Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; frame-src https://www.instagram.com 'self' https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 </IfModule>
 AddType application/wasm .wasm
+
+<IfModule mod_headers.c>
+<FilesMatch "\.(html|js|json|gb|txt)$">
+Header always set Cache-Control "no-cache"
+</FilesMatch>
+</IfModule>

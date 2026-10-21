@@ -4,9 +4,15 @@ RewriteEngine On
 RewriteCond %{HTTPS} !=on
 RewriteCond %{REQUEST_URI} !^/\.well-known/
 RewriteRule ^ https://y2kcrisis.com%{REQUEST_URI} [R=302,L]
+RewriteRule ^~gayboy/?$ /gayboy [R=301,L,NC]
+RewriteRule ^~gayboy/([a-z0-9-]+)/?$ /gayboy/$1 [R=301,L,NC]
+RewriteRule ^gameboy/?$ /gayboy [R=301,L,NC]
+RewriteRule ^gameboy/([a-z0-9-]+)/?$ /gayboy/$1 [R=301,L,NC]
+RewriteRule ^gayboy/$ /gayboy [R=301,L,NC]
+RewriteRule ^gayboy(?:/[a-z0-9-]+)?$ index.html [L,NC]
 RewriteRule ^~[A-Za-z0-9_]+(?:/[a-z0-9-]+)?/?$ index.html [L]
 <IfModule mod_headers.c>
-Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; frame-src 'self' https://www.youtube-nocookie.com https://w.soundcloud.com https://open.spotify.com https://player.vimeo.com https://www.mixcloud.com https://bandcamp.com https://player.twitch.tv https://clips.twitch.tv; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; frame-src https://www.instagram.com 'self' https://www.youtube-nocookie.com https://w.soundcloud.com https://open.spotify.com https://player.vimeo.com https://www.mixcloud.com https://bandcamp.com https://player.twitch.tv https://clips.twitch.tv; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 Header always set X-Content-Type-Options "nosniff"
 Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Strict-Transport-Security "max-age=31536000"

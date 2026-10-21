@@ -27,8 +27,8 @@
   }
   expand.setAttribute('aria-expanded', 'false');
   expand.addEventListener('click', () => expanded(!root.classList.contains('demo-expanded')));
-  const SAVE_KEY = 'gayboy-browser-sram-0.3-4a7e3e79';
-  const LEGACY_SAVE_KEY = 'gayboy-browser-sram-0.3-73d49395';
+  const SAVE_KEY = 'gayboy-browser-sram-0.3-622c7024';
+  const LEGACY_SAVE_KEYS = ['gayboy-browser-sram-0.3-4a7e3e79','gayboy-browser-sram-0.3-73d49395'];
   const CLOCK = 4194304;
   const AUDIO_FRAMES = 2048;
   const AUDIO_LEAD = 0.09;
@@ -106,10 +106,10 @@
     try {
       if (!instance) await powerOn();
       if (!instance) return;
-      const response = await fetch('emulator/tutorial-rom.json?v=interactive-2');
+      const response = await fetch('emulator/tutorial-rom.json?v=rom-paths-20261019');
       if (!response.ok) throw new Error('Tutorial information could not be loaded.');
       const metadata = await response.json();
-      const download = await fetch(metadata.rom);
+      const download = await fetch(metadata.rom+'?v='+metadata.sha256);
       if (!download.ok) throw new Error('Practice cartridge could not be loaded.');
       const practiceRom = await download.arrayBuffer();
       const digest = new Uint8Array(await crypto.subtle.digest('SHA-256',practiceRom));
@@ -154,7 +154,7 @@
   }
   function restore() {
     try {
-      const data = JSON.parse(localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY) || 'null');
+      const data = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
       if (!Array.isArray(data) || data.length !== 32768 ||
           !data.every(n => Number.isInteger(n) && n >= 0 && n <= 255)) return;
       const file = core._ext_ram_file_data_new(instance);
@@ -325,10 +325,10 @@
     if (!instance) throw new Error('Unable to load ROM');
     joypad = core._joypad_new();
     core._emulator_set_default_joypad_callback(instance, joypad);
-    // Explicit four-shade green palette for the original DMG aesthetic.
+    // Neutral white palette, lightest to darkest, for every DMG layer.
     for (let type = 0; type < 3; type++) {
       core._emulator_set_bw_palette_simple(instance, type,
-        0xffa1e8d5, 0xff6dbb9c, 0xff486545, 0xff242d18);
+        0xffffffff, 0xffaaaaaa, 0xff555555, 0xff000000);
     }
     if (!tutorialActive && !beatParked) restore();
     ramDirty = false;
@@ -353,10 +353,14 @@
         script.onerror = () => { script.remove(); reject(new Error('Emulator download failed')); };
         document.head.append(script);
       });
-      const response = await fetch('downloads/GAYBOY-tutorial.gb');
+      const metadataResponse=await fetch('emulator/tutorial-rom.json?v=rom-paths-20261019');
+      if(!metadataResponse.ok)throw new Error('Cartridge information could not be loaded.');
+      const metadata=await metadataResponse.json();
+      const response = await fetch(metadata.rom+'?v='+metadata.sha256);
       if (!response.ok) throw new Error('ROM download failed');
       rom = await response.arrayBuffer();
-      if (rom.byteLength !== 1048576) throw new Error('Incomplete ROM');
+      const romHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',rom)),b=>b.toString(16).padStart(2,'0')).join('');
+      if (rom.byteLength !== 1048576||romHash!==metadata.sha256) throw new Error('Incomplete or outdated ROM');
       core = await window.SameBoyCore({locateFile: name => 'emulator/' + name + '?v=beats-1'});
       await boot();
       if (window.matchMedia('(max-width: 590px)').matches) expanded(true);
@@ -386,8 +390,8 @@
       audio.resume().catch(()=>{});
     },
     async capture() {
-      if(!instance||loading||tutorialActive||beatBusy)throw new Error('Start your own beat in the emulator before sharing.');
-      const metadata=await(await fetch('emulator/tutorial-rom.json?v=interactive-2')).json();
+      if(!instance||loading||tutorialActive||beatBusy||beatParked)throw new Error('Start your own beat in the emulator before sharing.');
+      const metadata=await(await fetch('emulator/tutorial-rom.json?v=rom-paths-20261019')).json();
       if(!core._emulator_observe_mem(instance,metadata.symbols.seqplaying))
         throw new Error('Start your sequencer with SELECT + A, then share your beat.');
       release();
@@ -411,18 +415,28 @@
         if(!instance)await powerOn();
         if(!instance)throw new Error('Tap POWER ON, then try playing that beat again.');
         const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',rom)),b=>b.toString(16).padStart(2,'0')).join('');
-        if(hash!==Array.from(bytes.slice(8,40),b=>b.toString(16).padStart(2,'0')).join(''))throw new Error('That beat uses a different version of GAYBOY.');
+        const targetHash=Array.from(bytes.slice(8,40),b=>b.toString(16).padStart(2,'0')).join('');
+        const versions=await(await fetch('emulator/rom-versions.json?v=rom-paths-20261019')).json();
+        const metadata=versions.versions[targetHash];
+        if(!metadata)throw new Error('That beat uses an unavailable version of GAYBOY.');
+        let beatRom=rom;
+        if(hash!==targetHash){
+          const response=await fetch(metadata.rom+'?v='+targetHash);
+          if(!response.ok)throw new Error('The archived beat cartridge could not be loaded.');
+          beatRom=await response.arrayBuffer();
+          const archivedHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',beatRom)),b=>b.toString(16).padStart(2,'0')).join('');
+          if(archivedHash!==targetHash)throw new Error('The beat cartridge download was incomplete.');
+        }
         const wasRunning=running||resuming;
         setPaused(true,true);persist();
         beatParked={instance,romPtr,joypad,rom,ramDirty,running:wasRunning,expanded:root.classList.contains('demo-expanded')};
-        instance=romPtr=joypad=0;
+        instance=romPtr=joypad=0;rom=beatRom;
         await boot();setPaused(true,true);
         const ptr=core._malloc(bytes.length-40);
         try {
           core.HEAPU8.set(bytes.subarray(40),ptr);
           if(core._emulator_beat_load(instance,ptr,bytes.length-40))throw new Error('That beat could not be loaded. Your music is safe.');
         } finally {core._free(ptr);}
-        const metadata=await(await fetch('emulator/tutorial-rom.json?v=interactive-2')).json();
         if(core._emulator_observe_mem(instance,metadata.symbols.seqplaying)!==1)
           throw new Error('That shared beat does not contain a running sequence.');
         release();rebaseAudio();
@@ -446,6 +460,16 @@
     mute.textContent = muted ? '♫ unmute' : '♫ mute';
     mute.setAttribute('aria-pressed', String(muted));
   });
+  // Fixed-record saves suppress the new cartridge's song library. Keep them
+  // recoverable without automatically installing them into the new ROM.
+  try{
+    const previous=LEGACY_SAVE_KEYS.map(key=>localStorage.getItem(key)).find(Boolean);
+    if(previous){const data=JSON.parse(previous);if(Array.isArray(data)&&data.length===32768&&data.every(n=>Number.isInteger(n)&&n>=0&&n<=255)){
+      const backup=document.createElement('button');backup.type='button';backup.textContent='download previous save';backup.title='Your older cartridge save is preserved separately.';
+      backup.onclick=()=>{const href=URL.createObjectURL(new Blob([new Uint8Array(data)],{type:'application/octet-stream'})),a=document.createElement('a');a.href=href;a.download='GAYBOY-previous.sav';a.click();setTimeout(()=>URL.revokeObjectURL(href),1000);};
+      root.querySelector('.demo-toolbar').append(backup);
+    }}
+  }catch{}
   exportSave.addEventListener('click', () => {
     if (tutorialActive) return;
     persist();

@@ -16,7 +16,7 @@ def main():
     html = html.replace(style.group(), '<link rel="stylesheet" href="guide.css">')
     html = html.replace('Nothing in this review package has been published.', 'This guide is published as a review draft; details may change.')
     html = html.replace('Local review draft', 'Review draft')
-    html = html.replace('<nav aria-label="Contents">', '<nav aria-label="Contents"><a href="GAYBOY-user-guide-review.pdf">Download the PDF (review draft)</a><a href="https://github.com/dpjpandone/GAYBOY/tree/main/docs/user-guide">Guide source on GitHub</a>')
+    html = html.replace('<nav aria-label="Contents">', '<nav aria-label="Contents"><a href="GAYBOY-user-guide-review.pdf">Download the PDF (review draft)</a><a href="https://github.com/EvatechLTD/GAYBOY/tree/main/docs/user-guide">Guide source on GitHub</a>')
     images = {}
     def external_image(match):
         name = 'illustration-' + str(len(images) + 1) + '.png'

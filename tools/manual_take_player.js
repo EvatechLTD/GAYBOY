@@ -48,8 +48,8 @@ window.startManualTake = async function(seconds) {
     }while(!(event&4));
   }
   const pump=setInterval(tick,5);tick();
-  for(let n=3;n>0;n--){status.textContent=`Demo playing — recording starts in ${n}…`;await new Promise(r=>setTimeout(r,1000));}
-  const stream=canvas.captureStream(60);destination.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  for(let n=(window.manualCountdown ?? 3);n>0;n--){status.textContent=`Demo playing — recording starts in ${n}…`;await new Promise(r=>setTimeout(r,1000));}
+  const stream=canvas.captureStream(30);destination.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
   const mime=['video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
   const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000,audioBitsPerSecond:192000});
   const chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};

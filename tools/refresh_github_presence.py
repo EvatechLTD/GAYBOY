@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
-REPO = 'dpjpandone/GAYBOY'
+REPO = 'EvatechLTD/GAYBOY'
 DESCRIPTION = 'GAYBOY is a Game Boy synth, piano-roll sequencer, sample drum machine and MIDI chiptune workstation. Play in your browser or download the homebrew ROM.'
 
 
@@ -41,7 +41,7 @@ def main():
         api('repos/' + REPO, {'description': DESCRIPTION, 'homepage': 'https://buttholechopper.com/gayboy/'}, 'PATCH', token)
         api('repos/' + REPO + '/topics', {'names': ['gayboy', 'gameboy', 'game-boy', 'gameboy-color', 'chiptune', 'synthesizer', 'sequencer', 'drum-machine', 'midi', 'arduino-boy', 'homebrew', 'gbdk', 'music-production', '8-bit']}, 'PUT', token)
         print('GitHub About description, website and topics updated.')
-    repos = api('users/dpjpandone/repos?sort=pushed&direction=desc&per_page=100')
+    repos = api('users/EvatechLTD/repos?sort=pushed&direction=desc&per_page=100')
     repos = [r for r in repos if not r['fork'] and not r['archived'] and not r['private']][:4]
     data = {'refreshed': datetime.now(timezone.utc).isoformat(), 'repositories': [
         {'name': r['name'], 'url': r['html_url'], 'description': r['description'], 'updated': r['pushed_at']}

@@ -4,7 +4,7 @@ Your Game Boy has a music problem. Good. Let's make it worse.
 
 **GAYBOY** is a Game Boy music workstation: a synthesizer, piano-roll sequencer, sample drum machine and performance mixer in a `.gb` ROM. Make chiptune melodies, program beats and play the handheld as a MIDI synth through Arduinoboy.
 
-**[Play in your browser](https://buttholechopper.com/gayboy/)** · **[Download the ROM](https://buttholechopper.com/gayboy/downloads/GAYBOY.gb)** · **[GAYBOY on Y2KCRISIS](https://y2kcrisis.com/~GAYBOY)** · **[Report a bug](https://github.com/dpjpandone/GAYBOY/issues)**
+**[Play in your browser](https://y2kcrisis.com/gayboy)** · **[Download the ROM](https://y2kcrisis.com/apps/gayboy/downloads/GAYBOY.gb)** · **[GAYBOY on Y2KCRISIS](https://y2kcrisis.com/~GAYBOY)** · **[Report a bug](https://github.com/EvatechLTD/GAYBOY/issues)**
 
 ![GAYBOY piano-roll sequencer](website/images/sequencer.png)
 
@@ -33,8 +33,8 @@ The current development cartridge is **1 MiB, MBC5 with battery-backed 32 KiB RA
 
 The illustrated user guide is nearly finished and available for review:
 
-- [Read the illustrated guide online](https://buttholechopper.com/gayboy/guide/)
-- [Download the PDF](https://buttholechopper.com/gayboy/guide/GAYBOY-user-guide-review.pdf)
+- [Read the illustrated guide online](https://y2kcrisis.com/apps/gayboy/guide/)
+- [Download the PDF](https://y2kcrisis.com/apps/gayboy/guide/GAYBOY-user-guide-review.pdf)
 - [Browse the guide source and screenshots](docs/user-guide/)
 
 These are review drafts; some features still need a final walkthrough.
@@ -64,8 +64,8 @@ See [website notes](website/README.txt), [Y2KCRISIS setup](network/README.md), a
 
 ## Bugs and contributions
 
-[Open an issue](https://github.com/dpjpandone/GAYBOY/issues) with the ROM version, emulator or hardware, steps to reproduce, and expected versus actual behavior. Include a screenshot or save when useful, without private information. Keep contributions focused and describe how you checked them.
+[Open an issue](https://github.com/EvatechLTD/GAYBOY/issues) with the ROM version, emulator or hardware, steps to reproduce, and expected versus actual behavior. Include a screenshot or save when useful, without private information. Keep contributions focused and describe how you checked them.
 
 ## Credits and licensing
 
-GAYBOY is by [dpjpandone](https://github.com/dpjpandone). Browser emulation uses [SameBoy](https://sameboy.github.io/); its license is included in the emulator directory. Third-party components retain their own notices. There is currently no project-wide license granting reuse of GAYBOY code or artwork. Nintendo and Game Boy are trademarks of their respective owners; this is an independent homebrew project.
+GAYBOY is by [EvatechLTD](https://github.com/EvatechLTD). Browser emulation uses [SameBoy](https://sameboy.github.io/); its license is included in the emulator directory. Third-party components retain their own notices. There is currently no project-wide license granting reuse of GAYBOY code or artwork. Nintendo and Game Boy are trademarks of their respective owners; this is an independent homebrew project.

@@ -1,5 +1,14 @@
 <?php
 if(!isset($db)){http_response_code(404);exit;}
+if($a==='music'){
+    $id=$_GET['id']??'';$format=$_GET['format']??'';
+    if(!is_string($id)||!is_string($format)||!preg_match('/^[a-f0-9]{64}$/',$id)||!rows('SELECT id FROM music_files WHERE id=? AND format=? LIMIT 1',[$id,$format])||!is_file($home.'/music/'.$id))fail('Music file not found.',404);
+    $path=$home.'/music/'.$id;
+    header('Content-Type: application/octet-stream');header('X-Content-Type-Options: nosniff');
+    header('Content-Disposition: attachment; filename="soundtrack.'.$format.'"');
+    header('Cache-Control: public, max-age=31536000, immutable');header('Content-Length: '.filesize($path));
+    session_write_close();readfile($path);exit;
+}
 if($a==='asset'){
     $id=$_GET['id']??'';if(!preg_match('/^[a-f0-9]{64}$/',$id)||!is_file($home.'/uploads/'.$id))fail('Image not found.',404);$path=$home.'/uploads/'.$id;$info=getimagesize($path);
     header('Content-Type: '.$info['mime']);header('X-Content-Type-Options: nosniff');header('Cache-Control: public, max-age=31536000, immutable');header('Content-Length: '.filesize($path));readfile($path);exit;
@@ -49,6 +58,7 @@ if($a==='rooms'){
     out(array_values(array_filter($r,fn($r)=>!$r['owner']||($me&&!blocked($me,(int)$r['owner'])&&($r['privacy']==='public'||are_friends($me,(int)$r['owner']))))));
 }
 if(!$me)return;
+if($a==='music-library')out(rows('SELECT id,format,name,size FROM music_files WHERE owner=? ORDER BY created DESC',[$me]));
 if($a==='friends')out(friend_list($me));
 if($a==='desk'){
     $friends=friend_list($me);out(['friends'=>$friends,'postcards'=>rows('SELECT p.*,u.handle FROM postcards p JOIN users u ON u.id=p.author WHERE p.recipient=? ORDER BY p.id DESC LIMIT 100',[$me]),'conversations'=>rows("SELECT u.id,u.handle,MAX(m.id) last_id FROM messages m JOIN users u ON u.id=CASE WHEN m.author=? THEN m.recipient ELSE m.author END WHERE m.room='' AND (m.author=? OR m.recipient=?) GROUP BY u.id ORDER BY last_id DESC LIMIT 40",[$me,$me,$me]),'pages'=>rows('SELECT * FROM pages WHERE owner=? ORDER BY id',[$me])]);

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Versioned snapshots are stored as inert SQLite blobs outside the web root.
-const BEAT_ROM = '4a7e3e797061cb9d45f8207fc77e5f8d8ef99021fbfb4348b1394b32e09a6707';
+const BEAT_ROM = '622c70243cf4d4df0e17256f8ddedbbfdae4dd34cdb47e921465f99e4345bb88';
 function beat_handle(): never {
     $db=wall_db();
     $db->exec('CREATE TABLE IF NOT EXISTS beats (
@@ -25,7 +25,7 @@ function beat_handle(): never {
         if(!is_string($id)||!preg_match('/^[a-f0-9]{24}$/D',$id))wall_fail(404,'Beat not found.');
         $row=wall_query('SELECT id,name,title,created_at,state,sha FROM beats WHERE id=:id',['id'=>$id])->fetchArray(SQLITE3_ASSOC);
         if(!$row)wall_fail(404,'That beat is no longer on the wall.');
-        $row['snapshot']=base64_encode($row['state']);unset($row['state']);$row['rom']=BEAT_ROM;
+        $row['snapshot']=base64_encode($row['state']);$row['rom']=bin2hex(substr($row['state'],8,32));unset($row['state']);
         wall_json($row);
     }
     if($method==='GET' && in_array($action,['challenge','image','audio'],true))wall_handle();

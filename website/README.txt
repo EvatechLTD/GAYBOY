@@ -16,8 +16,8 @@ existing files beneath build/website-publish/, uploads assets before index.html,
 and verifies every deployed file over public HTTPS against its SHA256 hash.
 It only publishes the explicit file list, not this README or project files.
 
-Download is a fixed snapshot of build/GAYBOY.gb from October 17, 2026,
-published as downloads/GAYBOY-0.3.gb. To update it, validate the new ROM with
+Download and browser play use the October 18, 2026 build/GAYBOY.gb,
+published as downloads/GAYBOY.gb (with the older filenames kept as aliases). To update it, validate the new ROM with
 tools/check_rom.py, copy it to the website download path, update SHA256SUMS.txt,
 and adjust the page's date/version/size if needed before publishing.
 Never upload .sav files or cartridge RAM backups.
@@ -124,7 +124,7 @@ emulator/tutorial-rom.json pins downloads/GAYBOY-tutorial.gb by SHA256 and
 contains the symbol addresses used for read-only outcome checks. The player
 rejects a mismatched cartridge. Build the normal ROM, run check_rom.py, then
 package_browser_tutorial.py to regenerate this pair deliberately. The normal
-ROM download is independent. The publisher verifies the pair before upload.
+ROM download and browser cartridge contain the same build. The publisher verifies the pair before upload.
 Full checkpoint API exports are built with build_browser_sameboy.py.
 
 QA: verify_browser_tutorial.py runs all 12 demonstrations and learner tasks
@@ -135,7 +135,7 @@ The normal verify_browser_demo.py regression also covers the redesigned D-pad.
 
 Both the normal web player and tutorial use the pinned browser cartridge at
 downloads/GAYBOY-tutorial.gb, so learned controls match normal web play. The
-standalone 0.3 download remains its release snapshot. The new web cartridge has
+standalone 0.3 download is an alias of the current build. The new web cartridge has
 a separate SRAM key and imports the previous key when empty; the old browser
 save is retained as a backup. Lesson practice never writes to either key.
 Tutorial observations use side-effect-free RAM access, bypassing DMA bus
@@ -185,3 +185,16 @@ Local development only: set GAYBOY_COMMENTS_HOME to isolated storage containing
 app.php, audio/ and a fresh secret.bin; set GAYBOY_COMMENTS_LOCAL_TEST=1 and use
 PHP's localhost development server. The local cookie exception applies only to
 cli-server + loopback. Production ignores that exception.
+
+October 18, 2026 ROM update:
+Both sites now use build/GAYBOY.gb for normal play, tutorial practice and all
+current download aliases. downloads/GAYBOY.gb is the canonical download.
+Run check_rom.py then package_web_rom.py to copy a validated build and its
+matching symbols into both packages. rom-versions.json retains the original
+cartridge/symbol map for shared beats; archived ROMs are used only for those
+versioned snapshots. New saves use a separate browser key and retain old keys.
+
+October 19, 2026: legacy /gayboy/ redirects to https://y2kcrisis.com/gayboy.
+Legacy asset links redirect to /apps/gayboy/ on Y2KCRISIS. Browser cartridges
+now live under emulator/roms/; downloads/GAYBOY.gb is for explicit downloads.
+Count those URL namespaces separately; cached older players may still use old URLs.

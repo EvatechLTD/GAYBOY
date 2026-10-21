@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS rings(slug TEXT PRIMARY KEY,owner INTEGER REFERENCES 
 CREATE TABLE IF NOT EXISTS ring_members(ring TEXT REFERENCES rings(slug),user INTEGER REFERENCES users(id),PRIMARY KEY(ring,user));
 CREATE TABLE IF NOT EXISTS bulletins(id INTEGER PRIMARY KEY,author INTEGER REFERENCES users(id),body TEXT,reply INTEGER DEFAULT NULL,created INTEGER);
 CREATE TABLE IF NOT EXISTS beat_tracks(id TEXT PRIMARY KEY,author INTEGER REFERENCES users(id),title TEXT,snapshot TEXT,sha TEXT,created INTEGER);
+CREATE TABLE IF NOT EXISTS music_files(id TEXT,owner INTEGER REFERENCES users(id),format TEXT,name TEXT,size INTEGER,created INTEGER,PRIMARY KEY(owner,id,format));
+CREATE INDEX IF NOT EXISTS music_by_id ON music_files(id,format);
 CREATE INDEX IF NOT EXISTS message_room ON messages(room,id);
 CREATE INDEX IF NOT EXISTS message_dm ON messages(author,recipient,id);
 CREATE INDEX IF NOT EXISTS marks_owner ON marks(owner,id);
@@ -39,13 +41,31 @@ if(is_file(__DIR__.'/gayboy.json')&&!rows('SELECT id FROM users WHERE handle=?',
 }
 $db->exec('COMMIT');
 
+// Check file signatures, rather than trusting a filename or uploaded MIME type.
+function music_signature(string $raw,string $format): bool {
+    $size=strlen($raw);if($size<32)return false;
+    return match($format){
+        'mid','midi'=>substr($raw,0,4)==='MThd'&&substr($raw,4,4)==="\x00\x00\x00\x06"&&str_contains($raw,'MTrk'),
+        'sid'=>$size>=126&&in_array(substr($raw,0,4),['PSID','RSID'],true),
+        'xm'=>$size>=336&&substr($raw,0,17)==='Extended Module: '&&$raw[37]==="\x1a",
+        'it','mptm'=>$size>=192&&substr($raw,0,4)==='IMPM',
+        's3m'=>$size>=96&&substr($raw,44,4)==='SCRM',
+        'mod'=>$size>=1084&&(in_array(substr($raw,1080,4),['M.K.','M!K!','M&K!','N.T.','FLT4','FLT8','4CHN','6CHN','8CHN','CD81','OKTA'],true)||preg_match('/^\d{2}CH$/',substr($raw,1080,4))===1),
+        'mtm'=>substr($raw,0,3)==='MTM',
+        'stm'=>$size>=1168&&in_array(substr($raw,20,8),['!Scream!','BMOD2STM'],true),
+        '669'=>$size>=497&&in_array(substr($raw,0,2),['if','JN'],true),
+        'med'=>$size>=52&&in_array(substr($raw,0,4),['MMD0','MMD1','MMD2','MMD3'],true),
+        default=>false,
+    };
+}
+
 function settings(array $u): array {return json_decode($u['settings']??'{}',true)?:[];}
 function text(mixed $v,int $max=600): string {return mb_substr(trim(is_string($v)?$v:''),0,$max);}
 function color(mixed $v,string $default='#baff37'): string {return is_string($v)&&preg_match('/^#[a-f0-9]{6}$/i',$v)?$v:$default;}
 function https_url(mixed $v,bool $empty=true): string {
     $v=text($v,2000);if(!$v&&$empty)return '';
     if(preg_match('#^/?api\.php\?action=asset&id=[a-f0-9]{64}$#',$v))return $v;
-    if(str_starts_with($v,'apps/gayboy/')&&!str_contains($v,'..')&&preg_match('#^[a-zA-Z0-9/._-]+$#',$v))return $v;
+    if(str_starts_with($v,'apps/gayboy/')&&!str_contains($v,'..')&&preg_match('#^apps/gayboy/[a-zA-Z0-9/._-]+(?:\?v=[a-zA-Z0-9_-]{1,80})?$#',$v))return $v;
     if(!filter_var($v,FILTER_VALIDATE_URL)||strtolower(parse_url($v,PHP_URL_SCHEME)??'')!=='https'||parse_url($v,PHP_URL_USER)||parse_url($v,PHP_URL_PASS))fail('Use an HTTPS URL or an uploaded image.');
     return $v;
 }

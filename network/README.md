@@ -86,3 +86,18 @@ or domain attachment is ready; staging does not mean the domain is live.
 
 The tag studio bundles Press Start 2P (SIL Open Font License) and Permanent Marker
 (Apache License); their license files are in `fonts/` alongside the font files.
+
+## Image upload privacy
+
+The page editor and room wallpaper form include **Remove location metadata from
+new image uploads**, enabled by default. The preference stays in this browser and
+applies to all new image uploads from it. Turning it off preserves the original
+upload bytes. Requests that omit the choice are sanitized by default on the server.
+
+The sanitizer removes EXIF GPS/author information, XMP/IPTC and image comments,
+while preserving compressed image pixels, JPEG/PNG/WebP orientation, color
+profiles, transparency, and GIF/APNG animation. It does not remove visible location
+clues, change an externally linked image, or modify existing uploads.
+
+Run `tools/verify_upload_privacy.py` with the local project Python and PHP runtime
+for isolated API and Chrome tests. It never posts to production.

@@ -84,7 +84,12 @@ with sync_playwright() as p:
         next_button.click()
         expect(panel).to_have_attribute('data-lesson',str(n))
         expect(next_button).to_be_disabled()
-        expect(panel).to_have_attribute('data-stage','practice',timeout=60000)
+        try:
+            expect(panel).to_have_attribute('data-stage','practice',timeout=60000)
+        except Exception:
+            print('Tutorial errors:',errors,flush=True)
+            print(page.evaluate('()=>({track:qaRead("seqtrack"),head:qaRead("seqhead"),pitch:qaRead("seqpitch"),total:qaTotal()})'),flush=True)
+            raise
         expect(panel).to_be_focused()
 
     def cell(track,step,pitch):
@@ -138,11 +143,11 @@ with sync_playwright() as p:
     assert page.evaluate('qaTotal()') == 6
     expect(panel).to_be_focused()
     # Switch TWO instruments rather than copying the demonstrated P2 part.
-    chord('Space','ArrowRight',2)
+    chord('Space','ArrowLeft',2)
     track=page.evaluate('qaRead("seqtrack")')
     for _ in range(7):
         if track==2: break
-        chord('Space','ArrowRight')
+        chord('Space','ArrowLeft')
         track=page.evaluate('qaRead("seqtrack")')
     assert track==2, ('Could not select a different instrument',track)
     cell(track,3,62);key('z')

@@ -4,6 +4,16 @@ from intro_song import IntroSongDemo
 
 class QuickDemo(IntroSongDemo):
     bass_track = 2
+    def await_pad(self, slot):
+        # Preparation can already be running when the stopped pad is picked.
+        # Finish installing setup data before editing or starting its score.
+        for _ in range(1200):
+            if self.p.memory[self.s['_mx']+1] == slot and self.p.memory[self.s['_mx']+2] == 255:
+                break
+            yield
+        else:
+            raise RuntimeError('Prepared pad did not install: '+str(slot))
+        yield from self.wait(8)
     def prepare_parts(self, incomplete=False):
         from seq_storage_helpers import read_tracks,write_tracks,write_word
         tracks=read_tracks(self.p,self.s)
@@ -37,6 +47,7 @@ class QuickDemo(IntroSongDemo):
         yield from self.tap('up')
         yield from self.tap('right')
         yield from self.tap('a')
+        yield from self.await_pad(1)
         assert self.p.memory[self.s['_mx']+1] == 1
         # Populate the second, empty pad with the same score and active drums.
         IntroSongDemo.__init__(self,self.p,self.s)
@@ -47,6 +58,7 @@ class QuickDemo(IntroSongDemo):
         yield from self.choose(18)
         yield from self.tap('up')
         yield from self.tap('a')
+        yield from self.await_pad(0)
         assert self.p.memory[self.s['_mx']+1] == 0
         assert self.v('seqmuted') == 72
         # Queue on the final bar; preparation launches at the next available 1/1 grid.

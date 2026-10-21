@@ -2,44 +2,166 @@
   "version": 2,
   "basis": "Full Y2KCRISIS conversation and the original GAYBOY homepage",
   "requirements": [
-    {"feature":"Accounts, handles, profiles, avatar uploads and pronouns","implementation":"api.php, actions.php, editor.js"},
-    {"feature":"GAYBOY is an app and its page uses the same homepage renderer and editable template as members","implementation":"gayboy.json, homepage.js, editor.js, apps/gayboy/"},
-    {"feature":"Live homepage builder; twelve movable blocks per page; sidebar and single-column layouts","implementation":"editor.js, homepage.js, homepage.css"},
-    {"feature":"Editable title, welcome banner, tagline, ticker, quote, interests, mood, contact links and footer","implementation":"editor.js, schema.php"},
-    {"feature":"Colors, background patterns, uploaded wallpaper, fonts, borders, cursors, rounded panels and glitter controls","implementation":"editor.js, homepage.css"},
-    {"feature":"YouTube videos, playlists, Shorts and live links play in-page","implementation":"media.js, homepage.js"},
-    {"feature":"SoundCloud tracks/playlists, Spotify, Vimeo, Mixcloud, Twitch and Bandcamp embed-code players","implementation":"media.js"},
-    {"feature":"Direct audio/video files and one featured sidebar soundtrack","implementation":"media.js, homepage.js"},
-    {"feature":"Uploaded photos, image galleries, pocket collections, lists, downloads and large buttons","implementation":"actions.php, editor.js, homepage.js"},
-    {"feature":"Badges, dividers, stamps and under-construction signs","implementation":"editor.js, homepage.js"},
-    {"feature":"Optional visitor counter and a personal page update note","implementation":"queries.php, editor.js"},
-    {"feature":"Buddy requests, accepted buddy list, eight featured friends, presence and custom away messages","implementation":"actions.php, queries.php, social.js"},
-    {"feature":"AIM-style floating messenger, minimizes, stays open between pages, private history controls and optional sounds","implementation":"social.js, community.css"},
-    {"feature":"Public chatrooms plus member-hosted rooms with title, topic, color, uploaded wallpaper, capacity and privacy","implementation":"actions.php, queries.php, social.js"},
-    {"feature":"Visible room participants, shared media player, saved versus live-session history","implementation":"social.js, actions.php, queries.php"},
-    {"feature":"Room hosts appoint moderators; moderators remove messages, ban and unban","implementation":"actions.php, social.js"},
-    {"feature":"No likes, follower totals, public collection scores, streaks, read receipts or typing pressure","implementation":"social.js, homepage.js"},
-    {"feature":"Guestbook notes and actual freehand doodles, approval controls and owner removal","implementation":"homepage.js, actions.php"},
-    {"feature":"Private postcards; recipient chooses whether to display them publicly","implementation":"social.js, actions.php"},
-    {"feature":"Finite pin objects; three starter pins; giving transfers ownership; consensual atomic trades","implementation":"api.php, actions.php, social.js"},
-    {"feature":"Pin creator and ownership history; one-of-ones or fixed editions of two/three with no later expansion","implementation":"actions.php, social.js"},
-    {"feature":"Pins, current-tag stickers and stamps can be positioned and rotated on a homepage jacket","implementation":"editor.js, homepage.js"},
-    {"feature":"Optional private pin tin: display only pins placed on the jacket","implementation":"editor.js, queries.php"},
-    {"feature":"Creative profile achievements unlock finite creation tokens; no engagement grinding","implementation":"schema.php, actions.php, studio.js, social.js"},
-    {"feature":"One active sticker/tag; replacing it prevents old-tag placement; old bathroom marks retain their original artwork","implementation":"actions.php, studio.js"},
-    {"feature":"Paint pencil, brush, eraser, fill, eyedropper, undo/redo, transparency, grid and actual-size preview","implementation":"studio.js"},
-    {"feature":"Uploaded images become pixelated, reduced-palette sticker artwork","implementation":"studio.js"},
-    {"feature":"Editable text/image layers, 8-bit/graffiti/ransom/bubble/handwriting fonts, dragging, scaling and rotation","implementation":"studio.js"},
-    {"feature":"Sticker outlines and PNG export; same editor makes pins","implementation":"studio.js"},
-    {"feature":"Bathroom sticker graffiti and font-rendered quotes, placement and rotation, disable/friends/approval settings","implementation":"homepage.js, actions.php"},
-    {"feature":"Bathroom owner moderation, archived marks and restoring them without erasing history","implementation":"homepage.js, actions.php"},
-    {"feature":"Directory search, recently updated pages, random discovery and opt-in neighborhoods","implementation":"social.js, queries.php"},
-    {"feature":"User-created webrings with join/leave, previous/next and random wandering","implementation":"social.js, homepage.js"},
-    {"feature":"Finite chronological bulletin board, replies, monthly community questions and decorating prompts","implementation":"social.js, queries.php"},
-    {"feature":"Blocking, per-feature privacy, content reports and host moderation","implementation":"actions.php, queries.php, social.js"},
-    {"feature":"Original GAYBOY ROM, tutorial, controls, save export and in-browser app playback","implementation":"apps/gayboy/"},
-    {"feature":"GAYBOY beat capture/share, playback links and restoring the visitor's own beat","implementation":"apps/gayboy/network-beats.js, actions.php"},
-    {"feature":"Typed uWu becomes a custom emo/scene-face emoji with a long center bang in rooms and DMs; picker and common emoticons","implementation":"emoji.js, emoji/uwu.png, social.js"}
+    {
+      "feature": "Accounts, handles, profiles, avatar uploads and pronouns",
+      "implementation": "api.php, actions.php, editor.js"
+    },
+    {
+      "feature": "GAYBOY is an app and its page uses the same homepage renderer and editable template as members",
+      "implementation": "gayboy.json, homepage.js, editor.js, apps/gayboy/"
+    },
+    {
+      "feature": "Live homepage builder; twelve movable blocks per page; sidebar and single-column layouts",
+      "implementation": "editor.js, homepage.js, homepage.css"
+    },
+    {
+      "feature": "Editable title, welcome banner, tagline, ticker, quote, interests, mood, contact links and footer",
+      "implementation": "editor.js, schema.php"
+    },
+    {
+      "feature": "Colors, background patterns, uploaded wallpaper, fonts, borders, cursors, rounded panels and glitter controls",
+      "implementation": "editor.js, homepage.css"
+    },
+    {
+      "feature": "YouTube videos, playlists, Shorts and live links play in-page",
+      "implementation": "media.js, homepage.js"
+    },
+    {
+      "feature": "SoundCloud tracks/playlists, Spotify, Vimeo, Mixcloud, Twitch and Bandcamp embed-code players",
+      "implementation": "media.js"
+    },
+    {
+      "feature": "Direct audio/video files and one featured sidebar soundtrack",
+      "implementation": "media.js, homepage.js"
+    },
+    {
+      "feature": "Uploaded photos, image galleries, pocket collections, lists, downloads and large buttons",
+      "implementation": "actions.php, editor.js, homepage.js"
+    },
+    {
+      "feature": "Badges, dividers, stamps and under-construction signs",
+      "implementation": "editor.js, homepage.js"
+    },
+    {
+      "feature": "Optional visitor counter and a personal page update note",
+      "implementation": "queries.php, editor.js"
+    },
+    {
+      "feature": "Buddy requests, accepted buddy list, eight featured friends, presence and custom away messages",
+      "implementation": "actions.php, queries.php, social.js"
+    },
+    {
+      "feature": "AIM-style floating messenger, minimizes, stays open between pages, private history controls and optional sounds",
+      "implementation": "social.js, community.css"
+    },
+    {
+      "feature": "Public chatrooms plus member-hosted rooms with title, topic, color, uploaded wallpaper, capacity and privacy",
+      "implementation": "actions.php, queries.php, social.js"
+    },
+    {
+      "feature": "Visible room participants, shared media player, saved versus live-session history",
+      "implementation": "social.js, actions.php, queries.php"
+    },
+    {
+      "feature": "Room hosts appoint moderators; moderators remove messages, ban and unban",
+      "implementation": "actions.php, social.js"
+    },
+    {
+      "feature": "No likes, follower totals, public collection scores, streaks, read receipts or typing pressure",
+      "implementation": "social.js, homepage.js"
+    },
+    {
+      "feature": "Guestbook notes and actual freehand doodles, approval controls and owner removal",
+      "implementation": "homepage.js, actions.php"
+    },
+    {
+      "feature": "Private postcards; recipient chooses whether to display them publicly",
+      "implementation": "social.js, actions.php"
+    },
+    {
+      "feature": "Finite pin objects; three starter pins; giving transfers ownership; consensual atomic trades",
+      "implementation": "api.php, actions.php, social.js"
+    },
+    {
+      "feature": "Pin creator and ownership history; one-of-ones or fixed editions of two/three with no later expansion",
+      "implementation": "actions.php, social.js"
+    },
+    {
+      "feature": "Pins, current-tag stickers and stamps can be positioned and rotated on a homepage jacket",
+      "implementation": "editor.js, homepage.js"
+    },
+    {
+      "feature": "Optional private pin tin: display only pins placed on the jacket",
+      "implementation": "editor.js, queries.php"
+    },
+    {
+      "feature": "Creative profile achievements unlock finite creation tokens; no engagement grinding",
+      "implementation": "schema.php, actions.php, studio.js, social.js"
+    },
+    {
+      "feature": "One active sticker/tag; replacing it prevents old-tag placement; old bathroom marks retain their original artwork",
+      "implementation": "actions.php, studio.js"
+    },
+    {
+      "feature": "Paint pencil, brush, eraser, fill, eyedropper, undo/redo, transparency, grid and actual-size preview",
+      "implementation": "studio.js"
+    },
+    {
+      "feature": "Uploaded images become pixelated, reduced-palette sticker artwork",
+      "implementation": "studio.js"
+    },
+    {
+      "feature": "Editable text/image layers, 8-bit/graffiti/ransom/bubble/handwriting fonts, dragging, scaling and rotation",
+      "implementation": "studio.js"
+    },
+    {
+      "feature": "Sticker outlines and PNG export; same editor makes pins",
+      "implementation": "studio.js"
+    },
+    {
+      "feature": "Bathroom sticker graffiti and font-rendered quotes, placement and rotation, disable/friends/approval settings",
+      "implementation": "homepage.js, actions.php"
+    },
+    {
+      "feature": "Bathroom owner moderation, archived marks and restoring them without erasing history",
+      "implementation": "homepage.js, actions.php"
+    },
+    {
+      "feature": "Directory search, recently updated pages, random discovery and opt-in neighborhoods",
+      "implementation": "social.js, queries.php"
+    },
+    {
+      "feature": "User-created webrings with join/leave, previous/next and random wandering",
+      "implementation": "social.js, homepage.js"
+    },
+    {
+      "feature": "Finite chronological bulletin board, replies, monthly community questions and decorating prompts",
+      "implementation": "social.js, queries.php"
+    },
+    {
+      "feature": "Blocking, per-feature privacy, content reports and host moderation",
+      "implementation": "actions.php, queries.php, social.js"
+    },
+    {
+      "feature": "Original GAYBOY ROM, tutorial, controls, save export and in-browser app playback",
+      "implementation": "apps/gayboy/"
+    },
+    {
+      "feature": "GAYBOY beat capture/share, playback links and restoring the visitor's own beat",
+      "implementation": "apps/gayboy/network-beats.js, actions.php"
+    },
+    {
+      "feature": "Typed uWu becomes a custom emo/scene-face emoji with a long center bang in rooms and DMs; picker and common emoticons",
+      "implementation": "emoji.js, emoji/uwu.png, social.js"
+    },
+    {
+      "feature": "Upload or link MIDI, SID and tracker music; real Web Audio playback, transport, volume, MIDI/module loop and SID subtunes; reusable upload shelf",
+      "implementation": "retro/, media.js, editor.js, actions.php, queries.php"
+    },
+    {
+      "feature": "Embedded GAYBOY follows complete content height and Big screen fills the browser",
+      "implementation": "apps/gayboy/embed-layout.js, homepage.js, homepage.css"
+    }
   ],
   "added_features": [
     "Recoverable local homepage and paint drafts",
@@ -49,8 +171,20 @@
     "One-time recovery codes; password recovery invalidates old sessions",
     "Automatic media-provider detection and a phone preview in the builder"
   ],
-  "validation": ["tools/verify_network_v2.py", "tools/verify_network_beats.py", "tools/verify_network_live.py"],
+  "validation": [
+    "tools/verify_network_v2.py",
+    "tools/verify_network_beats.py",
+    "tools/verify_network_live.py"
+  ],
   "provider_limits": "Embedded services control availability, geographic restrictions and login requirements. Playback starts with visitor interaction. Bandcamp requires its official embed URL/code. Generic arbitrary iframe HTML is not executed.",
-  "exploratory_not_promised": ["Cross-user synchronized playback clocks", "Paid/scarcity marketplaces", "Scheduled notifications"],
-  "visual_asset": {"file":"emoji/uwu.png","tool":"built-in image_gen","prompt":"emoji/uwu-source.json"}
+  "exploratory_not_promised": [
+    "Cross-user synchronized playback clocks",
+    "Paid/scarcity marketplaces",
+    "Scheduled notifications"
+  ],
+  "visual_asset": {
+    "file": "emoji/uwu.png",
+    "tool": "built-in image_gen",
+    "prompt": "emoji/uwu-source.json"
+  }
 }

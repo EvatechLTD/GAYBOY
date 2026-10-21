@@ -6,7 +6,11 @@ export function mediaInfo(input){
     if(value.includes('<iframe')){const doc=new DOMParser().parseFromString(value,'text/html');value=doc.querySelector('iframe')?.getAttribute('src')||'';}
     if(value.startsWith('//'))value='https:'+value;
     if(value.startsWith('spotify:'))value='https://open.spotify.com/'+value.slice(8).replace(':','/');
-    let u;try{u=new URL(value);}catch{return {error:'Paste a song, playlist, video URL, or a provider’s iframe embed code.'};}
+    let u;try{u=new URL(value,/^\/?api\.php\?/.test(value)?location.origin+'/':undefined);}catch{return {error:'Paste a song, playlist, video URL, or a provider’s iframe embed code.'};}
+    const formats=['mid','midi','sid','mod','xm','s3m','it','mptm','mtm','stm','669','med'];
+    const ownMusic=u.origin===location.origin&&u.pathname==='/api.php'&&u.searchParams.get('action')==='music'&&/^[a-f0-9]{64}$/.test(u.searchParams.get('id')||'');
+    const format=String(ownMusic?u.searchParams.get('format'):u.pathname.split('.').pop()).toLowerCase();
+    if(formats.includes(format)&&(u.protocol==='https:'||ownMusic))return {provider:['mid','midi'].includes(format)?'MIDI':format==='sid'?'SID':format.toUpperCase()+' tracker',src:u.href,kind:'retro',format,height:220};
     if(u.protocol!=='https:')return {error:'Use an HTTPS media URL.'};
     const host=u.hostname.toLowerCase(),path=u.pathname;
     if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','youtu.be','www.youtube-nocookie.com'].includes(host)){
@@ -39,11 +43,18 @@ export function mediaInfo(input){
     }
     if(/\.(mp3|wav|ogg|m4a|aac|flac)(?:$|\?)/i.test(u.href))return {provider:'Audio',src:u.href,kind:'audio',height:80};
     if(/\.(mp4|webm|ogv|mov)(?:$|\?)/i.test(u.href))return {provider:'Video',src:u.href,kind:'video',height:360};
-    return {error:'That service does not have a supported player yet. Use YouTube, SoundCloud, Spotify, Vimeo, Mixcloud, Twitch, a Bandcamp embed, or a direct audio/video file.'};
+    return {error:'That service does not have a supported player yet. Use YouTube, SoundCloud, Spotify, Vimeo, Mixcloud, Twitch, a Bandcamp embed, a MIDI/SID/tracker file, or a direct audio/video file.'};
 }
 export function mediaHTML(value,compact=false){
     const m=mediaInfo(value);if(m.error)return `<div class="media-error" role="status">${esc(m.error)}</div>`;
+    if(m.kind==='retro')return `<div class="media-player"><iframe class="retro-player" title="${esc(m.provider)} player" src="retro/player.html?${esc(new URLSearchParams({src:m.src,format:m.format}).toString())}" style="height:220px" allow="autoplay" loading="lazy"></iframe></div>`;
     if(m.kind==='audio')return `<div class="media-player"><audio controls preload="none" src="${esc(m.src)}"></audio><small>Press play to start your soundtrack.</small></div>`;
     if(m.kind==='video')return `<div class="media-player"><video controls playsinline preload="metadata" src="${esc(m.src)}"></video></div>`;
     return `<div class="media-player"><iframe title="${esc(m.provider)} player" src="${esc(m.src)}" style="height:${compact?Math.min(m.height,200):m.height}px" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" loading="lazy" allowfullscreen></iframe><small>${esc(m.provider)} · playback follows the creator’s availability and provider rules.</small></div>`;
 }
+
+window.addEventListener('message',event=>{
+ if(event.origin!==location.origin||event.data?.type!=='y2k-retro-height'||!Number.isFinite(event.data.height))return;
+ const frame=[...document.querySelectorAll('iframe.retro-player')].find(f=>f.contentWindow===event.source);
+ if(frame)frame.style.height=Math.max(170,Math.min(2000,event.data.height+2))+'px';
+});

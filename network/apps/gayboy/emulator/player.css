@@ -103,3 +103,18 @@
 .gamepad button.tutorial-target{outline:3px solid #173c38;outline-offset:2px;box-shadow:0 0 0 5px #bfffe0}
 .gamepad .dpad button.tutorial-target{outline-offset:-4px;box-shadow:inset 0 0 0 5px #bfffe0}
 @media(max-height:600px) and (min-width:600px){.demo-expanded .handheld:after{display:none}}
+
+/* Keep the handheld's geometry identical in the page and in Big screen. */
+.demo-screen canvas{aspect-ratio:160/144;object-fit:contain}
+@media(max-width:590px){
+ .demo-panel,.demo-panel.demo-expanded{border:0;box-shadow:none;border-radius:0;padding:0;background:#210331}
+ .demo-panel>.panel-content,.demo-expanded>.panel-content{padding:0;width:100%;max-width:none;margin:0}
+ .demo-panel>h2{border:0;box-shadow:none;text-align:center}
+ .demo-panel .handheld,.demo-expanded .handheld{width:calc(100% - 40px);max-width:430px;margin:15px auto 19px}
+ .demo-panel .demo-intro{padding-inline:12px}
+ .demo-panel .demo-toolbar,.demo-panel .demo-status,.demo-panel .demo-tip,.demo-panel .demo-credit{margin-inline:12px}
+ .demo-panel.tutorial-active .handheld{width:calc(100% - 16px);margin:4px auto}
+}
+
+/* Match the idle screen to the neutral white emulator palette. */
+.demo-screen{background:#000}.demo-cover{background:repeating-linear-gradient(0deg,#0000 0 3px,#0001 3px 4px),#fff;color:#000}.demo-cover strong{text-shadow:2px 2px #aaa}.demo-cover button{background:#000;color:#fff;border-color:#aaa}

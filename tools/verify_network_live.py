@@ -31,7 +31,7 @@ with sync_playwright() as p:
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         page.screenshot(path=str(ROOT/f'build/network-qa/live-{width}.png'),full_page=True)
     assert not errors,errors
-    page.goto(BASE+'~GAYBOY',wait_until='domcontentloaded')
+    page.goto(BASE+'gayboy',wait_until='domcontentloaded')
     page.wait_for_selector('.homepage')
     assert page.locator('.hp-header h1').inner_text()=='GAYBOY'
     assert page.locator('.hp-gallery img').count()==4

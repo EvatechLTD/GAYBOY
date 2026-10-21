@@ -9,11 +9,17 @@ export function on(s,event,fn,root=document){const el=$(s,root);if(el)el.addEven
 export function bindAll(s,event,fn,root=document){$$(s,root).forEach(el=>el.addEventListener(event,e=>Promise.resolve().then(()=>fn(e,el)).catch(err=>notify(err.message))));}
 export const box=(title,body,cls='')=>`<section class="window ${cls}"><h2>${esc(title)}<span>✳</span></h2><div class="pad">${body}</div></section>`;
 export function requireMe(){if(state.me)return false;$('#view').innerHTML=box('CONNECTION REQUIRED','<h1 class="big-title">Come on in.</h1><p>Make yourself a homepage and find your people.</p><button data-signin>ESTABLISH CONNECTION ↗</button>');return true;}
-export function url(s){try{const u=new URL(s,document.baseURI);if(u.protocol==='https:'||(u.origin===location.origin&&/^(\/api\.php|\/apps\/)/.test(u.pathname)))return u.href;}catch{}return '';}
+const screenshotVersions={"/apps/gayboy/images/train.png":"neutral-20261018","/apps/gayboy/images/mixer.png":"neutral-20261018","/apps/gayboy/images/sequencer.png":"neutral-20261018","/apps/gayboy/images/turntable.png":"neutral-20261018","/apps/gayboy/images/drum-machine.png":"neutral-20261018"};
+export function url(s){try{const u=new URL(s,document.baseURI);if(u.protocol==='https:'||(u.origin===location.origin&&/^(\/api\.php|\/apps\/)/.test(u.pathname))){if(u.origin===location.origin&&screenshotVersions[u.pathname])u.searchParams.set('v',screenshotVersions[u.pathname]);return u.href;}}catch{}return '';}
 export const avatar=u=>{const s=parse(u.settings);return s.avatar?`<img class="user-avatar" src="${esc(url(s.avatar))}" alt="${esc(u.handle)}'s avatar" loading="lazy">`:`<span class="avatar-placeholder">${esc((s.displayName||u.handle||'?').slice(0,2))}</span>`;};
-export const pageLink=u=>`/~${encodeURIComponent(u.handle)}`;
+export const pageLink=u=>String(u.handle).toLowerCase()==='gayboy'?'/gayboy':`/~${encodeURIComponent(u.handle)}`;
 export function pinHTML(p){return `<figure class="pin-item"><div class="pin" title="${esc(p.name)} · #${p.id}">${p.art?`<img src="${esc(p.art)}" alt="${esc(p.name)}">`:esc(p.name)}</div><figcaption>${esc(p.name)}<small>PIN #${p.id}</small></figcaption></figure>`;}
-export async function upload(file){if(!file)return '';if(file.size>2400000)throw Error('Choose an image under 2.4 MB.');const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});return (await api('upload',{data})).url;}
+let stripUploadMetadata=true;
+try{stripUploadMetadata=localStorage.getItem('y2k-strip-upload-metadata')!=='false';}catch{}
+export const uploadPrivacyEnabled=()=>stripUploadMetadata;
+export function setUploadPrivacy(enabled){stripUploadMetadata=!!enabled;try{localStorage.setItem('y2k-strip-upload-metadata',String(stripUploadMetadata));}catch{}}
+export function uploadPrivacyControls(){return `<label class="check"><input type="checkbox" data-upload-privacy ${uploadPrivacyEnabled()?'checked':''}>Remove location metadata from new image uploads</label><p class="muted">Also removes embedded author and caption tags. Applies on this browser; existing uploads and visible photo details stay unchanged.</p>`;}
+export async function upload(file){if(!file)return '';if(file.size>2400000)throw Error('Choose an image under 2.4 MB.');const strip_metadata=uploadPrivacyEnabled();const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});return (await api('upload',{data,strip_metadata})).url;}
 export function formData(form){return Object.fromEntries(new FormData(form));}
 export function field(label,name,value='',type='text',extra=''){return `<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;}
 export function select(label,name,choices,value){return `<label>${esc(label)}<select name="${name}">${choices.map(c=>{const [v,l]=Array.isArray(c)?c:[c,c];return `<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`;}).join('')}</select></label>`;}

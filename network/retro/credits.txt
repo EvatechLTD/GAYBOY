@@ -1,0 +1,40 @@
+Y2KCRISIS retro music player dependencies
+
+Cowbell (Matt Westcott and contributors), BSD-3-Clause:
+https://github.com/demozoo/cowbell
+Builds: https://demozoo.github.io/cowbell/cowbell/
+Files: cowbell.min.js, openmpt.min.js, libopenmpt.js, libopenmpt.wasm.
+cowbell-audio.js is its WebAudio wrapper adapted to add a volume gain node.
+
+libopenmpt (OpenMPT contributors), BSD-3-Clause and bundled component notices:
+https://lib.openmpt.org/ - see openmpt-LICENSE.txt.
+
+jsSID 0.9.1 (Mihaly Horvath / Hermit), adapted for Cowbell by Gasman:
+https://github.com/og2t/jsSID - see jssid-README.txt for license and limitations.
+https://github.com/demozoo/cowbell/blob/main/cowbell/jssid.js
+The unminified SID source retains the original author credit.
+
+JZZ 1.9.6, JZZ-midi-SMF 1.9.9, JZZ-synth-Tiny 1.4.4 (Jazz-Soft), MIT:
+https://github.com/jazz-soft/JZZ
+https://github.com/jazz-soft/JZZ-midi-SMF
+https://github.com/jazz-soft/JZZ-synth-Tiny
+Exact npm package versions are vendored; see the matching LICENSE files.
+Tiny Synth implements General MIDI using Web Audio synthesis, not a soundfont.
+
+No remote decoder scripts, tracking, or music catalog requests are required.
+All engines are loaded on first playback. File URLs hosted elsewhere need CORS.
+SID support has jsSID's limitations (including no digital samples).
+
+The Cowbell OpenMPT adapter now rejects decoder initialization failure.
+jsSID allows zero background noise in its options.
+
+Vendored file SHA-256 digests:
+9e55e1268a57b3f6727ff86eac5cf20bd1c6186205fd6b9bbed596dfa2353836  cowbell-audio.js
+a2ce390119cdd00a632f8dbbb3a325866edf746b22e7352f0030a3286c72fce0  cowbell.min.js
+a3340dbd6710a0c99c635c5bf9e5e29484f4f8df76b51cd34b57b709c267c18e  jssid.js
+33a333215fb82db776ebca4a3c966fc4e06cc15248238f1bc5e2d141f915d5da  JZZ.js
+bf5bf44c6d1bd51a3712dc4304395ededab0d39ed567c61a3e8e39cfc1b74318  JZZ.midi.SMF.js
+7c8060e1294df13604d75f44bbe14bf0d3f60a065b2a103a5d6f9f9d11139760  JZZ.synth.Tiny.js
+aca14442d4a1e490683dcc6c09a3d8439db1b8149722c30e1dd77fb961fb0b08  libopenmpt.js
+2f7dee929debd2c575d1c54b967614cab58d344b1126426064b99106c4d1938f  libopenmpt.wasm
+d1081b22e87822c02445f9a77ca27f1143766bb6f6b3464ae28727a42ee7e35c  openmpt.min.js

@@ -1,10 +1,36 @@
 <?php
 if(!isset($db)){http_response_code(404);exit;}
 // New authenticated mutations. Unhandled actions continue through the v1 API.
+if($a==='delete-music'){
+    $id=text($p['id']??'',64);$format=text($p['format']??'',10);
+    $db->exec('BEGIN IMMEDIATE');
+    if(!rows('SELECT id FROM music_files WHERE owner=? AND id=? AND format=?',[$me,$id,$format]))fail('That file is not on your music shelf.',404);
+    q('DELETE FROM music_files WHERE owner=? AND id=? AND format=?',[$me,$id,$format]);
+    if(!rows('SELECT id FROM music_files WHERE id=? LIMIT 1',[$id])&&is_file($home.'/music/'.$id))unlink($home.'/music/'.$id);
+    $db->exec('COMMIT');out(['ok'=>true]);
+}
+if($a==='upload-music'){
+    $name=text($p['name']??'',120);$format=strtolower(pathinfo($name,PATHINFO_EXTENSION));
+    $encoded=$p['data']??'';$raw=is_string($encoded)&&strlen($encoded)<=3200000?base64_decode($encoded,true):false;
+    if(!$raw||strlen($raw)>2400000||!music_signature($raw,$format))fail('Choose a MIDI, SID, MOD, XM, S3M, IT, MPTM, MTM, STM, 669 or MED file under 2.4 MB.');
+    $id=hash('sha256',$raw);
+    $db->exec('BEGIN IMMEDIATE');
+    if(!rows('SELECT id FROM music_files WHERE owner=? AND id=? AND format=?',[$me,$id,$format])){
+        $usage=rows('SELECT COUNT(*) AS n,COALESCE(SUM(size),0) AS bytes FROM music_files WHERE owner=?',[$me])[0];
+        if($usage['n']>=24||$usage['bytes']+strlen($raw)>24000000)fail('Your music shelf is full (24 files / 24 MB).');
+        $dir=$home.'/music';if(!is_dir($dir))mkdir($dir,0700,true);
+        if(!is_file($dir.'/'.$id)&&file_put_contents($dir.'/'.$id,$raw,LOCK_EX)!==strlen($raw))throw new RuntimeException('Music upload failed.');
+        q('INSERT INTO music_files(id,owner,format,name,size,created) VALUES(?,?,?,?,?,?)',[$id,$me,$format,$name,strlen($raw),time()]);
+    }
+    $db->exec('COMMIT');
+    out(['url'=>'api.php?action=music&id='.$id.'&format='.$format,'name'=>$name]);
+}
 if($a==='upload'){
     $data=$p['data']??'';if(!is_string($data)||!preg_match('#^data:(image/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$#',$data,$m))fail('Choose a PNG, JPEG, GIF or WebP image.');
     $raw=base64_decode($m[2],true);$info=$raw?@getimagesizefromstring($raw):false;
     if(!$info||strlen($raw)>2400000||$info[0]>4096||$info[1]>4096||$info['mime']!==$m[1])fail('Images must be under 2.4 MB and 4096 × 4096 pixels.');
+    $strip=$p['strip_metadata']??true;if(!is_bool($strip))fail('Choose whether to remove image location metadata.');
+    if($strip){require_once __DIR__.'/image-privacy.php';try{$raw=image_privacy_strip($raw,$info['mime']);}catch(Throwable $e){fail('Could not remove metadata from this image. Try a different image.');}}
     $dir=$home.'/uploads';if(!is_dir($dir))mkdir($dir,0700,true);$id=hash('sha256',$raw);
     if(!is_file($dir.'/'.$id))file_put_contents($dir.'/'.$id,$raw,LOCK_EX);
     out(['url'=>'api.php?action=asset&id='.$id]);

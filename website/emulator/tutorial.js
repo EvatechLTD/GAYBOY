@@ -107,7 +107,7 @@ window.createGayboyTutorial = function(api) {
   function restore(ptr) { api.release(); api.restore(ptr); stableSince = 0; }
   function discard(ptr) { if (checkpoints.delete(ptr)) api.deleteSnapshot(ptr); }
   async function gridSetup() { await menu(8); }
-  async function melodicSetup() { await gridSetup(); if(read().track===6) await chord('select','right'); }
+  async function melodicSetup() { await gridSetup(); if(read().track===6) await chord('select','left'); }
   async function cell(step, pitch) {
     const c = read().track;
     for (let n=0;read().cursors[c]!==step && n<256;n++) await tap('right');
@@ -116,7 +116,7 @@ window.createGayboyTutorial = function(api) {
     if (read().pitches[c]!==pitch || read().head) throw new Error('Could not position the demonstration cursor.');
   }
   async function addNotes(count) {
-    if(read().track===6) await chord('select','right');
+    if(read().track===6) await chord('select','left');
     const c=read().track;
     for (let i=0;i<count;i++) {
       const s=read(), notes=s.tracks[c], used=new Set(notes.map(n=>n.step));
@@ -133,7 +133,7 @@ window.createGayboyTutorial = function(api) {
   async function selectNote() {
     const s=read(),track=s.tracks.findIndex((notes,c)=>c<6&&notes.length>0);
     if(track<0)throw new Error('This lesson needs a note from the earlier lessons.');
-    for(let n=0;read().track!==track&&n<7;n++)await chord('select','right');
+    for(let n=0;read().track!==track&&n<7;n++)await chord('select','left');
     const chosen=read().tracks[track][0];
     await cell(chosen.step,chosen.pitch); return chosen;
   }
@@ -154,14 +154,14 @@ window.createGayboyTutorial = function(api) {
       demo:async()=>addNotes(4),watch:'Watch: I am adding four notes in empty places while your loop plays. Your melody can be completely different.',
       task:'Your turn: add four more notes anywhere. Choose your own pitches and rhythm. Keep your existing notes.',
       goal:s=>grid(s)&&s.total>=baseline.total+4,praise:'Four more notes, your own melody. Keep that creativity going.'},
-    {title:'Try another instrument',pads:['select','right','B','up','down','left'],setup:gridSetup,
-      demo:async()=>{await chord('select','right');await addNotes(4);},
-      watch:'Watch: hold SELECT and tap Right to change instrument, release, then place four notes with B.',
-      task:'Goal: switch to a different instrument with SELECT + Left/Right, then plot four new notes on it with B. Choose any pitches and steps.',
+    {title:'Try another instrument',pads:['select','left','B','up','down','right'],setup:gridSetup,
+      demo:async()=>{await chord('select','left');await addNotes(4);},
+      watch:'Watch: hold SELECT and tap Left to change instrument, release, then place four notes with B.',
+      task:'Goal: switch to a different instrument with SELECT + Left, then plot four new notes on it with B. Choose any pitches and steps.',
       goal:s=>grid(s)&&s.track!==baseline.track&&s.tracks[s.track].length>=baseline.tracks[s.track].length+4,
       praise:'Another instrument, another layer. This is becoming your track.'},
     {title:'Make a note longer',pads:['B','right','up','down','left'],setup:melodicSetup,
-      demo:async()=>{await selectNote();await chord('B','right',2);},
+      demo:async()=>{await selectNote();await press('B',true);await press('right',true);await wait(1100);await press('right',false);await press('B',false);},
       watch:'Watch: move onto a note, hold B and tap Right to stretch it. Release B when it is long enough.',
       task:'Your turn: find any note. Hold B (Z) and tap Right to make it longer, then release. Any longer length counts.',
       goal:s=>grid(s)&&s.total===baseline.total&&s.tracks.some((notes,c)=>notes.some(n=>baseline.tracks[c].some(b=>b.step===n.step&&b.pitch===n.pitch&&n.length>b.length))),
@@ -249,8 +249,16 @@ window.createGayboyTutorial = function(api) {
       await wait(3000); await tap('start'); await wait(450);
       await until(s => api.read(map.mixer) === 0xD3 && !s.menu, 10000);
       await menu(8);
-      for (let n=0;read().track!==0 && n<7;n++) await chord('select','right');
+      for (let n=0;read().track!==0 && n<7;n++) await chord('select','left');
       if (read().track!==0) throw new Error('Could not open the first instrument.');
+      // Current cartridges include a demo song. Clear only the separate practice
+      // pattern through the ROM's confirmation screen, keeping the user's session parked.
+      if(read().playing)await chord('select','A');
+      if(read().total){
+        await menu(18);await menu(26);await tap('up');await tap('A');
+        await until(s=>s.page===18&&!s.menu&&s.total===0);
+        await menu(8);
+      }
       // Seed a real C2 note through the same controls the learner uses.
       // seq_name labels MIDI pitch 36 as C2; event storage encodes pitch + 1.
       await cell(0,36); await tap('B');

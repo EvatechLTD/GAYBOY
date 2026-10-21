@@ -19,7 +19,7 @@ URL = 'https://buttholechopper.com/gayboy/'
 MARKER = b'gayboy-static-page-v1\n'
 FILES = ('.htaccess', 'favicon.svg', 'style.css', 'page.js',
          'emulator/sameboy.js', 'emulator/sameboy.wasm', 'emulator/player.js', 'emulator/player.css',
-         'emulator/tutorial.js', 'emulator/tutorial-rom.json', 'downloads/GAYBOY-tutorial.gb',
+         'emulator/roms/GAYBOY.gb', 'emulator/tutorial.js', 'emulator/tutorial-rom.json', 'emulator/rom-versions.json', 'downloads/GAYBOY.gb', 'downloads/GAYBOY-tutorial.gb',
          'emulator/SAMEBOY-LICENSE.txt', 'emulator/SAMEBOY-UPSTREAM.txt', 'images/train.png',
          'images/turntable.png', 'images/drum-machine.png', 'images/sequencer.png',
          'images/mixer.png', 'downloads/GAYBOY-0.3.gb', 'downloads/SHA256SUMS.txt',
@@ -138,6 +138,17 @@ def main():
 
     # Read the complete snapshot before connecting; never publish a partial build.
     payloads = {name: (SOURCE / name).read_bytes() for name in FILES}
+    versions=json.loads(payloads['emulator/rom-versions.json'])
+    for digest, version in versions['versions'].items():
+        name=version['rom']
+        if not name.startswith('emulator/roms/GAYBOY') or '/' in name[len('emulator/roms/'):] or not name.endswith('.gb'):
+            raise RuntimeError('Unexpected archived cartridge path.')
+        data=(SOURCE/name).read_bytes()
+        if hashlib.sha256(data).hexdigest()!=digest:raise RuntimeError('Archived beat cartridge checksum mismatch.')
+        payloads[name]=data
+    for name in ['emulator/roms/GAYBOY.gb','downloads/GAYBOY.gb','downloads/GAYBOY-0.3.gb','downloads/GAYBOY-tutorial.gb']:
+        if payloads[name]!=payloads['downloads/GAYBOY.gb']:raise RuntimeError('Browser and download cartridges differ.')
+    payloads['index.html']=payloads.pop('index.html')
     private_files = ('app.php', 'admin.php', 'beats.php', 'admin-web.php', 'admin-init.php', *(f'audio/{digit}.wav' for digit in range(10)))
     private_payloads = {name: (ROOT / 'hosting/comments' / name).read_bytes() for name in private_files}
     tutorial = json.loads(payloads['emulator/tutorial-rom.json'])
@@ -201,7 +212,11 @@ def main():
                 destination = backup / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 with sftp.open(path, 'rb') as stream:
-                    destination.write_bytes(stream.read())
+                    prior=stream.read()
+                    if prior==data:
+                        hashes[name]=hashlib.sha256(data).hexdigest()
+                        continue
+                    destination.write_bytes(prior)
             temporary = path + '.upload-' + secrets.token_hex(6)
             with sftp.open(temporary, 'wx') as stream:
                 stream.write(data)
@@ -229,4 +244,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # The standalone site is retired; publishing must preserve its redirect.
+    from deploy_gayboy_destination import main as publish_redirect
+    publish_redirect(redirect_only=True)

@@ -25,10 +25,10 @@ def patch_html(html, website=False):
             key = tag.split(' content=')[0].split(' href=')[0]
             if key not in html:
                 html = html.replace('</head>', tag + '</head>', 1)
-        if 'href="https://github.com/dpjpandone/GAYBOY"' not in html:
-            html = html.replace('<a href="#about">', '<a href="https://github.com/dpjpandone/GAYBOY">GitHub source ↗</a><a href="#about">', 1)
+        if 'href="https://github.com/EvatechLTD/GAYBOY"' not in html:
+            html = html.replace('<a href="#about">', '<a href="https://github.com/EvatechLTD/GAYBOY">GitHub source ↗</a><a href="#about">', 1)
     elif 'GAYBOY Game Boy synth on GitHub' not in html:
-        html = html.replace('</footer>', ' · <a href="https://github.com/dpjpandone/GAYBOY">GAYBOY Game Boy synth on GitHub</a></footer>', 1)
+        html = html.replace('</footer>', ' · <a href="https://github.com/EvatechLTD/GAYBOY">GAYBOY Game Boy synth on GitHub</a></footer>', 1)
     return html
 
 

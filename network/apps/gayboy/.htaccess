@@ -2,3 +2,9 @@
 Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
 </IfModule>
 AddType application/wasm .wasm
+
+<IfModule mod_headers.c>
+<FilesMatch "\.(html|js|json|gb|txt)$">
+Header always set Cache-Control "no-cache"
+</FilesMatch>
+</IfModule>

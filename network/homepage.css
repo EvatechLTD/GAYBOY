@@ -11,3 +11,15 @@ body.page-route{background:var(--page-background,#190029)}.page-route>.desktop{d
 .guest-doodle-tools canvas{display:block;width:192px;height:192px;max-width:100%;touch-action:none;image-rendering:pixelated;background:repeating-conic-gradient(#aaa 0% 25%,white 0% 50%) 0/12px 12px;border:2px solid var(--hp-secondary)}.guest-doodle-tools input{padding:2px;width:70px;height:32px}.guest-doodle-tools label{max-width:100px}
 
 .homepage{font-size:var(--hp-font-size,14px);line-height:var(--hp-line-height,1.6)}.homepage .hp-text{font-size:inherit;line-height:var(--hp-line-height,1.6)}.homepage .hp-header h1{transform:rotate(var(--hp-tilt,-3deg))}.homepage .hp-columns{padding:var(--hp-spacing,25px);gap:var(--hp-spacing,25px)}.homepage .hp-panel{border-width:var(--hp-border-width,2px)}.homepage .hp-header{background-image:var(--hp-header-image,repeating-linear-gradient(0deg,#0000 0 3px,#0002 3px 4px),radial-gradient(ellipse at center,var(--hp-header),var(--hp-panel) 80%));background-size:cover;background-position:center}.homepage.no-shadows,.homepage.no-shadows .hp-panel{box-shadow:none}.hp-logo-image{display:block;max-width:100%;width:auto;max-height:var(--hp-heading,126px);margin:10px auto;image-rendering:pixelated}@container(max-width:560px){.homepage .hp-columns{padding:min(var(--hp-spacing,25px),15px);gap:0}}
+
+/* The app reports its content height instead of scrolling inside a fixed box. */
+.hp-app{min-height:300px}.homepage-app-open{overflow:hidden}
+.app-expanded-parent{transform:none!important;container-type:normal!important;isolation:auto!important;filter:none!important;contain:none!important}
+.hp-app.hp-app-expanded{position:fixed;inset:0;z-index:10000;width:100vw;height:100dvh!important;max-width:none;margin:0;background:#210331}
+
+/* A phone sees the same full-width handheld before and after power-on. */
+@media(max-width:590px){
+ .page-route .homepage .hp-app-block{width:100vw;max-width:none;margin-inline:calc(50% - 50vw);border:0!important;border-radius:0;padding:0;white-space:normal;box-shadow:none;background:#210331;transform:none}
+ .page-route .hp-app-block>h2{display:none}
+ .page-route .hp-app-block>.hp-content{padding:0}
+}

@@ -50,6 +50,7 @@ with sync_playwright() as p:
     page.keyboard.down('Space');page.wait_for_timeout(200);page.keyboard.press('x',delay=200);page.keyboard.up('Space')
     page.wait_for_function('()=>qaRead("seqplaying")===1')
     page.evaluate('()=>{window.qaOriginal=qaInstance;window.qaOriginalTicks=qaCore._emulator_get_ticks_f64(qaInstance)}')
+    captured_count=page.evaluate('()=>{const a=qaMap.symbols.seqeventcounts+12;return qaCore._emulator_observe_mem(qaInstance,a)|(qaCore._emulator_observe_mem(qaInstance,a+1)<<8);}')
     page.locator('#demo-share').click()
     expect(page.locator('.beat-dialog')).to_be_visible()
     expect(page.locator('.beat-dialog [type=submit]')).to_be_enabled()
@@ -86,7 +87,7 @@ with sync_playwright() as p:
         page.evaluate('()=>window.qaBeatPeak=0');page.wait_for_function('()=>qaBeatPeak>0.02',timeout=10000)
         assert page.evaluate('qaInstance!==qaOriginal')
         assert page.evaluate('qaRead("seqtrack")')==6
-        assert page.evaluate('()=>qaCore._emulator_observe_mem(qaInstance,qaMap.symbols.seqeventcounts+12)')==1
+        assert page.evaluate('()=>{const a=qaMap.symbols.seqeventcounts+12;return qaCore._emulator_observe_mem(qaInstance,a)|(qaCore._emulator_observe_mem(qaInstance,a+1)<<8);}')==captured_count
         # Audition cannot replace the visitor's local save or parked session.
         frozen=page.evaluate('qaCore._emulator_get_ticks_f64(qaOriginal)')
         page.wait_for_timeout(300)

@@ -134,12 +134,15 @@ def main():
                 pass
             # Only public program files. Private DB never enters document root.
             files = {name: (ROOT/'network'/name).read_bytes() for name in
-                     ('schema.php','actions.php','queries.php','core.js','themes.js','media.js',
+                     ('schema.php','actions.php','image-privacy.php','queries.php','core.js','themes.js','media.js',
                       'emoji.js','homepage.js','editor.js','studio.js','social.js','app.js',
                       'style.css','community.css','homepage.css','favicon.svg','gayboy.json','feature-audit.json')}
             for path in (ROOT/'network/fonts').iterdir():
                 if path.suffix in ('.ttf', '.txt'):
                     files['fonts/'+path.name] = path.read_bytes()
+            for path in (ROOT/'network/retro').iterdir():
+                if path.is_file() and (path.suffix in ('.html','.js','.css','.wasm','.txt') or path.name=='.htaccess'):
+                    files['retro/'+path.name] = path.read_bytes()
             files['emoji/uwu.png']=(ROOT/'network/emoji/uwu.png').read_bytes()
             files['emoji/uwu-source.json']=(ROOT/'network/emoji/uwu-source.json').read_bytes()
             for path in (ROOT/'network/apps/gayboy').rglob('*'):
@@ -167,6 +170,9 @@ def main():
                         raise RuntimeError('Refusing to replace a non-file.')
                     with sftp.open(dest, 'rb') as stream:
                         prior = stream.read()
+                    if prior == payload:
+                        print('Unchanged:', name)
+                        continue
                     backup = ROOT/'build/network-publish'/hashlib.sha256(prior).hexdigest()/name
                     backup.parent.mkdir(parents=True, exist_ok=True)
                     backup.write_bytes(prior)

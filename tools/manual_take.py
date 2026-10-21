@@ -19,11 +19,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--seconds', type=float, default=30)
     ap.add_argument('--headless', action='store_true')
+    ap.add_argument('--immediate', action='store_true', help='Record the current ROM from launch, without fixture preparation or countdown')
     args = ap.parse_args()
     ffmpeg = shutil.which('ffmpeg')
     if not ffmpeg:
         raise RuntimeError('FFmpeg is missing from PATH')
-    folder = ROOT/'recordings/manual'
+    folder = ROOT/('recordings' if args.immediate else 'recordings/manual')
     folder.mkdir(parents=True, exist_ok=True)
     output = folder/('take-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
     rom = ROOT/'build/GAYBOY.gb'
@@ -54,27 +55,31 @@ p{margin:10px}#status{color:#ffe66a}</style>
                 for(let type=0;type<3;type++)m._emulator_set_bw_palette_simple(e,type,
                     0xffe0ffbf,0xffb1dc65,0xff798b20,0xff3a3f07);
             }''', list(rom.read_bytes()))
-            p = SameBoy(page, symbols)
-            for _ in range(2800):
+            if not args.immediate:
+                p = SameBoy(page, symbols)
+                for _ in range(2800):
+                    p.tick()
+                    if p.memory[symbols['_introready']]:
+                        break
+                p.button_press('start')
+                for _ in range(1800):
+                    p.tick()
+                    if not p.memory[symbols['_introactive']] and p.memory[symbols['_page']]==8:
+                        break
+                assert p.memory[symbols['_page']]==8
+                p.button_release('start')
+                p.tick(50)
+                workflow = NativeIntroDemo(p, symbols)
+                for _ in workflow.prepare():
+                    p.tick()
                 p.tick()
-                if p.memory[symbols['_introready']]:
-                    break
-            p.button_press('start')
-            for _ in range(1800):
-                p.tick()
-                if not p.memory[symbols['_introactive']] and p.memory[symbols['_page']]==8:
-                    break
-            assert p.memory[symbols['_page']]==8
-            p.button_release('start')
-            p.tick(50)
-            workflow = NativeIntroDemo(p, symbols)
-            for _ in workflow.prepare():
-                p.tick()
-            p.tick()
-            assert workflow.v('seqplaying') and workflow.v('seqtrack')==1
+                assert workflow.v('seqplaying') and workflow.v('seqtrack')==1
             page.add_script_tag(path=str(ROOT/'tools/manual_take_player.js'))
             page.bring_to_front()
-            print('Demo ready. Take starts in 3 seconds. Use the emulator keyboard controls.', flush=True)
+            page.evaluate('(immediate)=>{window.manualCountdown=immediate?0:3;}', args.immediate)
+            page.locator('p').last.inner_text()
+            page.locator('p').last.evaluate('(el,seconds)=>el.textContent=seconds+"-second capture: emulator display + stereo audio."', args.seconds)
+            print('RECORDING NOW: '+str(args.seconds)+' seconds. Arrows, X=A, Z=B, Space=Start, Shift=Select.' if args.immediate else 'Demo ready. Take starts in 3 seconds.', flush=True)
             with page.expect_download(timeout=(args.seconds+30)*1000) as download:
                 page.evaluate('(seconds)=>startManualTake(seconds)', args.seconds)
             download.value.save_as(str(output.with_suffix('.webm')))
@@ -84,7 +89,7 @@ p{margin:10px}#status{color:#ffe66a}</style>
         print('Recording complete. Saving MP4...', flush=True)
         encoded = subprocess.run([ffmpeg, '-hide_banner', '-loglevel', 'error', '-y',
             '-i', str(output.with_suffix('.webm')), '-t', str(args.seconds),
-            '-vf', 'fps=60,tpad=stop_mode=clone:stop_duration=1', '-af', 'apad',
+            '-vf', 'fps=30,tpad=stop_mode=clone:stop_duration=1', '-af', 'apad',
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '16', '-pix_fmt', 'yuv420p',
             '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
             str(output.with_suffix('.mp4'))], capture_output=True, text=True)

@@ -33,7 +33,7 @@ with sync_playwright() as p:
   rom.set([0xc3,0x50,0x01],0x100);rom.set([0xf3,0x18,0xfd],0x150);
   const ptr=m._malloc(rom.length);m.HEAPU8.set(rom,ptr);
   const e=m._emulator_new_simple(ptr,rom.length,48000,2048,2);
-  m._emulator_set_bw_palette_simple(e,0,0xffa1e8d5,0xff6dbb9c,0xff486545,0xff242d18);
+  m._emulator_set_bw_palette_simple(e,0,0xffffffff,0xffaaaaaa,0xff555555,0xff000000);
   function run(t){let event;do{event=m._emulator_run_until_f64(e,t)}while(!(event&4));}
   run(4194304*3);
   const write=(a,v)=>m._emulator_write_mem(e,a,v);
@@ -46,7 +46,7 @@ with sync_playwright() as p:
   m._emulator_delete(e);m._free(ptr);
   return [0,2,4,6].map(x=>bytes.slice(x*4,x*4+4));
  }''',URL)
- assert shades==[[213,232,161,255],[156,187,109,255],[69,101,72,255],[24,45,36,255]],shades
+ assert shades==[[255,255,255,255],[170,170,170,255],[85,85,85,255],[0,0,0,255]],shades
  page.evaluate('''()=>{const factory=SameBoyCore;window.SameBoyCore=async(...args)=>{
   const m=await factory(...args);window.qaCore=m;const create=m._emulator_new_simple;
   m._emulator_new_simple=(...args)=>{window.qaInstance=create(...args);return qaInstance;};return m;
