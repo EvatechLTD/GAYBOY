@@ -1,0 +1,130 @@
+DRUMSAMPLES: MAKING LOUD, PURPOSE-BUILT 4-BIT DRUM KITS
+Approved reference: SLAP808 and SLAM909, 2026-10-21
+
+DELIVERABLE AND PRIORITY
+
+Make the final 16-level waveform the instrument. Prioritize strong output,
+audible body, and useful frequency content over exact vintage reproduction.
+The user auditioned DIRECT4BIT/SLAP808 and DIRECT4BIT/SLAM909 and approved
+their sound. Preserve those exact packed bytes when integrating them.
+The earlier high-resolution synthesize.py experiment is not the reference.
+
+The working generator is DRUMSAMPLES/synthesize_4bit.py. It synthesizes
+integer oscillator and noise amplitudes, applies integer envelopes and
+mixing, and emits unsigned DAC codes 0..15 at 11468 samples per second.
+Floating-point phase and envelope calculations are control calculations;
+there is no high-resolution audio master to remaster or convert later.
+Integer mixing can exceed the DAC range internally, then the output stage
+saturates to the native 16 levels. That saturation is part of the sound.
+
+REPRODUCE THE APPROVED SOUND
+
+From the repository root, with Python and NumPy installed:
+  python DRUMSAMPLES/synthesize_4bit.py
+
+Outputs are in DRUMSAMPLES/DIRECT4BIT/SLAP808 and SLAM909. Each has eight
+packed hits, kit-bank.bin, kit.json, individual WAV auditions, and a hits-only
+audition. LISTEN-ALL-16-HITS-ONCE.wav plays both kits, every hit exactly once,
+with 400 ms between hits. audition-order.json records their start times.
+
+WAV is a normal 16-bit PCM playback container containing only 16 exact
+amplitude values: PCM = (2 * DAC_code - 15) * 2184. It adds no detail,
+normalization, EQ, mixing, or gain reduction. The .4bit and bank files are
+the actual four-bit assets. Constant code 8 is the engine's silence/padding
+convention; centered audition decoding has a small constant offset there.
+Hardware AC coupling/filtering is not simulated by these WAVs.
+
+SOUND DESIGN THAT MADE THESE HIT HARD
+
+1. Start with discrete sources. The reference uses a 32-position oscillator
+   lookup table with the 16 odd amplitudes -15,-13,...,+13,+15, plus generated
+   integer noise. Use a repeatable seed so comparisons are meaningful.
+   Integer noise differences provide brighter attacks. XOR combinations of
+   pulse oscillators give hats their metallic character.
+
+2. Give bass drums a substantial body. SLAP808 settles to 53 Hz and SLAM909
+   to 61 Hz, with a fast downward sweep (14 ms time constant), a quieter
+   second harmonic, and a roughly 3 ms noise click. Body envelope time
+   constants are 180 and 140 ms. The added harmonic helps the fundamental
+   remain perceptible on limited speakers. Exact sub-bass output depends
+   on the playback hardware; it cannot be guaranteed by peak normalization.
+
+3. Build snares from body plus noise. Combine a falling oscillator near
+   185 Hz, a quieter 335 Hz component, and a bright noise decay around
+   75 ms. The 909 variant uses more noise. Body prevents a thin noise-only
+   snare; the noise adds bite.
+
+4. Make hats and percussion fit the available bandwidth. Hat pulse sources
+   use approximately 421, 587, 823, 1249, 1853, and 2683 Hz before XOR mixing.
+   Hat decay constants are 21 ms closed and 105 ms open. Clap has bursts
+   at 0, 11, and 23 ms followed by a tail. Toms combine a swept fundamental
+   with a quieter 1.58-times partial. Cowbell uses 540/800 Hz pulse sources;
+   rim uses 830/1470/2270 Hz components and a short 24 ms decay.
+
+5. Spend amplitude on the body. The reference searches drive values
+   1, 1.25, 1.5, 1.8, 2.2, 2.7, and 3.3 before clamping to DAC codes.
+   Hard saturation increases average level and creates harmonics. Tiny
+   normalized transients followed by a weak tail are not the goal.
+   Four samples soften the leading edge; 96 samples taper the final tail.
+   The hit lengths are 480, 250, 85, 310, 240, 300, 230, and 170 ms.
+
+6. Evaluate the actual DAC codes. The reference ranks candidates by:
+     attack_RMS * useful_band_power_fraction ** 2
+   Measure the first 80 ms (or the whole hit if shorter), subtract its mean,
+   and calculate RMS. For band power, use a Hann-windowed FFT. Bands are:
+     kick       35..450 Hz
+     snare     140..4400 Hz
+     hats     1800..5000 Hz
+     clap      700..4400 Hz
+     low tom    80..600 Hz
+     high tom  120..850 Hz
+     percussion 400..3200 Hz
+   This favors loudness with energy in the intended region. It is a small
+   heuristic search, not a global optimum or a perceptual loudness standard.
+   Most approved hits selected drive 3.3; the 808 cowbell selected 2.2.
+   Do not silently extend the search and replace approved sounds.
+
+7. Listen before accepting. Audition native-level hits once each, without
+   a backing track, limiting, or post-conversion processing. Then check
+   them in the actual engine, including overlapping voices and velocities.
+   The 5734 Hz Nyquist limit still applies. Discrete pulse synthesis and
+   saturation create aliasing; this reference accepts some grit for impact.
+   Brightness bands in the score are not a promise of band-limited audio.
+
+PACKING AND MAIN INTEGRATION
+
+Pad each hit to a multiple of 32 samples with code 8. Rotate EACH 32-sample
+frame right by one position for the existing DMG wave-RAM traversal, then
+pack the earlier code in the high nibble and the next code in the low nibble.
+Do not rotate the whole hit as one array. Reverse the per-frame rotation
+when comparing packed bytes to the logical audition waveform.
+
+Eight slots: kick, snare, closed hat, open hat, clap, low tom, high tom,
+cowbell/rim. Two legacy unused sample rows share a 16-byte 0x88 silence
+block. Each approved kit occupies 11920 bytes. Offsets and lengths in
+kit.json are byte counts; samples is the unpadded sample count.
+
+Main IDs: 6 = SLAP808 in ROM bank 39; 7 = SLAM909 in ROM bank 62.
+Existing kit IDs remain unchanged. The generated kit arrays have seven
+rows, excluding Amen. The selector includes Amen plus all seven kits.
+The interrupt fetch path requires every machine kit's data to start at
+the same CPU address as drumdata32; tools/check_rom.py enforces this.
+
+To regenerate the integration sources from approved packed assets:
+  python tools/make_drum_samples.py
+To rebuild and check the kit integration:
+  python tools/build_rom.py
+  python tools/test_kits.py
+
+make_iconic_kits.py reads the new banks directly from their .bin/.4bit
+assets, validates hit ranges, and writes metadata and generated C arrays.
+It does not send these kits through the legacy WAV mastering chain.
+Normal builds use the checked-in generated C sources. The ROM output is
+build/GAYBOY.gb. Kit tests verify all 56 auditions, exact source-to-ROM
+bank bytes, fetched sample blocks, full-level single-hit output, selector
+wraparound back to Amen, and return to the drum roll.
+
+For future kits, reserve free ROM space, extend selector and metadata,
+update generic and banked fetch dispatch, build inputs, bank-alignment
+checks, and the audition regression. Keep the packed files as the source
+of truth. Avoid changing approved sample timbre during integration.

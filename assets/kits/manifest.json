@@ -318,5 +318,117 @@
     "prepared": "assets\\kits\\5-8-DMXRim.wav",
     "samples": 1233,
     "mastering": "lsbatch-punch-v3"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 1,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\01-KICK.4bit",
+    "samples": 5505,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 2,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\02-SNARE.4bit",
+    "samples": 2867,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 3,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\03-CLOSED_HAT.4bit",
+    "samples": 975,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 4,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\04-OPEN_HAT.4bit",
+    "samples": 3555,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 5,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\05-CLAP.4bit",
+    "samples": 2752,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 6,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\06-LOW_TOM.4bit",
+    "samples": 3440,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 7,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\07-HIGH_TOM.4bit",
+    "samples": 2638,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAP808",
+    "slot": 8,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAP808\\08-COWBELL.4bit",
+    "samples": 1950,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 1,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\01-KICK.4bit",
+    "samples": 5505,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 2,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\02-SNARE.4bit",
+    "samples": 2867,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 3,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\03-CLOSED_HAT.4bit",
+    "samples": 975,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 4,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\04-OPEN_HAT.4bit",
+    "samples": 3555,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 5,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\05-CLAP.4bit",
+    "samples": 2752,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 6,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\06-LOW_TOM.4bit",
+    "samples": 3440,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 7,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\07-HIGH_TOM.4bit",
+    "samples": 2638,
+    "mastering": "direct-4bit-v1"
+  },
+  {
+    "kit": "SLAM909",
+    "slot": 8,
+    "prepared": "DRUMSAMPLES\\DIRECT4BIT\\SLAM909\\08-RIM.4bit",
+    "samples": 1950,
+    "mastering": "direct-4bit-v1"
   }
 ]

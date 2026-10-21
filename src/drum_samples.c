@@ -43,6 +43,8 @@ void drum_fetch33(uint16_t offset,uint8_t *dst) BANKED;
 void drum_fetch34(uint16_t offset,uint8_t *dst) BANKED;
 void drum_fetch35(uint16_t offset,uint8_t *dst) BANKED;
 void drum_fetch36(uint16_t offset,uint8_t *dst) BANKED;
+void drum_fetch39(uint16_t offset,uint8_t *dst) BANKED;
+void drum_fetch62(uint16_t offset,uint8_t *dst) BANKED;
 void kits_label(uint8_t row,uint8_t *dst) BANKED;
 void drum_fast190(void) BANKED;
 void drum_fast200(void) BANKED;
@@ -51,7 +53,9 @@ void drum_fast330(void) BANKED;
 void drum_fast340(void) BANKED;
 void drum_fast350(void) BANKED;
 void drum_fast360(void) BANKED;
-void drum_fetch0(void) BANKED {uint8_t bank=*(uint8_t *)0xac4b;if(bank==32){drum_fast320();return;}if(bank==33){drum_fast330();return;}if(bank==34){drum_fast340();return;}if(bank==35){drum_fast350();return;}if(bank==36){drum_fast360();return;}if(bank==19)drum_fast190();else if(bank==20)drum_fast200();else drum_fast160();}
+void drum_fast390(void) BANKED;
+void drum_fast620(void) BANKED;
+void drum_fetch0(void) BANKED {uint8_t bank=*(uint8_t *)0xac4b;if(bank==32){drum_fast320();return;}if(bank==33){drum_fast330();return;}if(bank==34){drum_fast340();return;}if(bank==35){drum_fast350();return;}if(bank==36){drum_fast360();return;}if(bank==39){drum_fast390();return;}if(bank==62){drum_fast620();return;}if(bank==19)drum_fast190();else if(bank==20)drum_fast200();else drum_fast160();}
 void drum_fast191(void) BANKED;
 void drum_fast201(void) BANKED;
 void drum_fast321(void) BANKED;
@@ -59,6 +63,8 @@ void drum_fast331(void) BANKED;
 void drum_fast341(void) BANKED;
 void drum_fast351(void) BANKED;
 void drum_fast361(void) BANKED;
-void drum_fetch1(void) BANKED {uint8_t bank=*(uint8_t *)0xac4c;if(bank==32){drum_fast321();return;}if(bank==33){drum_fast331();return;}if(bank==34){drum_fast341();return;}if(bank==35){drum_fast351();return;}if(bank==36){drum_fast361();return;}if(bank==19)drum_fast191();else if(bank==20)drum_fast201();else drum_fast161();}
-void drum_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) BANKED {if(bank==32){drum_fetch32(offset,dst);return;}if(bank==33){drum_fetch33(offset,dst);return;}if(bank==34){drum_fetch34(offset,dst);return;}if(bank==35){drum_fetch35(offset,dst);return;}if(bank==36){drum_fetch36(offset,dst);return;}if(bank==19)drum_fetch19(offset,dst);else if(bank==20)drum_fetch20(offset,dst);else memcpy(dst,drumdata16+offset,16); }
+void drum_fast391(void) BANKED;
+void drum_fast621(void) BANKED;
+void drum_fetch1(void) BANKED {uint8_t bank=*(uint8_t *)0xac4c;if(bank==32){drum_fast321();return;}if(bank==33){drum_fast331();return;}if(bank==34){drum_fast341();return;}if(bank==35){drum_fast351();return;}if(bank==36){drum_fast361();return;}if(bank==39){drum_fast391();return;}if(bank==62){drum_fast621();return;}if(bank==19)drum_fast191();else if(bank==20)drum_fast201();else drum_fast161();}
+void drum_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) BANKED {if(bank==32){drum_fetch32(offset,dst);return;}if(bank==33){drum_fetch33(offset,dst);return;}if(bank==34){drum_fetch34(offset,dst);return;}if(bank==35){drum_fetch35(offset,dst);return;}if(bank==36){drum_fetch36(offset,dst);return;}if(bank==39){drum_fetch39(offset,dst);return;}if(bank==62){drum_fetch62(offset,dst);return;}if(bank==19)drum_fetch19(offset,dst);else if(bank==20)drum_fetch20(offset,dst);else memcpy(dst,drumdata16+offset,16); }
 void drum_label(uint8_t row,uint8_t *dst) BANKED {if(drumkit){kits_label(row,dst);return;}memcpy(dst,drumlabels+(uint16_t)row*48,48); }

@@ -28,5 +28,5 @@ memory = audit(Path('build/GAYBOY.gb'))
 print('Engine reserves verified: %d bytes WRAM, %d bytes stack; bank zero excluded from song storage' %
       (memory['wram_unused_below_audio_tables_bytes'], memory['stack_reserved_bytes']))
 
-for bank in range(32,37):
+for bank in [32,33,34,35,36,39,62]:
  assert (s['_drumdata'+str(bank)]&65535)==(s['_drumdata32']&65535), 'PCM fast fetch requires bank-aligned kit data'

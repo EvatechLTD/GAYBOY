@@ -50,9 +50,25 @@ for k,(title,directory,files) in enumerate(kitdefs):
  offs += [len(banks[bank])]*2;lens += [16]*2;banks[bank]+=[136]*16
  assert len(banks[bank])<16300,(title,len(banks[bank]))
  metadata.append(([bank]*10,offs,lens))
+# Direct 4-bit kits are approved packed assets: never remaster through WAV.
+kit_banks = [32,33,34,35,36,39,62]
+for title, bank in [('SLAP808',39),('SLAM909',62)]:
+ folder=root/'DRUMSAMPLES/DIRECT4BIT'/title
+ kit=json.loads((folder/'kit.json').read_text())
+ data=(folder/'kit-bank.bin').read_bytes()
+ assert kit['rate']==11468 and kit['bits']==4 and len(data)==kit['bytes']<16300
+ banks[bank]=list(data)
+ offs=[sound['offset'] for sound in kit['sounds']]+[row['offset'] for row in kit['unused_rows']]
+ lens=[sound['length'] for sound in kit['sounds']]+[row['length'] for row in kit['unused_rows']]
+ assert len(offs)==len(lens)==10
+ for sound in kit['sounds']:
+  packed=(folder/(f"{sound['slot']:02d}-{sound['role']}.4bit")).read_bytes()
+  assert data[sound['offset']:sound['offset']+sound['length']]==packed
+  manifest.append(dict(kit=title,slot=sound['slot'],prepared=str((folder/(f"{sound['slot']:02d}-{sound['role']}.4bit")).relative_to(root)),samples=sound['samples'],mastering='direct-4bit-v1'))
+ metadata.append(([bank]*10,offs,lens))
 kitmeta=''
 for i,(name,typ) in enumerate([('bank','uint8_t'),('offset','uint16_t'),('length','uint16_t')]):
- kitmeta+=f'const {typ} kit{name}[5][10]={{'+','.join('{'+arr(m[i])+'}' for m in metadata)+'};\n'
+ kitmeta+=f'const {typ} kit{name}[{len(metadata)}][10]={{'+','.join('{'+arr(m[i])+'}' for m in metadata)+'};\n'
  kitmeta+=f'#define drum{name} (drumkit?kit{name}[drumkit-1]:amen{name})\n'
 (prepared/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 

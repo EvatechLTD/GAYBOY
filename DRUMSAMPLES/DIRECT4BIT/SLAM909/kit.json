@@ -1,0 +1,108 @@
+{
+  "name": "SLAM909",
+  "rate": 11468,
+  "bits": 4,
+  "method": "integer oscillators, integer envelopes, discrete noise; select drive by scoring final DAC codes",
+  "packing": "high nibble first; 32-sample frames rotated right one",
+  "bytes": 11920,
+  "sounds": [
+    {
+      "slot": 1,
+      "role": "KICK",
+      "offset": 0,
+      "length": 2768,
+      "samples": 5505,
+      "drive": 3.3,
+      "attack_rms_dbfs": -1.62,
+      "attack_useful_band_power_fraction": 0.9827,
+      "candidate_count": 7
+    },
+    {
+      "slot": 2,
+      "role": "SNARE",
+      "offset": 2768,
+      "length": 1440,
+      "samples": 2867,
+      "drive": 3.3,
+      "attack_rms_dbfs": -0.92,
+      "attack_useful_band_power_fraction": 0.6666,
+      "candidate_count": 7
+    },
+    {
+      "slot": 3,
+      "role": "CLOSED_HAT",
+      "offset": 4208,
+      "length": 496,
+      "samples": 975,
+      "drive": 3.3,
+      "attack_rms_dbfs": -3.71,
+      "attack_useful_band_power_fraction": 0.5282,
+      "candidate_count": 7
+    },
+    {
+      "slot": 4,
+      "role": "OPEN_HAT",
+      "offset": 4704,
+      "length": 1792,
+      "samples": 3555,
+      "drive": 3.3,
+      "attack_rms_dbfs": -0.08,
+      "attack_useful_band_power_fraction": 0.5238,
+      "candidate_count": 7
+    },
+    {
+      "slot": 5,
+      "role": "CLAP",
+      "offset": 6496,
+      "length": 1376,
+      "samples": 2752,
+      "drive": 3.3,
+      "attack_rms_dbfs": -2.62,
+      "attack_useful_band_power_fraction": 0.5638,
+      "candidate_count": 7
+    },
+    {
+      "slot": 6,
+      "role": "LOW_TOM",
+      "offset": 7872,
+      "length": 1728,
+      "samples": 3440,
+      "drive": 3.3,
+      "attack_rms_dbfs": -1.46,
+      "attack_useful_band_power_fraction": 0.9693,
+      "candidate_count": 7
+    },
+    {
+      "slot": 7,
+      "role": "HIGH_TOM",
+      "offset": 9600,
+      "length": 1328,
+      "samples": 2638,
+      "drive": 3.3,
+      "attack_rms_dbfs": -1.43,
+      "attack_useful_band_power_fraction": 0.9696,
+      "candidate_count": 7
+    },
+    {
+      "slot": 8,
+      "role": "RIM",
+      "offset": 10928,
+      "length": 976,
+      "samples": 1950,
+      "drive": 3.3,
+      "attack_rms_dbfs": -4.93,
+      "attack_useful_band_power_fraction": 0.9741,
+      "candidate_count": 7
+    }
+  ],
+  "unused_rows": [
+    {
+      "offset": 11904,
+      "length": 16
+    },
+    {
+      "offset": 11904,
+      "length": 16
+    }
+  ]
+}

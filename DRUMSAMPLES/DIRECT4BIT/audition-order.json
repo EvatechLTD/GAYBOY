@@ -1,0 +1,82 @@
+[
+  {
+    "kit": "SLAP808",
+    "hit": "KICK",
+    "start_seconds": 0.0
+  },
+  {
+    "kit": "SLAP808",
+    "hit": "SNARE",
+    "start_seconds": 0.88
+  },
+  {
+    "kit": "SLAP808",
+    "hit": "CLOSED_HAT",
+    "start_seconds": 1.53
+  },
+  {
+    "kit": "SLAP808",
+    "hit": "OPEN_HAT",
+    "start_seconds": 2.015
+  },
+  {
+    "kit": "SLAP808",
+    "hit": "CLAP",
+    "start_seconds": 2.725
+  },
+  {
+    "kit": "SLAP808",
+    "hit": "LOW_TOM",
+    "start_seconds": 3.3649
+  },
+  {
+    "kit": "SLAP808",
+    "hit": "HIGH_TOM",
+    "start_seconds": 4.0649
+  },
+  {
+    "kit": "SLAP808",
+    "hit": "COWBELL",
+    "start_seconds": 4.6949
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "KICK",
+    "start_seconds": 5.2649
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "SNARE",
+    "start_seconds": 6.1449
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "CLOSED_HAT",
+    "start_seconds": 6.7949
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "OPEN_HAT",
+    "start_seconds": 7.2799
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "CLAP",
+    "start_seconds": 7.9899
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "LOW_TOM",
+    "start_seconds": 8.6298
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "HIGH_TOM",
+    "start_seconds": 9.3298
+  },
+  {
+    "kit": "SLAM909",
+    "hit": "RIM",
+    "start_seconds": 9.9598
+  }
+]
