@@ -1,3 +1,4 @@
+extern __at (0xA433) uint8_t mixerfontdirty;
 #include "user_presets.h"
 #include "tones.h"
 /* Tile UI: 20x18, original 5x7 type, inverted chrome, differential VRAM writes. */
@@ -14,6 +15,7 @@ __at (0xACFF) uint8_t ui_loading_step;
 /* Never switch off the LCD or mask interrupts: only hide its background while
    a different page reuses the same tile graphics. Reveal after map publication. */
 void ui_transition_begin(void) BANKED {if(!ui_transition_hidden){HIDE_BKG;HIDE_SPRITES;ui_transition_hidden=1;}}
+uint8_t sticky_start;
 uint8_t auditionvoice=255,navopen,navchoice,navcategory,navblocked,repeataxis,repeatsteps,monoedit;
 uint8_t lastseqtrack=6;
 uint16_t repeatstart,repeatlast;
@@ -31,7 +33,7 @@ const char graychars[]="0123456789ACDEIKLNRSTUY";
 const char * const expnames[]={"ENGINE","WAVE ADSR","WAVE ATTACK","WAVE DECAY","WAVE SUSTAIN","WAVE RELEASE","BRIGHT","RES","FLT MOD","FLT SRC","PHASE DEPTH","PHASE RATE","DETUNE","CHR DEPTH","CHR RATE","NOTE DELAY","ECHO LEVEL","ECHO COUNT","ECHO PAN","ZOMBIE ADSR","CTRL RATE","DSP CUTOFF","DSP RES","AUDIO DELAY","DELAY MIX","FEEDBACK","SLEW"};
 
 const char * const voices[]={"PULSE1","PULSE2","WAVE1","NOISE"};
-const char * const pages[]={"LIVE","TONE","MOD","BANK","CC","TABLE","FX","MONOSYNTH","SEQUENCER","MASTURBATE","SEQ SETTINGS","P1","P2","WAVE1","WAVE2","NOISE","GLOBAL SETTINGS","DRUMSYNTH","MIXER","LOAD PATTERN","SAVE PATTERN","COPY","PASTE","KITS","LOAD SONG","SAVE SONG","CLEAR PATTERN","SYNC"};
+const char * const pages[]={"LIVE","TONE","MOD","BANK","CC","TABLE","FX","MONOSYNTH","SEQUENCER","MASTURBATE","SEQ SETTINGS","P1","P2","WAVE1","WAVE2","NOISE","SETTINGS","DRUMSYNTH","MIXER","LOAD PATTERN","SAVE PATTERN","COPY","PASTE","KITS","LOAD SONG","SAVE SONG","CLEAR PATTERN","SYNC"};
 const uint8_t channelmenu[5]={11,12,13,15,14};
 const uint8_t menuchannel[5]={0,1,2,4,3};
 const char * const mononames[]={"OCTAVE","LEVEL","ATTACK","DECAY","PW","WAVEFORM","PAN"};
@@ -81,8 +83,9 @@ void ui_restore_seq_tiles(void){extern uint8_t seqtilesready;uint8_t tile,y,c,v,
  for(tile=0;tile<12;tile++){mixfill();for(y=0;y<8;y++){v=tile<9?(y+tile>=8?126:0):tile==9?(y==3?255:0):y==1||y==6?126:y>1&&y<6?(tile==11?126:66):0;buf[y*2]=v;buf[y*2+1]=tile==9?0:v;}if(defer)memcpy(wavepixels+368+(uint16_t)tile*16,buf,16);else ui_upload_tile(192+tile,buf,0);}ui_font_upload_pending=defer;seqfontdirty=0;seqtilesready=0;previewshape=255;
 }
 
-void ui_render(void) BANKED {uint8_t i,n,start,inv;
+void ui_render(void) BANKED {uint8_t i,n,start,inv;if(page>=18)seqflushpending=1;
  if(navopen){HIDE_SPRITES;seqflushpending=1;ui_menu();return;}
+ {if(page!=18&&mixerfontdirty){if(page!=8)ui_restore_seq_tiles();mixerfontdirty=0;}}
  if(page!=8)HIDE_SPRITES;if(page!=8&&seqfontdirty)ui_restore_seq_tiles();
  if(tonepresetopen){tone_preset_render();return;}
  if(page==26){clear_render();return;}if(page==23){kits_render();return;}if(page==28){mixer_settings_render();return;}if(page==27){sync_render();return;}
@@ -126,7 +129,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
   if(edge&J_LEFT){navcategory=navcategory?navcategory-1:4;finder_first();dirty=1;}
   if(edge&J_RIGHT){navcategory=(navcategory+1)%5;finder_first();dirty=1;}
   if(edge&J_UP){finder_step(-1);dirty=1;}if(edge&J_DOWN){finder_step(1);dirty=1;}
-  if(edge&(J_START|J_A|J_B)){
+  if((edge&(J_A|J_B))||(sticky_start&&(edge&J_START))||(!sticky_start&&((lastpad&J_START)&&!(p&J_START)))){
    if(navchoice==255)return;
    navopen=0;seqdrawvalid=0;
    if(navchoice==45){page=28;mixer_settings_open();dirty=1;return;}
@@ -142,7 +145,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
  if(tonepresetopen){tone_preset_input(edge);return;}
  if((edge&J_START)&&page==16&&pageconfig==2){global_input(p,edge);return;}
  if((edge&J_START)&&((page==8&&seqpopup)||((page==8||page==10)&&genopen&&genrow>=8))){seq_input(p,edge);return;}
- if((edge&J_START)&&!navblocked){if(page==8||page==10)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();if(page==18){mixer_view_capture();mixer_prepare_cancel();}tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
+ if((edge&J_START)&&!navblocked){if(page==8)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();if(page==18){mixer_view_capture();mixer_prepare_cancel();}tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
 
  if(page==28){mixer_settings_input(p,edge);return;}if(page==27){sync_ui_input(p,edge);return;}if(page==23){kits_input(p,edge);return;}if(page>=18){mixer_input(p,edge);return;}if(page==17){eval_input(p,edge);return;}if(page==16){global_input(p,edge);return;}if(page==8||page==10){seq_input(p,edge);return;}
  if(page==2||selected<4&&(page==1||page==6)){eval_input(p,edge);return;}if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%4;choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}

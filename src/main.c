@@ -105,6 +105,7 @@ void midi(uint8_t b){if(syncmode&&sync_receive(b))return;midiage=12;if(b>=0xf8)r
 /* Frame-clock macros update pitch/duty without retriggering hardware envelopes. */
 uint8_t seq_native_supported(void) BANKED;
 void service_frame(void) BANKED;
+void roll_feedback_service(void) BANKED;
 void service(void){uint8_t b,budget=8;mixfill();while(rd!=wr&&budget--&&!seqnativelaunchfired){b=rx[rd++];midi(b);mixfill();}if(lastframe!=sys_time)service_frame();}
 void exp_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) NONBANKED {uint8_t saved=CURRENT_BANK;SWITCH_ROM(bank);memcpy(dst,(const void *)(0x4000+offset),16);SWITCH_ROM(saved);}
 extern uint16_t seqdeadline;
@@ -127,19 +128,20 @@ void mixfill(void){if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill(
    returning; the normal workstation timer is installed after the intro exits. */
 void intro_audio_tick(void);
 void intro_timer(void){uint8_t saved=CURRENT_BANK;SWITCH_ROM(21);intro_audio_tick();SWITCH_ROM(saved);}
+void mixer_fader_service(void) BANKED;
 void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();drum_init();startup();eval_defaults();ui_loading_begin();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
  disable_interrupts();padsampled=lastpad;add_VBL(input_vblank);add_SIO(link_serial_isr);add_TIM(engine_timer);SB_REG=0;SC_REG=0x80;set_interrupts(VBL_IFLAG|SIO_IFLAG|TIM_IFLAG);enable_interrupts();
  /* Preparation runs on Mixer; its private journal commit (phase18 atACB4)
     also finishes off-page. Avoid an idle bank round-trip on other pages. */
- *(uint8_t *)0xB4E3=0;lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();if(sparse_enabled)sparse_service();else if(page==18||link_ui_hold||*(volatile uint8_t *)0xACB4==18)mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
+ *(uint8_t *)0xA427=0;lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();if(sparse_enabled)sparse_service();else if(page==18||link_ui_hold||*(volatile uint8_t *)0xACB4==18)mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
  if(syncmode>1&&syncslave&&seqplaying)sync_advance(0);
  if(syncmode==1)link_service();
  if(mixer_layout_dirty&&!seqplaying)mixer_layout_service();
- if(padread==end){lastpad=p;if(!link_ui_hold){ui_input(p,0);if(p&&page!=18)seq_native_touch();}lastpad=p;}
- else while(padread!=padwrite){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;lastpad=p;if(!link_ui_hold||((p&J_SELECT)&&(edge&J_START))){ui_input(p,edge);if(page!=18)seq_native_touch();}lastpad=p;service();}
+ if(padread==end){if(!link_ui_hold){ui_input(p,0);if(p&&page!=18)seq_native_touch();}lastpad=p;}
+ else while(padread!=padwrite){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;if(!link_ui_hold||((p&J_SELECT)&&(edge&J_START))){ui_input(p,edge);if(page!=18)seq_native_touch();}lastpad=p;service();}
  if(!syncmode&&seqplaying&&!seqservicing&&seqirqdirty&&!seqirqready&&!seqirqfired){seqservicing=1;seq_irq_prepare();seqservicing=0;}
  /* Settings pages change on input. Periodic refresh is only for live views. */
- if(!link_ui_hold){if(!(page==18&&seqplaying&&sparse_enabled&&mx.pending<8)&&(dirty||(!navopen&&(page==0||page==9)&&!(++frame&3)))){dirty=0;ui_render();}ui_flush();}}
+ if(!link_ui_hold){if(!(page==18&&seqplaying&&sparse_enabled&&mx.pending<8)&&(dirty||(!navopen&&(page==0||page==9)&&!(++frame&3)))){dirty=0;ui_render();}ui_flush();if(page==8)roll_feedback_service();else if(page==18)mixer_fader_service();}}
  }
 }
 }

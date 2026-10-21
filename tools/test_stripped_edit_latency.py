@@ -30,16 +30,20 @@ def adjust(key):
     p.tick(80)
 
 def menu(item, button='a'):
-    press('start')
+    if v('sticky_start'):
+        press('start')
+    else:
+        p.button_press('start');p.tick(20)
     for _ in range(120):
-        if v('navopen'):
-            break
+        if v('navopen'):break
         p.tick(1)
     assert v('navopen')
-    put('navchoice', item)
-    press(button)
+    put('navchoice',item)
+    if v('sticky_start'):press(button)
+    else:p.button_release('start');p.tick(20)
     p.tick(20)
     assert not v('navopen')
+
 
 def row(tab, value):
     put('eval_tab', tab)

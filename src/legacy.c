@@ -6,7 +6,7 @@ void stocktable(uint8_t c,uint8_t n) BANKED {uint8_t i,b=stocktables[n];int8_t *
 /* Neutral APU instruments at boot. Browsing still loads the stock library. */
 const uint8_t startupvalues[26]={2,15,0,0,0,0,0,0,0,0,7,0,7,0,0,1,0,0,4,0,3,3,0,0,0,2};
 void startup(void) BANKED {uint8_t c,i;for(c=0;c<4;c++){load(c,c*10);memcpy(param[c],startupvalues,26);memset(mods[c],0,6);tablemode[c]=0;tablelen[c]=1;for(i=0;i<8;i++){tables[c][i][0]=0;tables[c][i][1]=c<2?(c?1:2):c==2?6:4;tables[c][i][2]=3;}edited[c]=1;held[c]=255;}
- param[1][0]=1;param[2][14]=6;param[3][1]=15;param[3][3]=3;master=0x77;route=0xFF;vin=0;globals();}
+ param[0][1]=param[1][1]=8;param[1][0]=1;param[2][14]=6;param[3][1]=15;param[3][3]=3;master=0x77;route=0xFF;vin=0;globals();}
 void enginepitch(void) BANKED {} void enginenote(uint8_t n,uint8_t v,uint8_t o) BANKED {(void)n;(void)v;(void)o;}
 void engineoff(uint8_t n) BANKED {(void)n;} void enginesustain(uint8_t on) BANKED {(void)on;}
 void engineframe(void) BANKED {} void engineset(uint8_t mode) BANKED {(void)mode;}

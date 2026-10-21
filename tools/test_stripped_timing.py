@@ -55,7 +55,10 @@ try:
     hits=[];p.hook_register(0,S['_play'],lambda _:hits.append(p._cycles()) if p.register_file.A==0 else None,None)
     p.button_press('select');press('a');p.button_release('select');p.tick(30);assert get('seqplaying')
     reports={}
-    for phase in ('idle','navigation'):
+    for phase in (('idle','navigation','editing') if '--editing' in sys.argv else ('idle','navigation')):
+        if phase=='editing':
+            put('seqtrack',6);put('drumrow',2);put('seqcursor',0,6);put('seqdrawvalid',0);put('dirty',1);p.tick(180)
+            p.button_press('b');p.tick(6)
         hits.clear()
         for i in range(240):
             if phase=='navigation':
@@ -63,13 +66,19 @@ try:
                 if i%12==2:p.button_release('right')
                 if i%24==4:p.button_press('up')
                 if i%24==6:p.button_release('up')
+            if phase=='editing':
+                if i%24==0:p.button_press('right')
+                if i%24==6:p.button_release('right')
+                if i%24==12:p.button_press('left')
+                if i%24==18:p.button_release('left')
             p.tick(1)
+        if phase=='editing':p.button_release('b');p.tick(6)
         intervals=np.diff(hits)/4194304*1000;assert len(intervals)>=6,intervals
         expected=125 if mode else 500
         reports[phase+'_max_error_ms']=float(abs(intervals-expected).max())
         reports[phase+'_intervals_ms']=intervals.tolist()
     reports['mode']='arp' if mode else 'mono';reports['pcm_underruns']=word('mixunderruns')
-    Path(('build/stripped-baseline/' if '--baseline' in sys.argv else 'build/')+'stripped-timing-'+reports['mode']+('-dense' if '--dense' in sys.argv else '')+'.json').write_text(json.dumps(reports,indent=2))
+    Path(('build/stripped-baseline/' if '--baseline' in sys.argv else 'build/')+'stripped-timing-'+reports['mode']+('-dense' if '--dense' in sys.argv else '')+('-editing' if '--editing' in sys.argv else '')+'.json').write_text(json.dumps(reports,indent=2))
     print('Measured baseline playback timing' if '--baseline' in sys.argv else 'PASS: playback timing',reports)
-    assert ('--baseline' in sys.argv or reports['navigation_max_error_ms']<25) and reports['pcm_underruns']<5
+    assert ('--baseline' in sys.argv or reports['navigation_max_error_ms']<25) and reports['pcm_underruns']<5 and reports.get('editing_max_error_ms',0)<25
 finally:p.stop(save=False)

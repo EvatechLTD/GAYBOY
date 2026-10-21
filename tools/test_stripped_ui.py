@@ -30,16 +30,20 @@ def adjust(key):
     p.tick(80)
 
 def menu(item, button='a'):
-    press('start')
+    if v('sticky_start'):
+        press('start')
+    else:
+        p.button_press('start');p.tick(20)
     for _ in range(120):
-        if v('navopen'):
-            break
+        if v('navopen'):break
         p.tick(1)
     assert v('navopen')
-    put('navchoice', item)
-    press(button)
-    p.tick(20)
+    put('navchoice',item)
+    if v('sticky_start'):press(button)
+    else:p.button_release('start');p.tick(20)
+    p.tick(180)
     assert not v('navopen')
+
 
 def row(tab, value):
     put('eval_tab', tab)
@@ -60,7 +64,7 @@ try:
     assert bytes(v('pool_root',i) for i in range(4))==b'GSR1'
     menu(2);assert 'MOD' in line(0)
     row(1,5);adjust('up');assert v('globalmod',5)==1
-    menu(11);row(0,4);put('eval_col',1);put('dirty',1);p.tick(40)
+    menu(11);row(0,5);put('eval_col',1);put('dirty',1);p.tick(40)
     adjust('down');assert v('evalpatch',9)==255
     assert 'FINE' in text(40) and 'LFO WAVE' not in text(40)
     p.screen.image.save('build/stripped-tone.png')
@@ -71,9 +75,9 @@ try:
     assert sum(v('seqeventcounts',i) for i in range(14))>0,[(name,v(name)) for name in ('seqtrack','seqhead','seqapending','page','navopen')]
     menu(18);p.tick(120)
     p.screen.image.save('build/stripped-mixer.png')
-    assert line(4).strip()=='P1 P2 WV  N DR KIK',line(4)
-    assert line(7)[0]=='V' and 'VOL' not in line(7),line(7)
-    assert '5 PATTERNS' in line(13),line(13)
+    assert line(2).strip()=='P1 P2 WV  N DR NHH',line(2)
+    assert line(5)[0]=='V' and 'VOL' not in line(5),line(5)
+    assert '5 PATTERNS' in line(14),line(14)
     assert v('sparse_patterns')==5
     print('PASS: fresh blank project, global MOD page, inline fine controls, note plotting, and reduced mixer')
 finally:

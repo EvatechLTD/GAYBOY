@@ -19,7 +19,7 @@ try:
  assert sum(v('seqeventcounts',i) for i in range(14))>0
  assert changes and saves,'Note edit must still be saved'
  report['note_edit_saved']=True
- menu(11);row(0,4);put('eval_col',0);adjust('up');assert v('finepitch')==1
+ menu(11);row(0,4 if args.baseline else 5);put('eval_col',0);adjust('up');assert v('finepitch')==1
  assert changes and saves
  print(json.dumps(report,indent=2))
  if args.output:Path(args.output).write_text(json.dumps(report,indent=2)+'\n')

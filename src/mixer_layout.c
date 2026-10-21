@@ -6,8 +6,8 @@
 #include "sparse_store.h"
 #include "link_control.h"
 extern uint8_t mixer_hidden[8],layout_cursor,mixer_device;
-extern uint8_t mixer_layout_dirty;
-void mixer_layout_load(void) BANKED {memset(mixer_hidden,0,8);linkpair=mixer_device=0;if(pool_root[118]=='M'){memcpy(mixer_hidden,pool_root+110,8);linkpair=pool_root[120]==1;mixer_device=pool_root[121]==1;}mixer_layout_dirty=0;}
+extern uint8_t mixer_layout_dirty,sticky_start;
+void mixer_layout_load(void) BANKED {memset(mixer_hidden,0,8);linkpair=mixer_device=0;if(pool_root[118]=='M'){memcpy(mixer_hidden,pool_root+110,8);linkpair=pool_root[120]==1;mixer_device=pool_root[121]==1;}eval_hidden=pool_root[122]=='V'?pool_root[123]:128;sticky_start=pool_root[124]==1;mixer_layout_dirty=0;}
 void mixer_layout_service(void) BANKED {memcpy(pool_root+110,mixer_hidden,8);pool_root[118]='M';pool_root[119]=1;pool_root[120]=linkpair;pool_root[121]=mixer_device;if(pool_commit())mixer_layout_dirty=0;}
 static const char * const linked_tracks[7]={"P3","P4","W3","N2","M2","W4","D2"};
 static const char * const tracks[7]={"P1","P2","WV","N","","","DR"};
@@ -16,7 +16,7 @@ static void text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canva
 static void num(uint8_t x,uint8_t y,uint8_t n,uint8_t inv){char s[4];s[0]='0'+n/100;s[1]='0'+n/10%10;s[2]='0'+n%10;s[3]=0;text(x,y,s,inv);}
 void mixer_layout_render(void) BANKED{uint8_t i,start=layout_cursor>5?layout_cursor-5:0;char label[17];if(start>8)start=8;
  memset(canvas,0,360);memset(canvas,96,20);text(0,0,mx.focus==5?"LINK LAYOUT":"LOCAL LAYOUT",1);
- for(i=start;i<start+10;i++){uint8_t row=3+i-start,id=i<4?i:i+2;num(0,row,i+1,layout_cursor==i);
+ for(i=start;i<start+10;i++){uint8_t row=3+i-start,id=i<4?i:i==4?6:i<8?i+12:i-1;num(0,row,i+1,layout_cursor==i);
   if(id<7)text(4,row,mx.focus==5?linked_tracks[id]:tracks[id],layout_cursor==i);
   else if(id<20)text(4,row,mixer_drum_name(mx.focus==5?linkmirror.kit:drumkit,id-7),layout_cursor==i);
   else {if(mx.focus==5){memcpy(label,linkmirror.names[i-20],16);label[16]=0;}else getname(i-20,label);text(4,row,label[0]?label:"PAD",layout_cursor==i);}

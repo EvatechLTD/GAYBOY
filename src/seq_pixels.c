@@ -360,6 +360,7 @@ static uint8_t roll_box_mask(uint8_t left,uint8_t right,uint8_t x){
  return (uint8_t)(255>>(left>x?left-x:0))&(uint8_t)(255<<(right<end?end-right:0));
 }
 static void roll_xor_tile(uint8_t *pixels,uint8_t mask) __naked { __asm
+ push bc
  ld h,d
  ld l,e
  ld c,a
@@ -370,6 +371,7 @@ selection_xor$:
  ld (hl+),a
  dec b
  jr nz,selection_xor$
+ pop bc
  ret
  __endasm; }
 /* AF00..AFEF is the onset/drum event staging area. Selection-only gestures
@@ -664,3 +666,7 @@ void roll_commit(void) BANKED {uint8_t group,n,bits,tile;uint16_t address;if(!ro
  }
  memset(rollpending,0,15);rollreplace=rollbuilding=0;
 }
+
+/* Small banked entry points keep edit feedback out of the full renderer bank. */
+void roll_feedback_begin(void) BANKED {seqtileoverflow=0;rollbuilding=1;rollreplace=rollpinslazy=0;memset(rollpending,0,15);roll_selection_pins();roll_pin_bases();}
+uint8_t roll_feedback_intern(uint8_t *pixels) BANKED {return roll_intern(pixels);}

@@ -57,8 +57,8 @@ void global_set(uint8_t enabled) BANKED {
  route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}globals();
  cursor[1]=0;seqdrawvalid=0;dirty=1;
 }
-void global_render(void) BANKED {if(pageconfig)page_menu_settings_render();else eval_global_render();}
-void global_input(uint8_t p,uint8_t edge) BANKED {if(pageconfig)page_menu_settings_input(p,edge);else eval_global_input(p,edge);}
+void global_render(void) BANKED {if(pageconfig==1||pageconfig==2)page_menu_settings_render();else eval_global_render();}
+void global_input(uint8_t p,uint8_t edge) BANKED {if(pageconfig==1||pageconfig==2)page_menu_settings_input(p,edge);else eval_global_input(p,edge);}
 void modulate(void) BANKED {}
 void eval_native_footer(uint8_t id) BANKED;
 void native_render(void) BANKED {
@@ -102,7 +102,7 @@ void service_frame(void) BANKED {uint16_t now,delta;__critical {now=sys_time;}
 extern volatile uint8_t padqueue[32],padwrite,padread;
 extern uint8_t lastpad;
 void mixer_poll_input(void) BANKED {uint8_t p,edge;
- if(page!=18||navopen||link_ui_hold||mx.focus<30||mx.focus>=38||seqservicing||*(uint8_t *)0xB4E3||padread==padwrite)return;
+ if(page!=18||navopen||link_ui_hold||mx.focus<30||mx.focus>=38||seqservicing||*(uint8_t *)0xA427||padread==padwrite)return;
  p=padqueue[padread];if(p&(J_START|J_SELECT))return;
- padread=(padread+1)&31;edge=p&~lastpad;lastpad=p;ui_input(p,edge);
+ padread=(padread+1)&31;edge=p&~lastpad;ui_input(p,edge);lastpad=p;
 }

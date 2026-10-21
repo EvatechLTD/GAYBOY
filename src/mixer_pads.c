@@ -24,7 +24,7 @@ static uint8_t hidden(void){uint8_t *p=mixer_hidden+(MIXER_LINK_VIEW?4:0);return
 static uint8_t queued(void){return MIXER_LINK_VIEW?linkmirror.pending:mx.pending;}
 static void text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+(uint16_t)y*20+x;while(*s&&x++<20)*d++=*s++-32+(inv?96:0);}
 static void padmap(uint8_t slot,uint8_t bank){uint8_t row,x,col=column(slot),ids[4];uint16_t at;if(col==255)return;
- for(row=0;row<2;row++){at=(uint16_t)(14+row)*20+col;for(x=0;x<4;x++){ids[x]=padtile(row*20+col+x,bank);visible[at+x]=canvas[at+x]=ids[x];}ui_upload_map(0x9800U+(uint16_t)(14+row)*32+col,ids,4);mixfill();}
+ for(row=0;row<2;row++){at=(uint16_t)(15+row)*20+col;for(x=0;x<4;x++){ids[x]=padtile(row*20+col+x,bank);visible[at+x]=canvas[at+x]=ids[x];}ui_upload_map(0x9800U+(uint16_t)(15+row)*32+col,ids,4);mixfill();}
 }
 void mixer_pad_restore(void) BANKED {if(padflash_off){padflash_off=0;padmap(padflash_slot,padbank);}}
 void mixer_tick(void) BANKED {uint8_t off,q=queued();if(navopen){padflash_off=0;return;}
@@ -71,11 +71,11 @@ void mixer_pads_render(void) BANKED {uint8_t i,j,n=0,pg=0,mask=hidden(),active=M
  if(q!=play)toggle(q);toggle(play);
  pad_names_valid=1;cachedpage=pg;cachedmask=mask;cacheddevice=!!MIXER_LINK_VIEW;cachedfocus=focus;pad_image_playing=play;pad_image_queued=q;padflash_slot=q;padflash_started=sys_time;mx.padcache=MIXER_LINK_VIEW?(linkmirror.slot==active&&linkmirror.pending==q):(mx.slot==active&&mx.pending==q);if(!mx.padcache)dirty=1;
  publish:
- memset(canvas+13*20,0,20);text(0,13,MIXER_LINK_VIEW?"LINKED":"LOCAL",0);text(9,13,"5 PATTERNS",0);
- if(play<8&&column(play)==255)text(14,13,"P>",0);if(q<8&&column(q)==255)text(17,13,"Q>",0);
- for(i=0;i<50;i++)canvas[14*20+i]=padtile(i,padbank);
- if(padflash_off&&q<8){uint8_t col=column(q);if(col!=255)for(i=0;i<2;i++)for(j=0;j<4;j++)canvas[(uint16_t)(14+i)*20+col+j]=padtile(i*20+col+j,padbank^1);}
- memset(canvas+20,0,20);if(mx.focus>=30&&mx.focus<38){i=mx.focus-30;memset(name,0,17);if(MIXER_LINK_VIEW)memcpy(name,linkmirror.names[i],16);else getname(i,name);name[16]=0;text(0,1,name,0);}
+ memset(canvas+14*20,0,20);text(0,14,MIXER_LINK_VIEW?"LINKED":"LOCAL",0);text(9,14,"5 PATTERNS",0);
+ if(play<8&&column(play)==255)text(14,14,"P>",0);if(q<8&&column(q)==255)text(17,14,"Q>",0);
+ for(i=0;i<40;i++)canvas[15*20+i]=padtile(i,padbank);
+
+ if(padflash_off&&q<8){uint8_t col=column(q);if(col!=255)for(i=0;i<2;i++)for(j=0;j<4;j++)canvas[(uint16_t)(15+i)*20+col+j]=padtile(i*20+col+j,padbank^1);}
  if(!n)text(0,16,"ALL PADS HIDDEN",0);
 }
 

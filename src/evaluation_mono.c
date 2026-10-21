@@ -5,13 +5,26 @@
 #include "sequencer_limits.h"
 static void text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+(uint16_t)y*20+x;while(*s&&x++<20)*d++=*s++-32+(inv?96:0);}
 #include "mixer_shared.h"
-extern uint8_t mixer_layout_dirty;
+extern uint8_t mixer_layout_dirty,sticky_start;
 static const char * const names[]={"PULSE1","PULSE2","WAVE","NOISE","MONOSYNTH","HIHAT","SNARE","PULSEKICK"};
 static int16_t delta(uint8_t edge){return edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;}
 static void tip(const char *a,const char *b){text(0,16,a,0);text(0,17,b,0);}
 void eval_status(void) BANKED {if(seqvelocityhidden){memset(canvas+340,0,20);text(0,17,seqeventfull?"PATTERN FULL":eval_message==1?"VOICE FULL: DIM OFF":eval_message==2?"MONO: LOWEST PLAYS":seqmuted&(1<<seqtrack)?"TRACK MUTED":seqplaying?"SELECT+A TO STOP":"SELECT+A TO PLAY",0);}}
-void eval_global_render(void) BANKED {uint8_t i;static const uint8_t tracks[]={0,1,2,3,6};memset(canvas,0,360);memset(canvas,96,20);text(0,0,"GLOBAL SETTINGS",1);text(0,3,"PAGE MENU",eval_row==0);for(i=0;i<5;i++){text(0,5+i,names[tracks[i]],eval_row==i+1);text(14,5+i,eval_hidden&(1<<tracks[i])?"HIDE":"SHOW",eval_row==i+1);}text(0,12,"WAVEFORMS",eval_row==6);text(15,12,eval_hidden&128?"OFF":"ON",eval_row==6);tip(eval_row==6?"SHOW WAVE PREVIEWS":eval_row?"HIDE SEQUENCER PAGE":"CUSTOMIZE PAGE MENU","A/B OR HOLD+ARROWS");}
-void eval_global_input(uint8_t p,uint8_t edge) BANKED {static const uint8_t tracks[]={0,1,2,3,6};int16_t d=delta(edge);uint8_t mask;if(!(p&(J_A|J_B))){if(edge&J_UP)eval_row=eval_row?eval_row-1:6;if(edge&J_DOWN)eval_row=(eval_row+1)%7;}else if(edge&(J_A|J_B)||d){if(!eval_row){pageconfig=1;}else{mask=eval_row==6?128:1<<tracks[eval_row-1];if(!d)eval_hidden^=mask;else if(d>0)eval_hidden&=~mask;else eval_hidden|=mask;previewshape=255;if(sparse_enabled==1){pool_root[122]='V';pool_root[123]=eval_hidden;mixer_layout_dirty=1;}}}dirty=1;}
+static const uint8_t settings_tracks[5]={0,1,2,3,6};
+static void settings_store_visibility(void){pool_root[122]='V';pool_root[123]=eval_hidden;mixer_layout_dirty=1;}
+void eval_global_render(void) BANKED {uint8_t i;static const char * const seqnames[]={"PULSE1","PULSE2","WAVE","NOISE","DRUMSYNTH"};static const char * const labels[]={"MIXER SETTINGS","QUICK MENU","SYNC","SEQ PAGES","WAVEFORMS","STICKY START"};static const uint8_t rows[]={3,5,7,9,12,14};
+ memset(canvas,0,360);memset(canvas,96,20);text(0,0,pageconfig==3?"SEQ PAGES":"SETTINGS",1);
+ if(pageconfig==3){for(i=0;i<5;i++){text(0,3+i*2,seqnames[i],eval_row==i);text(14,3+i*2,eval_hidden&(1<<settings_tracks[i])?"HIDE":"SHOW",eval_row==i);}tip("ONLY HIDES SEQ PAGE","SELECT BACK");return;}
+ for(i=0;i<6;i++){text(0,rows[i],labels[i],eval_row==i);text(i<4?19:16,rows[i],i<4?">":i==4?(eval_hidden&128?"OFF":"ON"):(sticky_start?"ON":"OFF"),eval_row==i);}
+ tip(eval_row==5?(sticky_start?"TAP START FOR MENU":"HOLD START TO BROWSE"):eval_row==4?"SHOW WAVE PREVIEWS":eval_row==3?"CHOOSE VISIBLE GRIDS":eval_row==2?"CLOCK AND LINK SYNC":eval_row==1?"CUSTOMIZE QUICK MENU":"MIXER VIEW AND LAYOUT","A/B OPEN OR TOGGLE");
+}
+void eval_global_input(uint8_t p,uint8_t edge) BANKED {int16_t d=delta(edge);uint8_t mask;
+ if(pageconfig==3){if(edge&J_SELECT){pageconfig=0;eval_row=3;dirty=1;return;}if(!(p&(J_A|J_B))){if(edge&J_UP)eval_row=eval_row?eval_row-1:4;if(edge&J_DOWN)eval_row=(eval_row+1)%5;}else if(edge&(J_A|J_B)||d){mask=1<<settings_tracks[eval_row];if(!d)eval_hidden^=mask;else if(d>0)eval_hidden&=~mask;else eval_hidden|=mask;settings_store_visibility();}dirty=1;return;}
+ if(!(p&(J_A|J_B))){if(edge&J_UP)eval_row=eval_row?eval_row-1:5;if(edge&J_DOWN)eval_row=(eval_row+1)%6;}
+ else if(eval_row<4){if((edge&(J_A|J_B))&&!d){if(!eval_row){page=28;mixer_settings_open();}else if(eval_row==1)pageconfig=1;else if(eval_row==2)page=27;else{pageconfig=3;eval_row=0;}}}
+ else if(edge&(J_A|J_B)||d){if(eval_row==5){sticky_start=d?d>0:!sticky_start;pool_root[124]=sticky_start;mixer_layout_dirty=1;}else{if(!d)eval_hidden^=128;else if(d>0)eval_hidden&=~128;else eval_hidden|=128;previewshape=255;settings_store_visibility();}}
+ dirty=1;
+}
 
 void seq_track_view(void) BANKED{uint8_t c=seqtrack,e[4],low=255,maximum=seq_note_maximum(c);uint16_t i,n;if(c==6)return;n=seq_event_count(c);for(i=0;i<n;i++){seq_event_get(c,i,e);if(e[1]&&e[1]-1<low)low=e[1]-1;if(!(i&15))mixfill();}if(low==255)low=36;if(low<SEQ_NOTE_MINIMUM(c))low=SEQ_NOTE_MINIMUM(c);if(low>maximum)low=maximum;seqpitch[c]=low;seqtop[c]=low>maximum-(seqrows-1)?maximum:low+seqrows-1;seqdrawvalid=0;}
 

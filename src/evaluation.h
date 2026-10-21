@@ -32,6 +32,10 @@
 #define EV_SECOND 28
 #define EV_SECOND_SHAPE 29
 #define EV_FINE 11
+extern uint8_t coarsepitch[8][3]; /* signed semitones, signed depth, source */
+uint16_t coarse_apply(uint8_t c,uint16_t base) BANKED;
+void coarse_capture(uint8_t *raw) BANKED;
+void coarse_restore(const uint8_t *raw,const uint8_t *mod) BANKED;
 extern uint8_t evalwavefx[27],evalwaveactive,evalsecondon,evalsecondmask;
 extern uint8_t expdirty;
 extern uint16_t exppcmstep[2];

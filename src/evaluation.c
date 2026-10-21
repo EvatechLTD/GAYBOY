@@ -6,13 +6,13 @@
 #include "mixer_shared.h"
 #include "tones.h"
 void mixer_pattern_changed(void) BANKED;
-uint8_t evalpatch[8][16],eval_hidden,eval_row,eval_col,eval_tab;
+uint8_t evalpatch[8][16],eval_hidden=128,eval_row,eval_col,eval_tab;
 uint8_t eval_confirm,eval_pending,eval_target;
 uint8_t eval_plotvel[7]={127,127,127,127,127,127,127};
 static uint8_t env,stage,from,lphase,modheld;
 /* Durations are bytes; a retained clock is always strictly below duration. */
 static uint8_t eclock;
-uint8_t globalmod[10]={0,0,64,0,0,0,8,0,0,0};
+uint8_t globalmod[10]={0,0,64,0,0,0,8,1,0,0};
 static uint32_t lfoclock;
 __at (0xD860) uint8_t chord[3][16];
 __at (0xD8B0) uint8_t arpindex[3];
@@ -42,9 +42,11 @@ static void eval_runtime_reset(void){eval_audio_reset();
  eval_prepare_due=0;memset(chordnext,0,sizeof(chordnext));memset(arpremaining,0,sizeof(arpremaining));env=stage=from=lphase=eclock=modheld=0;lfoclock=0;memset(chord,0,sizeof(chord));memset(arpcount,0,3);
  if(!evalinitialized){memset(arpclock,0,sizeof(arpclock));memset(arpindex,0,3);evalinitialized=1;}
 }
-void eval_defaults(void) BANKED {uint8_t c;memset(evalpatch,0,sizeof(evalpatch));
+void eval_defaults(void) BANKED {uint8_t c;memset(evalpatch,0,sizeof(evalpatch));memset(coarsepitch,0,24);
  for(c=0;c<8;c++){evalpatch[c][EV_DIV]=4;evalpatch[c][EV_RETRIGGER]=1;evalpatch[c][EV_MS]=125;evalpatch[c][EV_LEVEL_MODE]=0;}
- globalmod[0]=globalmod[1]=globalmod[3]=globalmod[4]=globalmod[5]=globalmod[7]=globalmod[8]=globalmod[9]=0;globalmod[2]=64;globalmod[6]=8;eval_wave_defaults();eval_runtime_reset();
+ /* Removed Mono patch bytes hold the three independent synth mixer gains. */
+ evalpatch[4][0]=evalpatch[4][1]=evalpatch[4][2]=127;
+ globalmod[0]=globalmod[1]=globalmod[3]=globalmod[4]=globalmod[5]=globalmod[8]=globalmod[9]=0;globalmod[2]=64;globalmod[6]=8;globalmod[7]=1;eval_wave_defaults();eval_runtime_reset();
 }
 void eval_load_object(uint16_t object) BANKED {(void)object;}
 void eval_capture(uint8_t *out) BANKED {memset(out,0,EVAL_BYTES);out[0]='S';out[1]=1;memcpy(out+2,evalpatch,128);memcpy(out+130,globalmod,10);}
@@ -54,10 +56,10 @@ uint8_t eval_mode(uint8_t c) BANKED {return c<3&&evalpatch[c][EV_MODE]==1;}
 uint8_t eval_visible(uint8_t c) BANKED {return c!=4&&c!=5&&!(eval_hidden&(1<<c));}
 void eval_set_mode(uint8_t c,uint8_t mode) BANKED {if(c>=3)return;evalpatch[c][EV_MODE]=mode?1:0;evalpatch[c][EV_CHORD_HISTORY]=1;arpremaining[c]=0;eval_seq_off(c);seqdrawvalid=0;seqirqready=0;seqirqdirty=1;mixer_pattern_changed();dirty=1;}
 int8_t eval_signal(uint8_t c,uint8_t source) BANKED {uint8_t phase=lphase,n;(void)c;static const uint8_t sine[17]={0,6,12,19,24,30,36,41,45,49,53,56,59,61,63,64,64};if(!source)return env;switch(globalmod[4]){case 1:return (phase>>1)-64;case 2:return phase<128?64:-64;case 3:return (int8_t)((phase&0xC0)*73+37)/2;case 4:n=phase&63;if(phase&64)n=64-n;n=sine[n>>2];return phase&128?-(int8_t)n:n;default:return phase<128?(int16_t)phase-64:191-(int16_t)phase;}}
-int8_t eval_amount(uint8_t c,uint8_t destination) BANKED {int16_t value;if(c>=8||destination)return 0;value=(int8_t)evalpatch[c][EV_DEPTH];value*=eval_signal(0,evalpatch[c][EV_SOURCES]&1);return value<0?-((-value)>>6):value>>6;}
-void eval_note(uint8_t c,uint8_t on) BANKED {uint8_t mask;if(c>=8)return;mask=1<<c;if(!(evalpatch[c][EV_LEVEL_MODE]==128||evalpatch[c][EV_DEPTH]))return;if(on){modheld|=mask;if(!globalmod[9])lphase=0;if(!globalmod[0]&&!globalmod[1]){stage=3;env=from=globalmod[2];}else if(!globalmod[0]){stage=2;env=from=64;}else{stage=1;env=from=0;}eclock=0;}else{modheld&=~mask;if(modheld)return;stage=globalmod[3]?4:0;from=env;eclock=0;if(!stage)env=0;}}
+int8_t eval_amount(uint8_t c,uint8_t destination) BANKED {int16_t value;uint8_t source;if(c>=8||destination>1)return 0;value=(int8_t)(destination?coarsepitch[c][1]:evalpatch[c][EV_DEPTH]);if(!value)return 0;source=destination?coarsepitch[c][2]:evalpatch[c][EV_SOURCES]&1;value*=eval_signal(0,source);return value<0?-((-value)>>6):value>>6;}
+void eval_note(uint8_t c,uint8_t on) BANKED {uint8_t mask;if(c>=8)return;mask=1<<c;if(!(evalpatch[c][EV_LEVEL_MODE]==128||evalpatch[c][EV_DEPTH]||coarsepitch[c][1]))return;if(on){modheld|=mask;if(!globalmod[9])lphase=0;if(!globalmod[0]&&!globalmod[1]){stage=3;env=from=globalmod[2];}else if(!globalmod[0]){stage=2;env=from=64;}else{stage=1;env=from=0;}eclock=0;}else{modheld&=~mask;if(modheld)return;stage=globalmod[3]?4:0;from=env;eclock=0;if(!stage)env=0;}}
 void eval_frame(void) BANKED {uint8_t target,duration,before=0,after=0,div=globalmod[6];uint16_t ticks;uint32_t previous=lfoclock,period=14400UL;lfoclock+=(uint32_t)seqbpm*frameadvance;if(lfoclock>=22118400UL)lfoclock-=22118400UL;
- if(globalmod[7]){if(globalmod[8]==1)period=9600UL;else if(globalmod[8]==2)period=21600UL;if(div>16)div=16;if(div<=8&&((uint32_t)seqbpm<<(16-div))>period*128)lphase+=(uint16_t)128*frameadvance;else{if(div<=8){before=((previous%period)<<(16-div))/period;after=((lfoclock%period)<<(16-div))/period;}else{period<<=div-8;before=((previous%period)<<8)/period;after=((lfoclock%period)<<8)/period;}lphase+=after-before;}}
+ if(globalmod[7]){if(globalmod[8]==1)period=9600UL;else if(globalmod[8]==2)period=21600UL;if(div>16)div=16;if(div<=8&&((uint32_t)seqbpm<<(16-div))>period*128)lphase+=(uint16_t)128*frameadvance;else{if(div<=8){previous%=period;mixfill();before=div==8&&period==14400UL?(uint16_t)((uint16_t)previous*4)/225:(previous<<(16-div))/period;mixfill();previous=lfoclock%period;mixfill();after=div==8&&period==14400UL?(uint16_t)((uint16_t)previous*4)/225:(previous<<(16-div))/period;}else{period<<=div-8;previous%=period;mixfill();before=(previous<<8)/period;mixfill();previous=lfoclock%period;mixfill();after=(previous<<8)/period;}lphase+=after-before;}}
  else lphase+=(uint16_t)globalmod[5]*frameadvance;
  if(stage==3){env=globalmod[2];return;}if(!stage)return;duration=globalmod[stage==1?0:stage==2?1:3];target=stage==1?64:stage==2?globalmod[2]:0;ticks=eclock+frameadvance;
  if(!duration||ticks>=duration){env=from=target;eclock=0;stage=stage==4?0:stage+1;}else{eclock=ticks;env=from+((int16_t)target-from)*ticks/duration;}
