@@ -6,10 +6,11 @@ import json
 import numpy as np
 from pyboy import PyBoy
 from boot_helpers import enter_app
+ROM=Path(sys.argv[sys.argv.index('--rom')+1]) if '--rom' in sys.argv else Path('build/GAYBOY.gb')
 
 S = {line.split()[1]: int(line.split()[2], 16)
-     for line in Path('build/GAYBOY.noi').read_text().splitlines() if line.startswith('DEF ')}
-p = PyBoy('build/GAYBOY.gb', window='null', sound_emulated=True, cgb=False,
+     for line in ROM.with_suffix('.noi').read_text().splitlines() if line.startswith('DEF ')}
+p = PyBoy(str(ROM), window='null', sound_emulated=True, cgb=False,
           ram_file=BytesIO(bytes(32768)))
 p.set_emulation_speed(0)
 
@@ -42,9 +43,10 @@ try:
     put('evalpatch',8,9);put('evalpatch',1,8);put('globalmod',128,5)
     pulses=[[step,n,127,4 if mode else 1] for step in (0,4,8,12) for n in ((61,65,68) if mode else (70,))]
     events=pulses+[[0,49,127,16]]+[[step,11 if step%4==0 else 12,100,1] for step in range(0,16,2)]+[[0,1,100,1],[8,2,100,1],[0,13,100,1],[8,13,100,1]]
+    if '--dense' in sys.argv:put('evalpatch',0,13);events=pulses+[[0,49,127,16]]+[[step,11+step%2,100,1] for step in range(256-len(pulses)-1)]
     offset=0
     for c in range(7):
-        n=len(pulses) if c==0 else 1 if c==2 else 12 if c==6 else 0
+        n=len(pulses) if c==0 else 1 if c==2 else len(events)-len(pulses)-1 if c==6 else 0
         put('seqeventoffsets',offset,c*2);put('seqeventoffsets',0,c*2+1);put('seqeventcounts',n,c*2);put('seqeventcounts',0,c*2+1);offset+=n
     p.memory[0x4000]=1
     for i,e in enumerate(events):p.memory[0xa000+768+i*4:0xa000+772+i*4]=e
@@ -67,7 +69,7 @@ try:
         reports[phase+'_max_error_ms']=float(abs(intervals-expected).max())
         reports[phase+'_intervals_ms']=intervals.tolist()
     reports['mode']='arp' if mode else 'mono';reports['pcm_underruns']=word('mixunderruns')
-    Path('build/stripped-timing-'+reports['mode']+'.json').write_text(json.dumps(reports,indent=2))
-    print('PASS: native, fine LFO, Wave, drums and PCM playback timing',reports)
-    assert reports['navigation_max_error_ms']<25 and reports['pcm_underruns']<5
+    Path(('build/stripped-baseline/' if '--baseline' in sys.argv else 'build/')+'stripped-timing-'+reports['mode']+('-dense' if '--dense' in sys.argv else '')+'.json').write_text(json.dumps(reports,indent=2))
+    print('Measured baseline playback timing' if '--baseline' in sys.argv else 'PASS: playback timing',reports)
+    assert ('--baseline' in sys.argv or reports['navigation_max_error_ms']<25) and reports['pcm_underruns']<5
 finally:p.stop(save=False)

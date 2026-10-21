@@ -216,8 +216,8 @@ void seq_clamp_cursor(void){eval_seq_clamp_cursor();}
 void eval_seq_off_track(uint8_t c) BANKED {seq_off(c);}
 
 void seq_track_view(void) BANKED;
-void seq_mute(void){if(!syncmode){seqirqready=0;seqirqdirty=1;}seqmuted^=1<<seqtrack;if(seqmuted&(1<<seqtrack))seq_off(seqtrack);dirty=1;}
-void seq_solo(void){uint8_t c;if(!syncmode){seqirqready=0;seqirqdirty=1;}seqsolo^=1<<seqtrack;for(c=0;c<SEQ_TRACKS;c++)if(!seq_audible(c))seq_off(c);dirty=1;}
+void seq_mute(void){mixer_pattern_changed();if(!syncmode){seqirqready=0;seqirqdirty=1;}seqmuted^=1<<seqtrack;if(seqmuted&(1<<seqtrack))seq_off(seqtrack);dirty=1;}
+void seq_solo(void){mixer_pattern_changed();uint8_t c;if(!syncmode){seqirqready=0;seqirqdirty=1;}seqsolo^=1<<seqtrack;for(c=0;c<SEQ_TRACKS;c++)if(!seq_audible(c))seq_off(c);dirty=1;}
 void seq_edit_value(uint8_t field,int16_t delta){uint8_t c=seqtrack;uint16_t step=c==6?65535:seq_hit(c,seqcursor[c],seqpitch[c]),current;int16_t value,lo=1,hi=127;
  if(field==4&&seqhead==5&&c<SEQ_NOTE_TRACKS)step=seq_note_get(c,seqcursor[c])?seqcursor[c]:65535;
  if(field==4&&seqhead==5&&c==6){drum_velocity_edit(delta);return;}
@@ -225,9 +225,10 @@ void seq_edit_value(uint8_t field,int16_t delta){uint8_t c=seqtrack;uint16_t ste
  if(field==10){int16_t z=(int16_t)seqzoom+delta;seqzoom=z<0?0:z>3?3:z;seq_dimensions();seq_clamp_cursor();seqdrawvalid=0;dirty=1;return;}
  if(field==1){mixer_tempo_edit(delta);return;}
  if(field==9){seqvelocityhidden=delta<0;seq_dimensions();seq_clamp_cursor();seqdrawvalid=0;dirty=1;return;}
- if(field==7){seqdrawvalid=0;value=(int16_t)seqbeats+delta;seqbeats=value<1?1:value>12?12:value;dirty=1;return;}
- if(field==8){seqdrawvalid=0;if(delta>0&&seqdenom<16)seqdenom<<=1;if(delta<0&&seqdenom>2)seqdenom>>=1;dirty=1;return;}
+ if(field==7){mixer_pattern_changed();seqdrawvalid=0;value=(int16_t)seqbeats+delta;seqbeats=value<1?1:value>12?12:value;dirty=1;return;}
+ if(field==8){mixer_pattern_changed();seqdrawvalid=0;if(delta>0&&seqdenom<16)seqdenom<<=1;if(delta<0&&seqdenom>2)seqdenom>>=1;dirty=1;return;}
  if(field==6){value=!!(seqmuted&(1<<c));if((delta>0&&!value)||(delta<0&&value))seq_mute();return;}
+ mixer_pattern_changed();
  if(field==2){current=seqlength[c];hi=256;}else if(field==3){current=seqgate[c];hi=100;}else if(field==4)current=page==10||step==65535?seqdefaultvel[c]:seq_velocity_get(c,step);else {current=step==65535?seqdefaultdur[c]:seq_dur(c,step);hi=256;if(c==6)lo=0;}
  value=field==2&&(delta>=10||delta<=-10)?(delta>0?(current>128?256:current*2):(current>1?current/2:1)):current+delta;if(value<lo)value=lo;if(value>hi)value=hi;
  if((field==2||field==3)&&!syncmode){seqirqready=0;seqirqdirty=1;}

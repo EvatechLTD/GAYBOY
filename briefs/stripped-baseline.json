@@ -1,0 +1,8 @@
+{
+  "tag": "stripped-baseline-20261020",
+  "commit": "e7a66e6",
+  "rom_sha256": "cd7d430b5f84a54d0e47fa8a04a30ebb82120ff209987e73d1d24b354f61ffb0",
+  "artifact_directory": "build/stripped-baseline",
+  "branch": "stripped",
+  "description": "Five-pattern stripped build preserved before event lookup, waveform upload, and navigation optimizations."
+}

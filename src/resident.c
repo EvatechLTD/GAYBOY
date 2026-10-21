@@ -2,6 +2,8 @@
 #pragma opt_code_speed
 #include "api.h"
 #include "resident.h"
+void mixer_pattern_changed(void) BANKED;
+void storage_sorted_dirty(void) BANKED;
 #include "sparse_store.h"
 #include "mixer_shared.h"
 #include "tones.h"
@@ -169,10 +171,10 @@ move_backward_done$:
  jp (hl)
  __endasm;}
 void resident_move(uint16_t to,uint16_t from,uint16_t bytes) BANKED {uint8_t bank=1+(mx.slot>>2);uint16_t base=0xA000U+(uint16_t)(mx.slot&3)*2048U+RESIDENT_EVENTS;uint8_t *dst=(uint8_t *)(base+to),*src=(uint8_t *)(base+from);if(!bytes||to==from)return;if(to>from)move_backward(dst+bytes-1,src+bytes-1,bytes,bank);else move_forward(dst,src,bytes,bank);}
-void resident_events_changed(void) BANKED {resident_write(mx.slot,32,(uint8_t *)seqeventcounts,14);last_edit=sys_time;seqirqdirty=1;}
+void resident_events_changed(void) BANKED {resident_write(mx.slot,32,(uint8_t *)seqeventcounts,14);last_edit=sys_time;mixer_pattern_changed();seqirqdirty=1;}
 static void metadata(uint8_t slot,uint8_t writing){uint8_t b[81];if(writing){memcpy(b,seqeventcounts,14);memcpy(b+14,seqlength,14);memcpy(b+28,seqdefaultdur,14);memcpy(b+42,seqdefaultvel,7);memcpy(b+49,seqgate,7);memcpy(b+56,mx.level,7);memcpy(b+63,mx.pan,7);b[70]=seqmuted;b[71]=seqsolo;b[72]=seqbeats;b[73]=seqdenom;b[74]=0;memcpy(b+75,&seqbpm,2);memcpy(b+77,&drummutemask,2);memcpy(b+79,&drumsolomask,2);resident_write(slot,32,b,81);resident_write(slot,16,(uint8_t *)mx.name,16);}else{resident_read(slot,32,b,81);applymeta(b);resident_read(slot,16,(uint8_t *)mx.name,16);mx.name[16]=0;seqstepunits=15360U/seqbpm;memset(seqcachedgate,100,7);seqcachedbpm=0;}}
 uint8_t sparse_snapshot(uint8_t slot) BANKED {if(slot>=5||slot!=mx.slot||io_busy)return 0;io_busy=1;metadata(slot,1);tones_capture();resident_write(slot,128,TONE_RAW,POOL_TONE_BYTES);saved_generation=pattern_generation;pattern_dirty=0;io_busy=0;return 1;}
-uint8_t sparse_restore(uint8_t slot) BANKED {if(slot>=5||sparse_enabled!=1)return 0;mx.slot=slot;metadata(slot,0);resident_read(slot,128,TONE_RAW,POOL_TONE_BYTES);tones_apply();seqeventcache=0;eval_drum_dirty();saved_generation=pattern_generation;pattern_dirty=0;return 1;}
+uint8_t sparse_restore(uint8_t slot) BANKED {if(slot>=5||sparse_enabled!=1)return 0;mx.slot=slot;storage_sorted_dirty();metadata(slot,0);resident_read(slot,128,TONE_RAW,POOL_TONE_BYTES);tones_apply();seqeventcache=0;eval_drum_dirty();saved_generation=pattern_generation;pattern_dirty=0;return 1;}
 uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t busy=seqservicing;if(slot>=5)return 0;seqservicing=1;if(seqplaying)seq_pattern_release();if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.padcache=0;seqdrawvalid=0;if(seqplaying)seq_pattern_handoff();seqservicing=busy;dirty=1;return 1;}
 void sparse_request(uint8_t slot,uint8_t edit) BANKED {if(slot>=5)return;if(edit&&slot==mx.slot){page=8;seq_open();dirty=1;return;}if(pattern_dirty)sparse_snapshot(mx.slot);mx.pending=slot;mx.openempty=edit;mx.cachevalid=0;if(!seqplaying||!mx.quant){mx.pending=255;mixer_activate(slot,edit);}dirty=1;}
 void sparse_service(void) BANKED {if(!io_busy&&pattern_dirty&&!seqservicing&&!seqplaying&&padread==padwrite&&(uint16_t)(sys_time-last_edit)>30)sparse_snapshot(mx.slot);}
