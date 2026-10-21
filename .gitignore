@@ -50,3 +50,6 @@ Thumbs.db
 *.[wW][mM][vV]
 *.[mM][kK][vV]
 *.[oO][pP][uU][sS]
+
+# Retired worktrees, local snapshots and historical build artifacts
+/archived/
