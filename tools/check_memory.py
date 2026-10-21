@@ -19,7 +19,7 @@ def audit(rom):
  if index_bytes:assert s['_eventheads']==0xA000 and s['_eventnext']==0xA200 and s['_waveimage']==0xA400
  feedback_bytes=0
  if '_fastcells' in s:
-  feedback_regions=[(0xA410,0xA440,'velocity queue'),(0xA500,0xA534,'coverage'),(0xA534,0xA538,'overlaps'),(0xA540,0xA6E0,'origins'),(0xA800,0xAB40,'onset handles')]
+  feedback_regions=[(0xA410,0xA440,'velocity queue'),(0xA440,0xA469,'locked velocity'),(0xA500,0xA534,'coverage'),(0xA534,0xA538,'overlaps'),(0xA540,0xA6E0,'origins'),(0xA800,0xAB40,'onset handles')]
   assert s['_fastcells']==0xA800 and s['_fastrowbits']==0xA500 and s['_fastcoverorigin']==0xA540
   for a,b in zip(feedback_regions,feedback_regions[1:]):assert a[1]<=b[0]
   assert feedback_regions[-1][1]<=0xAC00

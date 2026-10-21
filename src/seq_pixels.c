@@ -113,7 +113,7 @@ void seq_dimensions(void) BANKED {
  seqheight=seqzoom==0?16:8;
  seqgridheight=seqzoom==1&&!seqvelocityhidden?112:128;
  seqrows=seqgridheight/seqheight;
- if(seqtrack==6){seqheight=8;seqgridheight=seqcols==16&&!seqvelocityhidden?112:128;seqrows=13;}
+ if(seqtrack==6){seqheight=8;seqgridheight=!seqvelocityhidden?112:128;seqrows=13;}
  seqbase=(seqcursor[seqtrack]/seqcols)*seqcols;
  if(seqlength[seqtrack]>seqcols&&seqbase+seqcols>seqlength[seqtrack])seqbase=seqlength[seqtrack]-seqcols;
 }
@@ -612,12 +612,12 @@ void seq_playhead(void) BANKED {
    rollplayx=x;rollplaypos=seqposition[c];rollplaybase=seqbase;rollplaycols=seqcols;rollplaytrack=c;
   }on=1;
  }else if(rollplayx!=255){sprite=shadow_OAM;for(i=0;i<17;i++,sprite++)sprite->x=0;rollplayx=255;}
- if(c==6){seqheight=8;seqgridheight=seqcols==16&&!seqvelocityhidden?112:128;cursor_y=DRUM_SCREEN_ROW(drumrow)*8;}else cursor_y=((int16_t)seqtop[c]-seqpitch[c])*seqheight;
+ if(c==6){seqheight=8;seqgridheight=!seqvelocityhidden?112:128;cursor_y=DRUM_SCREEN_ROW(drumrow)*8;}else cursor_y=((int16_t)seqtop[c]-seqpitch[c])*seqheight;
  ch=seqhead==5?24:seqheight;limit=seqhead==5?136:seqgridheight;if(seqhead==5)cursor_y=112;
  if((!seqhead||seqhead==5||seqhead==6)&&!seqfocus&&cursor_y>=0&&cursor_y<limit){
   i=seqcursor[c]-seqbase;top=cursor_y+8;
   if(!rollcursorvisible||rollcursorcell!=i||rollcursory!=top||rollcursorcols!=seqcols||rollcursortrack!=c||rollcursorhead!=seqhead||rollcursorh!=ch){
-  if(seqhead==6){left=0;right=16;}else{left=(c==6?24:16)+((uint16_t)i*(c==6?136:144))/seqcols;right=(c==6?24:16)+((uint16_t)(i+1)*(c==6?136:144))/seqcols;}width=right-left;top=cursor_y+8;
+  if(seqhead==6){left=0;right=c==6?24:16;}else{left=(c==6?24:16)+((uint16_t)i*(c==6?136:144))/seqcols;right=(c==6?24:16)+((uint16_t)(i+1)*(c==6?136:144))/seqcols;}width=right-left;top=cursor_y+8;
   if(rollcursorw!=width||rollcursorh!=ch){
    for(q=0;q<20;q++){gx=rollqx[q];if(gx>=width||rollqy[q]>=ch)continue;
     for(y=0;y<8;y++){gy=rollqy[q]+y;bits=0;

@@ -119,7 +119,7 @@ void ui_loading_prepare(void) BANKED {if(seqfontdirty)ui_restore_seq_tiles();}
 void auditionstop(void){if(auditionvoice<4)stop(auditionvoice);auditionvoice=255;}
 void auditionstart(void){auditionstop();play(selected,60,127);auditionvoice=selected;}
 void browse(int8_t d){int16_t n=(int16_t)program[selected]+d;if(n<0)n+=100;if(n>=100)n-=100;choice=n;if(polymode)polyload(n);else load(selected,n);edited[selected]=0;if(lastpad&J_B)auditionstart();}
-void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){panic();overflow=0;navopen=0;navblocked=1;dirty=1;return;}
+void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){navopen=0;navblocked=seqselectused=1;if(seqplaying)panic();else{panic();seq_transport();}overflow=0;dirty=1;return;}
  if(((lastpad&J_A)&&!(p&J_A))||(edge&J_START)){seq_audition_stop();if(auditionvoice!=255)auditionstop();}
  if((lastpad&J_B)&&!(p&J_B))auditionstop();
  if(!(p&J_START))navblocked=0;

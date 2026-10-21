@@ -1,6 +1,11 @@
 #pragma bank 10
 #include "api.h"
 void drum_brush_plot(void) BANKED;
+void drum_brush_toggle(void) BANKED;
+void seq_brush_toggle(void) BANKED;
+void drum_name_input(uint8_t p,uint8_t edge) BANKED;
+void drum_velocity_input(uint8_t p,uint8_t edge) BANKED;
+void drum_velocity_status(void) BANKED;
 void roll_feedback_cancel(void) BANKED;
 void roll_feedback_velocity_row(void) BANKED;
 uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED;
@@ -326,17 +331,21 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   if(edge&(J_UP|J_DOWN)){seqselectused=1;seq_edit_value(10,edge&J_UP?-1:1);}return;
  }
  if((lastpad&J_SELECT)&&!seqselectused){if(page==8&&!seqhead&&!seqfocus&&seqgrouptrack==c){seqpopup=1;seqpopupchoice=seqpopuperror=0;seqselectused=1;seqapending=seqdrag=0;repeatsteps=1;dirty=1;return;}page=page==10?8:10;seqfocus=page==10?1:0;seqedit=seqhead=0;seqselectused=1;seqdrawvalid=0;dirty=1;return;}
- /* A+B paints onsets; ordinary B keeps its existing resize/delete gestures. */
+ /* A+B toggles each entered cell; forming the chord preserves its start cell. */
  if(page==8&&!seqhead&&!seqfocus&&(p&(J_A|J_B))==(J_A|J_B)){
+  uint8_t previousstep=seqcursor[c],previouspitch=c==6?drumrow:seqpitch[c];
   seqapending=seqdrag=0;seqbused=seqamoved=1;
-  if(edge&J_LEFT)seqcursor[c]=seqcursor[c]?seqcursor[c]-1:seqlength[c]-1;
-  if(edge&J_RIGHT)seqcursor[c]=(uint16_t)seqcursor[c]+1>=seqlength[c]?0:seqcursor[c]+1;
+  if((edge&J_LEFT)&&seqcursor[c])seqcursor[c]--;
+  if((edge&J_RIGHT)&&(uint16_t)seqcursor[c]+1<seqlength[c])seqcursor[c]++;
   if(c==6){if((edge&J_UP)&&drumrow)drumrow--;if((edge&J_DOWN)&&drumrow<12)drumrow++;}
   else{if((edge&J_UP)&&seqpitch[c]<127)seqpitch[c]++;if((edge&J_DOWN)&&seqpitch[c])seqpitch[c]--;seq_clamp_cursor();}
-  if(edge&(J_A|J_B|J_UP|J_DOWN|J_LEFT|J_RIGHT)){
+  if(edge&mask){if(previousstep!=seqcursor[c]||previouspitch!=(c==6?drumrow:seqpitch[c])){if(c==6)drum_brush_toggle();else seq_brush_toggle();}}
+  else if(edge&(J_A|J_B)){
    if(c==6)drum_brush_plot();else{uint16_t cursor=0;uint8_t event[4],exists=0,fast;while(seq_event_next_step(c,seqcursor[c],&cursor,event))if(event[1]==seqpitch[c]+1){exists=1;break;}if(!exists){event[0]=seqcursor[c];event[1]=seqpitch[c]+1;event[2]=eval_plotvel[c];event[3]=seqdefaultdur[c];fast=seq_event_total()<256?roll_note_feedback(c,event,0):0;if(!seq_note_set(c,event[0],event[1],event[2],seqdefaultdur[c]))fast=0;seqdrawvalid=fast;}}
   }dirty=1;return;
  }
+ if(page==8&&c==6&&seqhead==6){drum_name_input(p,edge);return;}
+ if(page==8&&c==6&&seqhead==5){drum_velocity_input(p,edge);return;}
  if(page==8&&seqhead==6){
   if(edge&J_UP){if(seqpitch[c]<127)seqpitch[c]++;seq_clamp_cursor();dirty=1;}
   if(edge&J_DOWN){if(seqpitch[c])seqpitch[c]--;seq_clamp_cursor();dirty=1;}
@@ -348,7 +357,7 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
  }
  if(page==8&&seqhead==5){
   seqedit=0;
-  if(!(p&(J_A|J_B))){if(edge&J_LEFT){seqcursor[c]=seqcursor[c]?seqcursor[c]-1:seqlength[c]-1;dirty=1;}if(edge&J_RIGHT){seqcursor[c]=(seqcursor[c]+1)%seqlength[c];dirty=1;}}
+  if(!(p&(J_A|J_B))){if(edge&J_LEFT){seqcursor[c]=seqcursor[c]?seqcursor[c]-1:seqlength[c]-1;dirty=1;}if(edge&J_RIGHT){if((uint16_t)seqcursor[c]+1<seqlength[c])seqcursor[c]++;dirty=1;}}
   if(p&(J_A|J_B)){if(edge&J_UP)seq_edit_value(4,1);if(edge&J_DOWN)seq_edit_value(4,-1);if(edge&J_LEFT)seq_edit_value(4,-10);if(edge&J_RIGHT)seq_edit_value(4,10);}
   else if(edge&J_UP){seqhead=0;dirty=1;}
   else if((edge&J_DOWN)&&c!=6&&seqpitch[c]){seqpitch[c]--;if(seqtop[c])seqtop[c]--;seq_clamp_cursor();dirty=1;}
@@ -387,7 +396,7 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   }
   if(!seqamoved&&seqapending==2)seq_erase(c,seqaanchor);seqapending=0;if(!(edge&mask))return;
  }
- if(edge&J_LEFT){if(seqcursor[c]==seqbase){seqhead=6;seqedit=0;}else seqcursor[c]--;dirty=1;}if(edge&J_RIGHT){seqcursor[c]=(seqcursor[c]+1)%seqlength[c];dirty=1;}
+ if(edge&J_LEFT){if(seqcursor[c]==seqbase){seqhead=6;seqedit=0;}else seqcursor[c]--;dirty=1;}if(edge&J_RIGHT){if((uint16_t)seqcursor[c]+1<seqlength[c])seqcursor[c]++;dirty=1;}
  if(edge&J_UP){if(seqpitch[c]>=seqtop[c]){seqhead=seq_top_entry();seqedit=0;}else if(seqpitch[c]<127)seqpitch[c]++;dirty=1;}if(edge&J_DOWN){if(seqcols==16&&!seqvelocityhidden&&seqpitch[c]+seqrows-1==seqtop[c]){seqhead=5;seqedit=0;}else if(seqpitch[c])seqpitch[c]--;dirty=1;}seq_clamp_cursor();
 }
 /* Three grid families fit the preview slots; +6 still selects the playhead tile. */
@@ -417,11 +426,11 @@ void seq_render(void) BANKED {
  if((c!=6&&seqviewtop!=seqtop[c])||seqviewbase!=seqbase||seqviewcols!=seqcols||seqviewtrack!=c)seqdrawvalid=0;
  if(navopen){seqdrawvalid=0;memcpy(canvas,seqscreen,360);seqflushpending=1;HIDE_SPRITES;return;}
  if(seqdrawvalid==2){if(roll_selection_update()){seqflushpending=1;seqdrawvalid=1;}else seqdrawvalid=0;}
- if(seqdrawvalid){if(c==6&&seqcols==16&&!seqvelocityhidden&&seqviewtop!=drumrow){roll_feedback_velocity_row();}seq_audio();}
+ if(seqdrawvalid){seq_audio();}
  else{roll_feedback_cancel();seqflushpending=1;seq_meterbuild();if(c==6)drum_render();else seq_pixels(navigation);if(rollcancelled){seqflushpending=0;seqdrawvalid=0;dirty=1;return;}seq_audio();memcpy(seqscreen,canvas,360);seqdrawvalid=1;}
  memset(canvas,96,20);seq_text(0,0,seqshort[c],1);if(c!=6)seq_text(4,0,eval_mode(c)==1?"ARP":"MONO",seqhead!=1);
  canvas[9]=244+((seqmuted>>c)&1)+(seqhead==2?2:0);canvas[11]=248+((seqsolo>>c)&1)+(seqhead==3?2:0);roll_header_range();
- eval_status();
+ eval_status();if(c==6&&!seqvelocityhidden)drum_velocity_status();
  if(eval_confirm){seq_text(0,7,"DISABLE OTHER MODE?",0);seq_text(0,9,"A CONTINUE B CANCEL",0);}if(seqeventfull)canvas[8]='!'-32+96;roll_selection_prepare(memcmp(seqscreen,canvas,20)!=0);if(memcmp(seqscreen,canvas,20)){seqflushpending=1;memcpy(seqscreen,canvas,20);}seq_audio();seq_playhead();
  if(seqlengthpause==1){__critical {seqlengthpausestart=sys_time;}seqlengthpause=2;}
 }

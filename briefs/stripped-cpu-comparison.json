@@ -2,7 +2,7 @@
   "baseline_tag": "stripped-baseline-20261020",
   "baseline_commit": "e7a66e6",
   "baseline_rom_sha256": "cd7d430b5f84a54d0e47fa8a04a30ebb82120ff209987e73d1d24b354f61ffb0",
-  "current_rom_sha256": "84003cb92e10b9dd261bd6bf7f46c39272a7a8e85312d51041112a0e7164cc19",
+  "current_rom_sha256": "98dda697e779624114e1150bc7eb4bb16e3da0ec106a75abc7e04447da7c56b3",
   "measurements": {
     "event_lookup_mean_ms": {
       "baseline": 73.45104217529297,
@@ -42,11 +42,11 @@
     },
     "delete_visible_ms": {
       "baseline": 133.9435577392578,
-      "optimized": 83.71353149414062
+      "optimized": 83.71257781982422
     },
     "mixed_pcm_mono_worst_error_ms": {
       "baseline": 2.2535324096679688,
-      "optimized": 2.7008056640625
+      "optimized": 3.2091140747070312
     },
     "mixed_pcm_mono_pcm_underruns": {
       "baseline": 0,
@@ -54,7 +54,7 @@
     },
     "dense_mono_worst_error_ms": {
       "baseline": 29.9530029296875,
-      "optimized": 3.2110214233398438
+      "optimized": 3.9339065551757812
     },
     "dense_mono_pcm_underruns": {
       "baseline": 0,
@@ -62,7 +62,7 @@
     },
     "mixed_pcm_arp_worst_error_ms": {
       "baseline": 20.98369598388672,
-      "optimized": 22.24254608154297
+      "optimized": 21.907806396484375
     },
     "mixed_pcm_arp_pcm_underruns": {
       "baseline": 0,
@@ -70,7 +70,7 @@
     },
     "dense_arp_worst_error_ms": {
       "baseline": 35.30120849609375,
-      "optimized": 25.527000427246094
+      "optimized": 25.037765502929688
     },
     "dense_arp_pcm_underruns": {
       "baseline": 0,
@@ -78,7 +78,7 @@
     },
     "wram_ordinary_bytes": {
       "baseline": 3687,
-      "optimized": 3725
+      "optimized": 3726
     },
     "event_index_and_wave_shadow_cartridge_ram_bytes": {
       "baseline": 0,

@@ -72,7 +72,7 @@ static void ram(uint8_t b){ENABLE_RAM;SWITCH_RAM(b);}
 static uint8_t bank(uint8_t s){return 1+s/3;}
 static uint8_t *record(uint8_t s){return (uint8_t *)(0xA000U+(uint16_t)(s%3)*RECORD);}
 static void text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+(uint16_t)y*20+x;while(*s&&x++<20)*d++=*s++-32+(inv?96:0);}
-static void num(uint8_t x,uint8_t y,uint8_t n,uint8_t inv){uint8_t h=0,t=0,base=16+(inv?96:0),*dst=canvas+(uint16_t)y*20+x;if(n>=100){n-=100;h=1;}while(n>=10){n-=10;t++;}dst[0]=base+h;dst[1]=base+t;dst[2]=base+n;}
+static void num(uint8_t x,uint8_t y,uint16_t n,uint8_t inv){uint8_t h=0,t=0,base=16+(inv?96:0),*dst=canvas+(uint16_t)y*20+x;while(n>=100){n-=100;h++;}while(n>=10){n-=10;t++;}dst[0]=base+h;dst[1]=base+t;dst[2]=base+n;}
 /* Exact additive checksum; the common sixteen-byte block avoids C stack spills. */
 static uint16_t checksum_chunk(const uint8_t *buf,uint8_t n) __naked { __asm
  ld l,e

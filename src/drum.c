@@ -620,7 +620,8 @@ drum_done1$:
  ret
  __endasm; }
 uint16_t drum_duration(const uint8_t *e){return e[3]?e[3]:256U;}
-uint16_t drum_find(uint8_t step,uint8_t row){uint16_t i,count=seq_event_count(6);uint8_t e[4];i=roll_drum_hit(step,row);if(i==65535U)return i;if(i!=65534U&&i<count&&seq_event_get(6,i,e)&&e[1]==DRUM_VOICE_ROW(row)+1&&step>=e[0]&&(uint16_t)step<e[0]+drum_duration(e))return i;for(i=0;i<count;i++)if(seq_event_get(6,i,e)&&e[1]==DRUM_VOICE_ROW(row)+1&&step>=e[0]&&(uint16_t)step<e[0]+drum_duration(e))return i;return 65535U;}
+uint16_t drum_find(uint8_t step,uint8_t row){uint16_t i,count=seq_event_count(6),best=65535U;uint8_t e[4],start=0;i=roll_drum_hit(step,row);if(i==65535U)return i;if(i!=65534U&&i!=65535U&&i<count&&seq_event_get(6,i,e)&&e[1]==DRUM_VOICE_ROW(row)+1&&step>=e[0]&&(uint16_t)step<e[0]+drum_duration(e))return i;for(i=0;i<count;i++)if(seq_event_get(6,i,e)&&e[1]==DRUM_VOICE_ROW(row)+1&&step>=e[0]&&(uint16_t)step<e[0]+drum_duration(e)){if(e[0]==step)return i;if(best==65535U||e[0]>=start){best=i;start=e[0];}}return best;}
+
 void drum_erase(uint16_t index,uint8_t row){uint8_t e[4],fast=0;(void)row;eval_message=0;if(index!=65535U){if(seq_event_get(6,index,e))fast=roll_note_feedback(6,e,1);seq_event_erase(6,index);if(fast)roll_drum_erase_handles(index);}seqdrawvalid=fast;dirty=1;}
 void drum_age_sync(void) BANKED {}
 /* The event pool's insertion order is the plot age. */
@@ -636,11 +637,12 @@ uint16_t drum_plot(uint8_t step,uint8_t row,uint16_t dur,uint8_t vel,uint16_t ag
  e[0]=step;e[1]=DRUM_VOICE_ROW(row)+1;e[2]=vel;e[3]=(uint8_t)dur;if(replace!=65535U&&seq_event_get(6,replace,old))fast=roll_replace_feedback(6,old,e,replace);if(replace==65535U&&seq_event_total()<256)fast=roll_note_feedback(6,e,0);if(!seq_event_put(6,replace,e)){seqdrawvalid=0;return 65535U;}seqdrawvalid=fast;dirty=1;return replace==65535U?seq_event_count(6)-1:replace;
 }
 void drum_insert(void){uint16_t n=drum_find(seqcursor[6],drumrow),dur=seqdefaultdur[6];if(n!=65535U){drum_erase(n,drumrow);return;}if(!dur)dur=drumrow>=3?drum_auto(DRUM_VOICE_ROW(drumrow)):1;n=drum_plot(seqcursor[6],drumrow,dur,eval_plotvel[6],0);eval_message=n!=65535U&&!seqdrawvalid&&!eval_drum_allowed(n)?1:0;dirty=1;}
-void drum_brush_plot(void) BANKED {uint8_t e[4];uint16_t n=roll_drum_onset(seqcursor[6],drumrow),cursor=0;if(n==65534U){while(seq_event_next_step(6,seqcursor[6],&cursor,e))if(e[1]==DRUM_VOICE_ROW(drumrow)+1)return;}else if(n!=65535U)return;n=drum_plot(seqcursor[6],drumrow,seqdefaultdur[6],eval_plotvel[6],0);eval_message=n!=65535U&&!seqdrawvalid&&!eval_drum_allowed(n)?1:0;dirty=1;}
-void drum_velocity_edit(int8_t delta) BANKED {uint8_t e[4];uint16_t n=drum_find(seqcursor[6],drumrow);int16_t value;
- if(n==65535U){value=(int16_t)seqdefaultvel[6]+delta;seqdefaultvel[6]=value<1?1:value>127?127:value;}
- else{seq_event_get(6,n,e);value=(int16_t)e[2]+delta;e[2]=value<1?1:value>127?127:value;eval_plotvel[6]=e[2];seq_event_put(6,n,e);}seqdrawvalid=0;dirty=1;
+void drum_brush_toggle(void) BANKED {uint8_t e[4];uint16_t n=roll_drum_onset(seqcursor[6],drumrow),cursor=0;
+ if(n==65534U){n=65535U;while(seq_event_next_step(6,seqcursor[6],&cursor,e))if(e[1]==DRUM_VOICE_ROW(drumrow)+1){n=cursor-1;break;}}
+ if(n!=65535U)drum_erase(n,drumrow);else drum_plot(seqcursor[6],drumrow,seqdefaultdur[6],eval_plotvel[6],0);
 }
+void drum_brush_plot(void) BANKED {uint8_t e[4];uint16_t n=roll_drum_onset(seqcursor[6],drumrow),cursor=0;if(n==65534U){while(seq_event_next_step(6,seqcursor[6],&cursor,e))if(e[1]==DRUM_VOICE_ROW(drumrow)+1)return;}else if(n!=65535U)return;n=drum_plot(seqcursor[6],drumrow,seqdefaultdur[6],eval_plotvel[6],0);eval_message=n!=65535U&&!seqdrawvalid&&!eval_drum_allowed(n)?1:0;dirty=1;}
+
 uint8_t drum_selected_event(const uint8_t *e){return seqgrouptrack==6&&e[1]&&e[0]>=seqgroupx0&&e[0]<=seqgroupx1&&DRUM_VIEW_ROW(e[1]-1)>=seqgroupy0&&DRUM_VIEW_ROW(e[1]-1)<=seqgroupy1;}
 uint8_t drum_group_size(int8_t delta){uint16_t i,t,count=seq_event_count(6);uint8_t e[4],old[4],voices,pcm=0,fast=seqdrawvalid;int16_t d;
  for(i=0;i<count;i++){seq_event_get(6,i,e);if(drum_selected_event(e)){if(e[1]<=10)pcm=1;d=drum_duration(e)+delta;if(d<1||d>seqlength[6]-e[0])return 0;}}
@@ -669,7 +671,7 @@ void drum_input(uint8_t p,uint8_t edge) BANKED {uint8_t s=seqcursor[6],row=drumr
   else if(edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN)){seqamoved=drumbused=1;dst=e[0];r=row;if(edge&J_LEFT)dst--;if(edge&J_RIGHT)dst++;if(edge&J_UP)r--;if(edge&J_DOWN)r++;if(dst<0||dst+dur>seqlength[6]||r<0||r>12)return;drumanchor=drum_plot(dst,r,dur,e[2],n+1);seqcursor[6]=dst;drumrow=r;}else return;
   dirty=1;return;
  }
- if(edge&J_LEFT)seqcursor[6]=s?s-1:seqlength[6]-1;if(edge&J_RIGHT){if(seqcols==16&&!seqvelocityhidden&&s==(uint16_t)seqbase+seqcols-1){seqhead=5;seqedit=0;}else seqcursor[6]=(uint16_t)s+1>=seqlength[6]?0:s+1;}if(edge&J_UP){if(row==0)seqhead=seq_top_entry();else drumrow--;}if(edge&J_DOWN){if(row<12)drumrow++;else if(seqcols==16&&!seqvelocityhidden){seqhead=5;seqedit=0;}}if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT))dirty=1;
+ if(edge&J_LEFT){if(s==seqbase){seqhead=6;seqedit=0;}else seqcursor[6]=s-1;}if((edge&J_RIGHT)&&(uint16_t)s+1<seqlength[6])seqcursor[6]=s+1;if(edge&J_UP){if(row==0)seqhead=seq_top_entry();else drumrow--;}if(edge&J_DOWN){if(row<12)drumrow++;}if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT))dirty=1;
 }
 void drum_synth_render(void) BANKED {eval_render();}
 void drum_synth_input(uint8_t p,uint8_t edge) BANKED {eval_input(p,edge);}

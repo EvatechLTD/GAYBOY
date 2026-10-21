@@ -11,10 +11,13 @@ p = PyBoy('build/GAYBOY.gb', window='null', sound_emulated=True, cgb=False,
 p.set_emulation_speed(0)
 
 def v(name, offset=0):
-    return p.memory[S['_' + name]+offset]
+    address=S['_' + name]+offset
+    return p.memory[0,address] if 0xa000<=address<0xc000 else p.memory[address]
 
 def put(name, value, offset=0):
-    p.memory[S['_' + name]+offset] = value & 255
+    address=S['_' + name]+offset
+    if 0xa000<=address<0xc000:p.memory[0,address]=value&255
+    else:p.memory[address]=value&255
 
 def press(key, frames=5):
     p.button_press(key)

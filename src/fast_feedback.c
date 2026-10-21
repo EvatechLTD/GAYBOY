@@ -2,7 +2,10 @@
 #pragma opt_code_speed
 #include "api.h"
 #include "drum_rows.h"
-extern uint8_t seqdenom,seqbeats;
+extern uint8_t seqdenom,seqbeats,drumvelrow;
+void drum_velocity_set(uint8_t row,uint8_t step,uint8_t value) BANKED;
+void drum_velocity_refresh(void) BANKED;
+void drum_velocity_service(void) BANKED;
 extern __at (0xB000) uint8_t rolltiles[128][16];
 extern __at (0xAD80) uint8_t rollcache[10];
 extern __at (0xAF00) uint8_t rollonsets[40][4];
@@ -41,7 +44,8 @@ void roll_edit_batch(uint8_t enabled) BANKED {feedbackbatch=enabled;if(!enabled&
 extern volatile uint8_t padsampled,padread,padwrite;
 void roll_feedback_cancel(void) BANKED {feedbackpending=feedbackphase=feedbackbatch=0;}
 static void feedback_velocity_queue(uint8_t c,uint8_t col,uint8_t value){if(feedbacktrack!=c||feedbackbase!=seqbase||feedbackrow!=drumrow){feedbackpending=feedbackphase=0;}feedbacktrack=c;feedbackbase=seqbase;feedbackrow=drumrow;feedbackvel[col]=value;feedbackpending|=1U<<col;feedbackphase=0;}
-void roll_feedback_velocity_row(void) BANKED {uint8_t col,value,height;uint16_t prior=feedbackpending;feedbackpending=feedbackphase=0;feedbacktrack=6;feedbackbase=seqbase;feedbackrow=drumrow;for(col=0;col<16;col++){value=rollbackground[(uint16_t)drumrow*16+col];height=value?1+((uint16_t)value*20)/127:0;if(height!=rolloldvel[col]||(prior&(1U<<col))){feedbackvel[col]=value;feedbackpending|=1U<<col;}}seqviewtop=drumrow;}
+void roll_feedback_velocity_row(void) BANKED {drum_velocity_refresh();}
+
 static uint8_t feedback_ready(uint8_t c){return page==8&&!navopen&&!seqpopup&&seqdrawvalid==1&&seqfontdirty&&rollcache[0]==168&&(!rollbuilding||feedbackbatch)&&seqviewtrack==c&&seqtrack==c&&seqviewbase==seqbase&&seqviewcols==seqcols&&(c==6||seqviewtop==seqtop[c]);}
 uint16_t roll_drum_onset(uint8_t step,uint8_t row) BANKED {uint16_t id;if(!feedback_ready(6)||row>=13||step<seqbase||(uint16_t)step>=seqbase+seqcols)return 65534U;id=fastcells[row][step-seqbase];return id?id-1:65535U;}
 uint16_t roll_drum_hit(uint8_t step,uint8_t row) BANKED {uint16_t id;uint8_t origin,col;if(!feedback_ready(6)||row>=13||step<seqbase||(uint16_t)step>=seqbase+seqcols)return 65534U;col=step-seqbase;id=fastcells[row][col];if(id)return id-1;if(!(fastrowbits[row]&feedback_bit[col]))return 65535U;origin=fastcoverorigin[row][col];if(origin<seqbase)return 65534U;id=fastcells[row][origin-seqbase];return id?id-1:65534U;}
@@ -105,10 +109,10 @@ run_done$:
  add sp,#4
  jp (hl)
  __endasm;}
-static void feedback_region(uint8_t left,uint8_t right,uint8_t top,uint8_t bottom,uint8_t erase,uint8_t bar){uint8_t t,x,i,lo,hi,mask,id,n,old,pixels[16],base0,base1,bit,color,sx,first,last,from,barmask;uint16_t at,step;uint16_t *refs=(uint16_t *)rollonsets;
+static void feedback_region(uint8_t left,uint8_t right,uint8_t top,uint8_t bottom,uint8_t erase,uint8_t bar){uint8_t t,x,i,lo,hi,mask,id,n,old,pixels[16],base0,base1,bit,color,sx,first,last,from,barmask,pad;uint16_t at,step;uint16_t *refs=(uint16_t *)rollonsets;
  for(t=top>>3;t<((bottom+7)>>3);t++)for(x=left>>3;x<((right+7)>>3);x++){
   at=(uint16_t)(t+1)*20+x;old=canvas[at];n=feedback_index(old);if(n==255){seqtileoverflow=1;return;}memcpy(pixels,rolltiles[n],16);lo=left>x*8?left-x*8:0;hi=right<(x+1)*8?right-x*8:8;mask=feedback_masks[lo]^feedback_masks[hi];first=top>t*8?top-t*8:0;last=bottom<(t+1)*8?bottom-t*8:8;base0=base1=0;
-  if(bar){feedback_run(pixels,mask,first,last-first,0,0);if(t==14&&!first)feedback_run(pixels,mask,0,1,0,mask);if(bar>1){if(seqtrack!=6&&t==16&&last==8)feedback_run(pixels,mask,7,1,0,mask);from=136-(bar-1)>t*8?136-(bar-1)-t*8:0;if(from<first)from=first;if(from<last&&left+2<right-2&&left+2<(x+1)*8&&right-2>x*8){lo=left+2>x*8?left+2-x*8:0;hi=right-2<(x+1)*8?right-2-x*8:8;barmask=feedback_masks[lo]^feedback_masks[hi];feedback_run(pixels,barmask,from,last-from,barmask,barmask);}}}
+  if(bar){pad=seqtrack==6&&right-left<6?1:2;feedback_run(pixels,mask,first,last-first,0,0);if(t==14&&!first)feedback_run(pixels,mask,0,1,0,mask);if(bar>1){if(seqtrack!=6&&t==16&&last==8)feedback_run(pixels,mask,7,1,0,mask);from=136-(bar-1)>t*8?136-(bar-1)-t*8:0;if(from<first)from=first;if(from<last&&left+pad<right-pad&&left+pad<(x+1)*8&&right-pad>x*8){lo=left+pad>x*8?left+pad-x*8:0;hi=right-pad<(x+1)*8?right-pad-x*8:8;barmask=feedback_masks[lo]^feedback_masks[hi];feedback_run(pixels,barmask,from,last-from,barmask,barmask);}}}
   else{if(erase){uint8_t *base=seqtrack==6?(uint8_t *)0xBD40:rollbackground;base0=base[(uint16_t)x*16+2];base1=base[(uint16_t)x*16+3];}else base0=base1=255;feedback_run(pixels,mask,first,last-first,base0&mask,base1&mask);}
   if(!bar&&rollcache[5]==seqtrack){bit=feedback_selection_mask(x*8,t*8+first)&mask;for(i=first;i<last;i++){pixels[i*2]^=bit;pixels[i*2+1]^=bit;}}
   id=roll_feedback_intern(pixels);if(seqtileoverflow)return;if(old!=id){refs[n]--;refs[feedback_index(id)]++;canvas[at]=seqscreen[at]=id;}mixfill();
@@ -116,16 +120,17 @@ static void feedback_region(uint8_t left,uint8_t right,uint8_t top,uint8_t botto
 }
 uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED {uint8_t row=0,col,endcol,left,right,top,bottom,x,k,voices,height;uint16_t begin=e[0],end=begin+(e[3]?e[3]:256U),at,id;uint32_t bits=0;int16_t y;
  if(!feedback_ready(c)||c==4||c==5)return 0;if(c!=6&&(eval_mode(c)||evalpatch[c][EV_CHORD_HISTORY]))return 0;if(end<=seqbase||begin>=(uint16_t)seqbase+seqcols)return 0;col=begin<seqbase?0:begin-seqbase;endcol=end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase;
- if(c==6){row=DRUM_VIEW_ROW(e[1]-1);if(row>=13)return 0;bits=(feedback_low[endcol]^feedback_low[col]);if((erase||row>=3)&&(fastoverlap&(1U<<row)))return 0;if(!erase&&row>=3&&(fastrowbits[row]&bits))return 0;
+ if(c==6){row=DRUM_VIEW_ROW(e[1]-1);if(row>=13)return 0;bits=(feedback_low[endcol]^feedback_low[col]);if((erase||row>=3)&&(fastoverlap&(1U<<row)))return 0;if(!erase&&(fastrowbits[row]&bits))return 0;
   /* Edits which can change another PCM hit's admission use the full renderer.
      The common non-overlapping drum and hat gestures need no admission scan. */
   if(row>=3)for(k=col;k<endcol;k++){voices=0;x=rollx[k]+2;for(row=3;row<13;row++){height=feedback_pixel(x,DRUM_SCREEN_ROW(row)*8+2);if(erase&&height==2)return 0;if(height==3)voices++;}if(!erase&&voices>=2)return 0;}row=DRUM_VIEW_ROW(e[1]-1);top=DRUM_SCREEN_ROW(row)*8+1;bottom=top+6;
  }else{for(k=col;k<endcol;k++)if(!erase&&rollnotes[k]&&(rollnotes[k]!=e[1]||(k>col&&rollkind[k]==1)))return 0;if(!erase&&endcol<seqcols&&rollnotes[endcol]==e[1]&&rollkind[endcol]==2)return 0;if(erase&&e[3]!=1&&col&&rollnotes[col-1]==e[1])return 0;y=((int16_t)seqtop[c]-(e[1]-1))*seqheight;if(y<0||y+seqheight>seqgridheight)return 0;top=y+1;bottom=y+seqheight-1;}
- left=rollx[col]+(begin>=seqbase);right=rollx[endcol]-(c!=6&&end<=(uint16_t)seqbase+seqcols);if(right<=left)return 0;
+ left=rollx[col]+(begin>=seqbase);right=rollx[endcol]-(end<=(uint16_t)seqbase+seqcols);if(right<=left)return 0;
  if(!feedbackbatch||!rollbuilding)roll_feedback_begin();if(c!=6&&!erase&&begin>=seqbase)feedback_region(left-1,left,top,bottom,1,0);feedback_region(left,right,top,bottom,erase,0);
- if(seqcols==16&&!seqvelocityhidden&&begin>=seqbase&&begin<(uint16_t)seqbase+16){col=begin-seqbase;feedback_velocity_queue(c,col,erase?0:e[2]);if(c==6){rollbackground[(uint16_t)row*16+col]=erase?0:e[2];id=seq_event_count(6)+(erase?-1:1);rollcache[1]=id;rollcache[3]=id>>8;}}
+ if(c!=6&&seqcols==16&&!seqvelocityhidden&&begin>=seqbase&&begin<(uint16_t)seqbase+16){col=begin-seqbase;feedback_velocity_queue(c,col,erase?0:e[2]);}
 
  if(seqtileoverflow){roll_clear_transition();seqfontdirty=seqdrawvalid=0;dirty=1;return 0;}
+ if(c==6)drum_velocity_set(row,begin,erase?0:e[2]);
  if(c==6){if(erase){fastrowbits[row]&=~bits;if(begin>=seqbase)fastcells[row][begin-seqbase]=0;}else{for(k=begin<seqbase?0:begin-seqbase;k<endcol;k++)if(!(fastrowbits[row]&feedback_bit[k]))fastcoverorigin[row][k]=begin;if(fastrowbits[row]&bits)fastoverlap|=1U<<row;fastrowbits[row]|=bits;if(begin>=seqbase)fastcells[row][begin-seqbase]=seq_event_count(6)+1;}}
  else for(k=begin<seqbase?0:begin-seqbase;k<endcol;k++){rollnotes[k]=erase?0:e[1];rollkind[k]=erase?0:k+seqbase==begin?1:2;rollnotey[k]=erase?255:top-1;rolloldkind[k]=rollkind[k];}
  /* Publish the few changed tiles before the note-store mutation. */
@@ -149,7 +154,7 @@ static uint8_t feedback_drum_resize(const uint8_t *old,const uint8_t *next){
   voices=0;for(r=3;r<13;r++){pixel=feedback_pixel(rollx[k]+2,DRUM_SCREEN_ROW(r)*8+2);if(pixel==2)return 0;if(r!=row&&pixel==3)voices++;}
   if(!erase&&voices>=2)return 0;
  }
- left=rollx[first];right=rollx[last];top=DRUM_SCREEN_ROW(row)*8+1;
+ left=rollx[first]-((erase?b:a)>seqbase);right=rollx[last]-((erase?a:b)<=(uint16_t)seqbase+seqcols);top=DRUM_SCREEN_ROW(row)*8+1;
  if(!feedbackbatch||!rollbuilding)roll_feedback_begin();feedback_region(left,right,top,top+6,erase,0);
  if(seqtileoverflow){roll_clear_transition();seqfontdirty=seqdrawvalid=0;dirty=1;return 0;}
  if(erase)fastrowbits[row]&=~bits;
@@ -232,7 +237,7 @@ handle_store$:
  __endasm;}
 
 /* One slider scanline-row per idle frame. Queued input always wins. */
-void roll_feedback_service(void) BANKED {uint8_t col,height,row,left,width;uint16_t at;if(!feedbackpending)return;if(!feedback_ready(feedbacktrack)||seqcols!=16||seqvelocityhidden||feedbackbase!=seqbase||feedbackrow!=drumrow){feedbackpending=feedbackphase=0;return;}if(padread!=padwrite||padsampled&(J_A|J_B|J_LEFT|J_RIGHT|J_UP|J_DOWN|J_START|J_SELECT))return;for(col=0;col<16;col++)if(feedbackpending&(1U<<col))break;if(col>=16){feedbackpending=0;return;}height=feedbackvel[col]?1+((uint16_t)feedbackvel[col]*20)/127:0;row=14+feedbackphase;roll_feedback_begin();feedback_region(rollx[col],rollx[col+1],row*8,row*8+8,0,1+height);if(seqtileoverflow){feedbackpending=0;roll_clear_transition();seqfontdirty=seqdrawvalid=0;dirty=1;return;}roll_commit();left=rollx[col]>>3;width=((rollx[col+1]+7)>>3)-left;at=(uint16_t)(row+1)*20+left;ui_upload_map(0x9800U+(uint16_t)(row+1)*32+left,canvas+at,width);memcpy(visible+at,canvas+at,width);if(++feedbackphase==3){feedbackphase=0;feedbackpending&=~(1U<<col);rolloldvel[col]=height;}}
+void roll_feedback_service(void) BANKED {uint8_t col,height,row,left,width;uint16_t at;if(seqtrack==6){drum_velocity_service();return;}if(!feedbackpending)return;if(!feedback_ready(feedbacktrack)||seqcols!=16||seqvelocityhidden||feedbackbase!=seqbase||feedbackrow!=drumrow){feedbackpending=feedbackphase=0;return;}if(padread!=padwrite||padsampled&(J_A|J_B|J_LEFT|J_RIGHT|J_UP|J_DOWN|J_START|J_SELECT))return;for(col=0;col<16;col++)if(feedbackpending&(1U<<col))break;if(col>=16){feedbackpending=0;return;}height=feedbackvel[col]?1+((uint16_t)feedbackvel[col]*20)/127:0;row=14+feedbackphase;roll_feedback_begin();feedback_region(rollx[col],rollx[col+1],row*8,row*8+8,0,1+height);if(seqtileoverflow){feedbackpending=0;roll_clear_transition();seqfontdirty=seqdrawvalid=0;dirty=1;return;}roll_commit();left=rollx[col]>>3;width=((rollx[col+1]+7)>>3)-left;at=(uint16_t)(row+1)*20+left;ui_upload_map(0x9800U+(uint16_t)(row+1)*32+left,canvas+at,width);memcpy(visible+at,canvas+at,width);if(++feedbackphase==3){feedbackphase=0;feedbackpending&=~(1U<<col);rolloldvel[col]=height;}}
 
 static uint8_t *feedback_header_number(uint8_t *dst,uint16_t value,uint8_t base){uint8_t digit,hundreds=value>=100;if(hundreds){digit=value/100;*dst++='0'+digit-32+base;value-=digit*100;}if(hundreds||value>=10){digit=value/10;*dst++='0'+digit-32+base;value-=digit*10;}*dst++='0'+value-32+base;return dst;}
 __at (0xA428) static uint8_t feedbackheader[7];
@@ -247,12 +252,12 @@ uint8_t roll_group_add(uint8_t c,const uint8_t *e,uint16_t index) BANKED {uint16
    The inactive piano base image provides the continuation masks. */
 static uint32_t feedback_changed_tiles(uint16_t begin,uint16_t end){uint8_t first,last;
  if(end<=seqbase||begin>=(uint16_t)seqbase+seqcols)return 0;
- first=rollx[begin<seqbase?0:begin-seqbase]>>3;last=(rollx[end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase]+7)>>3;
+ first=(rollx[begin<seqbase?0:begin-seqbase]-(begin>seqbase))>>3;last=(rollx[end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase]+7)>>3;
  return (feedback_low[last]^feedback_low[first]);
 }
 uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED {
  uint32_t *continued=(uint32_t *)0xBE80,occupied=0,second=0,bits,changedtiles=0;
- uint16_t i,count,begin,end,changed=0,at,*refs=(uint16_t *)rollonsets;
+ uint16_t i,count,begin,end,changed=0,continuing=0,at,*refs=(uint16_t *)rollonsets;
  uint8_t e[4],row,col,last,x,left,right,mask,bit,low,high,color,k,n,id,old,pixels[16],selection,firstrow=seqgroupy0+(dy<0?dy:0),lastrow=seqgroupy1+(dy>0?dy:0);
  if(!feedback_ready(6))return 0;
  if(lastrow>=3&&(fastghostrows&0x1FF8))return 0;
@@ -266,7 +271,8 @@ uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED {
   }
   col=begin<seqbase?0:begin-seqbase;last=end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase;bits=(feedback_low[last]^feedback_low[col]);
   if(row>=3){if(lastrow>=3&&(second&bits))return 0;second|=occupied&bits;occupied|=bits;}else if(row==2&&firstrow<=2&&lastrow>=2&&(fastrowbits[row]&bits))return 0;
-  if(fastrowbits[row]&bits)fastoverlap|=1U<<row;
+  if(fastrowbits[row]&bits){if(row>=firstrow&&row<=lastrow)return 0;fastoverlap|=1U<<row;}
+  if(end>(uint16_t)seqbase+seqcols)continuing|=1U<<row;
   for(k=col;k<last;k++)if(!(fastrowbits[row]&feedback_bit[k]))fastcoverorigin[row][k]=begin;
   fastrowbits[row]|=bits;if(begin<seqbase)continued[row]|=bits;else{if(col+1<last)continued[row]|=bits&~feedback_bit[col];if(!fastcells[row][col])fastcells[row][col]=i+1;if(seqcols==16)rollbackground[(uint16_t)row*16+col]=e[2];}
   if(!(i&7))service();
@@ -274,7 +280,7 @@ uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED {
  roll_feedback_begin();
  for(row=firstrow;row<=lastrow;row++){
   memcpy(rollrow,(const void *)0xBD40,320);bits=1UL;
-  for(col=0;col<seqcols;col++,bits<<=1)if(fastrowbits[row]&bits){left=rollx[col]+(!col||!(continued[row]&bits));right=rollx[col+1];drum_feedback_span(left,right);}
+  for(col=0;col<seqcols;col++,bits<<=1)if(fastrowbits[row]&bits){left=rollx[col]+(!col||!(continued[row]&bits));right=rollx[col+1]-((col+1<seqcols)?(!(fastrowbits[row]&feedback_bit[col+1])||fastcells[row][col+1]):!(continuing&(1U<<row)));drum_feedback_span(left,right);}
   for(x=3;x<20;x++){
    if(!(changedtiles&feedback_bit[x]))continue;
    low=rollrow[x*16+2];high=rollrow[x*16+3];
@@ -290,5 +296,18 @@ uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED {
  if(seqcols==16&&!seqvelocityhidden)roll_feedback_velocity_row();
  if(dx||dy){seqflushpending=1;return 1;}
  roll_commit();for(row=0;row<13;row++)if(changed&(1U<<row)){at=(uint16_t)(DRUM_SCREEN_ROW(row)+1)*20+3;ui_upload_map(0x9800U+(uint16_t)(DRUM_SCREEN_ROW(row)+1)*32+3,canvas+at,17);memcpy(visible+at,canvas+at,17);mixfill();}
+ seqflushpending=1;return 1;
+}
+
+/* Slider edits touch only the scanlines between the previous and new heights. */
+uint8_t roll_velocity_bar(uint8_t col,uint8_t oldheight,uint8_t height) BANKED {
+ uint8_t left,right,top,bottom,row,width;uint16_t at;
+ if(!feedback_ready(6)||seqvelocityhidden||col>=seqcols)return 0;
+ if(oldheight==height)return 1;
+ left=rollx[col];right=rollx[col+1];top=oldheight==255?112:136-(oldheight>height?oldheight:height);bottom=oldheight==255?136:136-(oldheight<height?oldheight:height);
+ roll_feedback_begin();feedback_region(left,right,top,bottom,0,1+height);
+ if(seqtileoverflow){roll_clear_transition();seqfontdirty=0;seqdrawvalid=0;dirty=1;return 0;}
+ roll_commit();width=((right+7)>>3)-(left>>3);
+ for(row=top>>3;row<((bottom+7)>>3);row++){at=(uint16_t)(row+1)*20+(left>>3);ui_upload_map(0x9800U+(uint16_t)(row+1)*32+(left>>3),canvas+at,width);memcpy(visible+at,canvas+at,width);mixfill();}
  seqflushpending=1;return 1;
 }

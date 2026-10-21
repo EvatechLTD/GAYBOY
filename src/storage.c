@@ -97,7 +97,9 @@ uint8_t seq_event_next_step(uint8_t c,uint8_t step,uint16_t *cursor,uint8_t *e) 
 uint8_t seq_note_event(uint8_t c,uint8_t step,uint8_t *e) BANKED {uint16_t i=0;uint8_t next[4],found=0;while(seq_event_next_step(c,step,&i,next))if(!found||next[1]<e[1]){memcpy(e,next,4);found=1;}return found;}
 void seq_event_erase(uint8_t c,uint16_t i) BANKED {uint16_t at;if(c>=7||i>=seqeventcounts[c])return;at=seqeventoffsets[c]+i;resident_move(at*4,(at+1)*4,(total()-at-1)*4);seqeventcounts[c]--;changed(c);}
 uint8_t seq_event_put(uint8_t c,uint16_t i,const uint8_t *event) BANKED {uint8_t e[4],old[4];uint16_t at,n;if(c>=7||!event[1]||event[2]>127)return 0;memcpy(e,event,4);
- if(i!=65535U){if(i>=seqeventcounts[c])return 0;resident_write(mx.slot,RESIDENT_EVENTS+(seqeventoffsets[c]+i)*4,e,4);changed(c);return 1;}
+ if(i!=65535U){if(i>=seqeventcounts[c])return 0;at=seqeventoffsets[c]+i;readnote(at,old);resident_write(mx.slot,RESIDENT_EVENTS+at*4,e,4);
+  /* Velocity cannot change address chains or drum voice admission. */
+  if(old[0]==e[0]&&old[1]==e[1]&&old[3]==e[3]){if(c!=6)eval_chord_dirty(c);resident_events_changed();seqeventfull=0;}else changed(c);return 1;}
  n=total();if(n>=RESIDENT_NOTES){seqeventfull=1;return 0;}i=seqeventcounts[c];
  at=seqeventoffsets[c]+i;resident_move((at+1)*4,at*4,(n-at)*4);resident_write(mx.slot,RESIDENT_EVENTS+at*4,e,4);seqeventcounts[c]++;changed(c);return 1;}
 void seq_track_clear(uint8_t c) BANKED {uint16_t at,end;if(c>=7)return;at=seqeventoffsets[c];end=at+seqeventcounts[c];resident_move(at*4,end*4,(total()-end)*4);seqeventcounts[c]=0;changed(c);}

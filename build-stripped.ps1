@@ -2,7 +2,7 @@ $ErrorActionPreference = "Continue"
 Set-Location $PSScriptRoot -ErrorAction Stop
 python tools/build_rom.py
 if ($LASTEXITCODE) { throw "ROM build failed" }
-foreach ($test in @("test_stripped_engine.py", "test_stripped_resident.py", "test_stripped_ui.py", "test_stripped_edit_latency.py", "test_stripped_fast_edits.py", "test_stripped_menu_controls.py", "test_stripped_resize.py", "test_stripped_groups.py", "test_stripped_duplicate.py", "test_stripped_screen_cleanup.py", "test_stripped_coarse.py", "test_stripped_instrument_navigation.py", "test_stripped_mixer_update.py", "test_stripped_settings.py", "test_stripped_drum_separator.py", "test_stripped_group_overlap.py", "test_stripped_mixer_pixels.py")) {
+foreach ($test in @("test_stripped_engine.py", "test_stripped_resident.py", "test_stripped_ui.py", "test_stripped_edit_latency.py", "test_stripped_fast_edits.py", "test_stripped_menu_controls.py", "test_stripped_resize.py", "test_stripped_groups.py", "test_stripped_duplicate.py", "test_stripped_screen_cleanup.py", "test_stripped_coarse.py", "test_stripped_instrument_navigation.py", "test_stripped_mixer_update.py", "test_stripped_settings.py", "test_stripped_drum_separator.py", "test_stripped_group_overlap.py", "test_stripped_mixer_pixels.py", "test_stripped_brush_toggle.py", "test_stripped_keyboard_return.py", "test_stripped_drum_velocity_navigation.py", "test_stripped_locked_velocity.py", "test_stripped_velocity_dense.py", "test_stripped_master_transport.py", "test_stripped_painted_kicks.py")) {
     python (Join-Path "tools" $test)
     if ($LASTEXITCODE) { throw "$test failed" }
 }
@@ -26,5 +26,7 @@ if (Test-Path "build/stripped-baseline/cpu.json") {
 }
 python tools/test_stripped_timing.py --groups
 if ($LASTEXITCODE) { throw "Live group edit timing failed" }
+python tools/test_stripped_timing.py --velocity
+if ($LASTEXITCODE) { throw "Live velocity timing failed" }
 python tools/package_stripped.py
 if ($LASTEXITCODE) { throw "Packaging failed" }

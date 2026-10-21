@@ -33,7 +33,7 @@ void stop(uint8_t c) BANKED {
 }
 void panic_audio(void) BANKED{uint8_t c;seqapending=seqamoved=0;seqplaying=0;seqticks=0;drum_stop();exp_reset();monocount=monodown=0;modreset();memset(keycount,0,4);voice_reset();polysustain=0;for(c=0;c<4;c++){active[c]=0;stop(c);held[c]=255;sustain[c]=0;}NR12_REG=NR22_REG=0;}
 extern uint8_t seqgate[7];
-extern uint16_t seqcachedbpm;
+extern uint16_t seqcachedbpm,seqdeadline;
 uint8_t experimental_mode=1;
 const char * const native_voices[]={"PULSE1","PULSE2","WAVE1","NOISE"};
 const char * const native_names[]={"DUTY","VOLUME","ENV DIR","ENV RATE","SWEEP TIME","SWEEP DIR","SWEEP SHIFT","LENGTH","LENGTH ON","MUTE","MASTER R","VIN R","MASTER L","VIN L","WAVE SHAPE","WAVE LEVEL","WAVE LENGTH","WAVE DAC OFF","NOISE SHIFT","NOISE WIDTH","NOISE DIV","PAN","DAC OFF","SUSTAIN","STOP","BEND RANGE"};
@@ -90,8 +90,12 @@ void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint
 
 /* Keep frame-rate FX work out of the scarce fixed-ROM interrupt bank. */
 uint8_t seq_native_fx_idle(void) BANKED;
-void service_frame(void) BANKED {uint16_t now,delta;__critical {now=sys_time;}
- if(lastframe!=now){delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;
+void service_frame(void) BANKED {uint16_t now,delta;__critical {now=sys_time;delta=seqticks;}
+ if(lastframe!=now){
+  /* Let an imminent sequencer event precede the next video-rate mod update.
+     lastframe stays unchanged so the deferred update catches up afterward. */
+  if(seqplaying&&!syncmode&&!seqservicing&&delta<seqdeadline&&seqdeadline-delta<=8)return;
+  delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;
   if(!seqnativelaunchfired){eval_frame();mixfill();eval_audio_frame();}
   if(midiage)midiage--;
  }

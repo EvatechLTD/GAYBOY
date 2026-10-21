@@ -11,12 +11,12 @@ def tilepixel(x,y):
  address=0x8000+tile*16 if p.memory[0xff40]&16 else 0x9000+(tile if tile<128 else tile-256)*16
  off=address+(y%8)*2;mask=128>>(x%8)
  return bool(p.memory[off]&mask)+2*bool(p.memory[off+1]&mask)
-def grid():return bytes(tilepixel(x,y) for y in range(v('seqgridheight')) for x in range(24,160))
+def grid():
+ height=(128 if v('seqvelocityhidden') else 112) if v('seqtrack')==6 else v('seqgridheight')
+ return bytes(tilepixel(x,y) for y in range(height) for x in range(24,160))
 def count():return v('seqeventcounts',12)|v('seqeventcounts',13)<<8
 def notes():
- p.memory[0x4000]=1
- data=[list(p.memory[0xa300+i*4:0xa304+i*4]) for i in range(count())]
- p.memory[0x4000]=0
+ data=[list(p.memory[1,0xa300+i*4:0xa304+i*4]) for i in range(count())]
  return data
 def tapquick(key):p.button_press(key);p.tick(1);p.button_release(key);p.tick(1)
 for rownum,velocity in ((0,False),(5,False),(0,True),(5,True)):
@@ -62,7 +62,7 @@ for rownum,velocity in ((0,False),(5,False),(0,True),(5,True)):
   p.tick(30);image=grid();put('seqdrawvalid',0);put('dirty',1);p.tick(180);assert '--baseline' in sys.argv or grid()==image,'Fast edit differs from full redraw'
   reports.append({'row':rownum,'velocity_visible':velocity,**latencies})
  finally:p.stop(save=False)
-# Fresh hihat patterns: paint identical default lengths, never resize or erase.
+# A+B paints empty cells and erases existing onsets or note bodies.
 if '--baseline' not in sys.argv:
  for length in (1,4):
   exec(prefix)
@@ -71,9 +71,10 @@ if '--baseline' not in sys.argv:
    p.button_press('a');p.tick(2);p.button_press('b');p.tick(4)
    for _ in range(7):tapquick('right')
    p.button_release('a');p.button_release('b');p.tick(6)
-   if count()!=8:print('paint backlog',length,count(),v('seqcursor',6),v('padread'),v('padwrite'));p.tick(12)
-   assert count()==8 and v('seqcursor',6)==7,notes()
-   assert sorted((e[0],e[3]) for e in notes())==[(i,length) for i in range(8)],notes()
+   p.tick(100)
+   expected=[(i,length) for i in range(8)]
+   assert v('seqcursor',6)==7,notes()
+   assert sorted((e[0],e[3]) for e in notes())==expected,notes()
    p.tick(100);image=grid();put('seqdrawvalid',0);put('dirty',1);p.tick(240);assert grid()==image,'Paint differs from complete render'
    p.screen.image.save('build/stripped-paint-'+str(length)+'.png')
   finally:p.stop(save=False)

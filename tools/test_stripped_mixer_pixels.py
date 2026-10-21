@@ -22,6 +22,10 @@ def check(label):
  assert not mismatches,(label,mismatches)
 try:
  enter_app(p,S);menu(18);check('first entry')
+ for bpm in (99,120,200,255,256,300):
+  put('seqglobalbpm',bpm&255);put('seqglobalbpm',bpm>>8,1);put('dirty',1);p.tick(60)
+  assert line(1)[4:7]==f'{bpm:03}',('BPM digits',bpm,line(1))
+ put('seqglobalbpm',120);put('seqglobalbpm',0,1)
  for target in (11,30,16,2,23):
   menu(target);menu(18);check('return from '+str(target))
   p.button_press('start');p.tick(20);press('select');p.button_release('start');check('cancel menu')

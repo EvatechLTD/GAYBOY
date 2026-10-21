@@ -158,28 +158,8 @@ extern __at (0xAD80) uint8_t rollcache[10];
 extern __at (0xADB8) uint8_t rolloldvel[40];
 extern __at (0xBFE8) uint8_t rolldirty[20];
 void roll_upload_dirty(uint8_t row) BANKED;
-void drum_velocity_render(void) BANKED {uint8_t t,scan,i,vel,e[4],saved[5],changed=0,full=rollcache[0]!=167&&rollcache[0]!=168,left,right,x,row;uint16_t scaled,n,step,a,b,span,bit,count=seq_event_count(6),end=(uint16_t)seqbase+16,*covered=(uint16_t *)rollrow;
- /* The full drum grid has already consumed its background scanline. Reuse
-    that scratch for all thirteen rows' onset velocities, until a note edit
-    or viewport change rebuilds the grid. Row focus then costs sixteen bytes,
-    rather than sixteen scans of every event on every selection edge. */
- if(full||rollcache[2]!=225||rollcache[1]!=(uint8_t)count||rollcache[3]!=(uint8_t)(count>>8)){
-  /* The extra unused bytes are safe. SDCC's PUSH-AF constant optimization
-     miscompiles a 208-byte memset count as 144 on this GBZ80 toolchain. */
-  memset(rollbackground,0,256);memset(covered,0,26);
-  for(n=0;n<count;n++){if(!(n&7))mixfill();if(!seq_event_get(6,n,e)||!e[1]||e[1]>13)continue;row=DRUM_VIEW_ROW(e[1]-1);a=e[0];b=a+grid_duration(e);if(b<=seqbase||a>=end)continue;
-   left=a<seqbase?0:a-seqbase;right=b>end?16:b-seqbase;span=(65535U<<left)&(65535U>>(16-right));
-   if(a>=seqbase){i=a-seqbase;bit=1U<<i;if(!(covered[row]&bit))rollbackground[(uint16_t)row*16+i]=e[2];}covered[row]|=span;
-  }
-  rollcache[1]=count;rollcache[2]=225;rollcache[3]=count>>8;
- }
- memcpy(rollkind,rollbackground+(uint16_t)drumrow*16,16);
- memset(rolldirty,full?1:0,20);
- for(i=0;i<16;i++){vel=rollkind[i];scaled=(uint16_t)vel*20;rollkind[i]=vel?1+((scaled+1+(scaled>>7))>>7):0;
-  if(full||rollkind[i]!=rolloldvel[i]){changed=1;left=(rollx[i]+2)>>3;right=(rollx[i+1]-3)>>3;for(x=left;x<=right;x++)rolldirty[x]=1;}rolloldvel[i]=rollkind[i];
- }
- if(changed)for(t=14;t<17;t++){if(rollcache[0]==168)memcpy(saved,(const void *)0xAFD0,5);memset(rollrow,0,320);scan=(t-14)*8;if(!scan)drum_span(0,0,160,2);for(i=0;i<16;i++){if(rollkind[i]){step=(uint16_t)seqbase+i;scan=(t-14)*8;if(scan<24-rollkind[i])scan=24-rollkind[i];for(;scan<(t-13)*8;scan++)drum_span(scan&7,rollx[i]+2,rollx[i+1]-2,step>=seqlength[6]?2:3);}mixfill();}if(rollcache[0]==168)memcpy((void *)0xAFD0,saved,5);roll_upload_dirty(t);service();}seqviewtop=drumrow;
-}
+void drum_velocity_render(void) BANKED;
+
 extern uint8_t seqbeats,seqdenom;
 void roll_clear_transition(void) BANKED;
 __at (0xAFD8) uint8_t drumselectcache[24];
@@ -200,7 +180,7 @@ void drum_render(void) BANKED {
  for(event=0;event<count;event++){if(!(event&7))mixfill();if(roll_navigation_abort())return;if(!seq_event_get(6,event,e)||!e[1]||e[1]>13)continue;row=DRUM_VIEW_ROW(e[1]-1);a=e[0];b=a+grid_duration(e);
   if(b<=seqbase||a>=viewend)continue;left=a>seqbase?a-seqbase:0;last=b<viewend?b-seqbase:seqcols;cellbits=(0xffffffffUL<<left)&(0xffffffffUL>>(32-last));if(fastrowbits[row]&cellbits)fastoverlap|=1U<<row;for(i=left;i<last;i++)if(!(fastrowbits[row]&(1UL<<i)))fastcoverorigin[row][i]=a;fastrowbits[row]|=cellbits;if(a>=seqbase&&!fastcells[row][a-seqbase])fastcells[row][a-seqbase]=event+1;if(visible>=192)continue;
   if(grid_selected(e))drumselectcache[visible>>3]|=1<<(visible&7);
-  drumleft[visible]=rollx[a>seqbase?a-seqbase:0]+1;if(!eval_drum_allowed(event)){drumdim[visible>>3]|=1<<(visible&7);fastghostrows|=1U<<row;}drumright[visible]=rollx[b<viewend?b-seqbase:seqcols];drumnext[visible]=drumheads[row];drumheads[row]=visible;visible++;mixfill();if(roll_navigation_abort())return;
+  drumleft[visible]=rollx[a>seqbase?a-seqbase:0]+1;if(!eval_drum_allowed(event)){drumdim[visible>>3]|=1<<(visible&7);fastghostrows|=1U<<row;}drumright[visible]=rollx[b<viewend?b-seqbase:seqcols]-(b<=viewend);drumnext[visible]=drumheads[row];drumheads[row]=visible;visible++;mixfill();if(roll_navigation_abort())return;
  }
  for(t=0;t<seqgridheight/8;t++){
   target=DRUM_SCREEN_INDEX(t);if(target==255){memset(rollrow,0,320);roll_upload(t);continue;}
@@ -213,13 +193,17 @@ void drum_render(void) BANKED {
    if(drumright[k]>boundary)drum_span(scan,drumleft[k]>boundary?drumleft[k]:boundary,drumright[k],2);
    mixfill();if(roll_navigation_abort())return;k=drumnext[k];
   }
-  drum_replicate(scan,last);if(target<13)drum_span(7,24,160,1);mixfill();if(roll_navigation_abort())return;
+  k=target<13?drumheads[target]:255;while(k!=255){if(drumright[k]<160)drum_span(scan,drumright[k],drumright[k]+1,0);k=drumnext[k];}
+  for(i=1;i<seqcols;i++)if(fastcells[target][i])drum_span(scan,rollx[i]-1,rollx[i],0);
+  drum_replicate(scan,last);if(target==3)drum_span(0,24,160,1);if(target<13)drum_span(7,24,160,1);mixfill();if(roll_navigation_abort())return;
   if(seqgrouptrack==6)roll_invert_selection(t);
   roll_upload(t);service();
  }
- if(seqcols==16&&!seqvelocityhidden)drum_velocity_render();
+ if(!seqvelocityhidden)drum_velocity_render();
  if(seqtileoverflow&&!retried){retried=1;roll_clear_transition();seqfontdirty=0;goto redraw;}
  seqfontdirty=1;seqviewbase=seqbase;seqviewcols=seqcols;seqviewtrack=6;seqviewtop=drumrow;rollcache[0]=167;rollcache[4]=seqgridheight;rollcache[5]=seqgrouptrack;rollcache[6]=seqgroupx0;rollcache[7]=seqgroupx1;rollcache[8]=seqgroupy0;rollcache[9]=seqgroupy1;
 }
 
 void drum_feedback_span(uint8_t left,uint8_t right) BANKED {drum_span(1,left,right,3);}
+
+void drum_velocity_span(uint8_t y,uint8_t left,uint8_t right,uint8_t color) BANKED {drum_span(y,left,right,color);}

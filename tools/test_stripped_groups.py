@@ -6,14 +6,14 @@ prefix=Path('tools/test_stripped_ui.py').read_text().split('\ntry:')[0]
 prefix=prefix.replace("Path('build/GAYBOY.noi')","rom.with_suffix('.noi')").replace("'build/GAYBOY.gb',",'str(rom),')
 helpers='def tilepixel'+Path('tools/test_stripped_fast_edits.py').read_text().split('def tilepixel')[1].split('for rownum,velocity')[0]
 reports=[]
-for track,rownum,size in ((6,5,2),(6,0,2),(0,0,2),(6,0,6),(6,5,6),(0,0,6)):
+for track,rownum,size in ((6,5,2),(6,3,2),(6,0,2),(0,0,2),(6,0,6),(6,5,6),(0,0,6)):
  steps0=[2,6] if size==2 else list(range(2,14,2));anchor=steps0[0]
  exec(prefix);exec(helpers)
  try:
   enter_app(p,S);put('seqtrack',track);put('seqhead',0);put('seqfocus',0);put('drumrow',rownum);put('seqdefaultdur',1,track*2);put('seqdefaultdur',0,track*2+1);put('seqdrawvalid',0);put('dirty',1);p.tick(180)
   for step in steps0:put('seqcursor',step,track);put('dirty',1);p.tick(10);press('b');p.tick(80)
   def records():
-   p.memory[0x4000]=1;e=[list(p.memory[0xa300+i*4:0xa304+i*4]) for i in range(size)];p.memory[0x4000]=0;return e
+   return [list(p.memory[1,0xa300+i*4:0xa304+i*4]) for i in range(size)]
   put('seqcursor',0,track);put('dirty',1);p.tick(20)
   rebuild=[];ptr=S['_drum_render' if track==6 else '_seq_pixels'];p.hook_register(ptr>>16,ptr&65535,lambda _:rebuild.append(p._cycles()),None)
   p.button_press('a');p.tick(6)

@@ -11,7 +11,7 @@ for track,rownum in ((6,5),(6,0),(0,0)):
   enter_app(p,S);put('seqtrack',track);put('seqhead',0);put('seqfocus',0);put('drumrow',rownum);put('seqdefaultdur',1,track*2);put('seqdefaultdur',0,track*2+1);put('seqdrawvalid',0);put('dirty',1);p.tick(180)
   press('b');p.tick(100)
   def records():
-   p.memory[0x4000]=1;e=list(p.memory[0xa300:0xa304]);p.memory[0x4000]=0;return e
+   return list(p.memory[1,0xa300:0xa304])
   rebuild=[];ptr=S['_drum_render' if track==6 else '_seq_pixels'];p.hook_register(ptr>>16,ptr&65535,lambda _:rebuild.append(p._cycles()),None)
   def compare():
    p.tick(90);image=grid();put('seqdrawvalid',0);put('dirty',1);p.tick(180);assert image==grid(),(track,rownum,'pixel mismatch',records());rebuild.clear()
