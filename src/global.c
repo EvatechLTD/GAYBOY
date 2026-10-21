@@ -1,6 +1,7 @@
 #pragma bank 15
 #include "api.h"
 extern uint8_t globalmod[10];
+extern uint32_t noiseleft[2];
 extern uint8_t seqnativelaunchfired;
 void seq_native_touch(void) NONBANKED;
 #include "tones.h"
@@ -90,13 +91,23 @@ void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint
 
 /* Keep frame-rate FX work out of the scarce fixed-ROM interrupt bank. */
 uint8_t seq_native_fx_idle(void) BANKED;
-void service_frame(void) BANKED {uint16_t now,delta;__critical {now=sys_time;delta=seqticks;}
+extern uint16_t pattern_generation;
+void service_frame(void) BANKED {uint16_t now,delta;uint8_t users=0,needed=0;__critical {now=sys_time;delta=seqticks;}
  if(lastframe!=now){
   /* Let an imminent sequencer event precede the next video-rate mod update.
      lastframe stays unchanged so the deferred update catches up afterward. */
   if(seqplaying&&!syncmode&&!seqservicing&&delta<seqdeadline&&seqdeadline-delta<=8)return;
   delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;
-  if(!seqnativelaunchfired){eval_frame();mixfill();eval_audio_frame();}
+  if(!seqnativelaunchfired){
+   if(eval_moddirty||eval_modgeneration!=pattern_generation)eval_mod_configure();
+   if(eval_lfousers||eval_envusers){
+    if(active[0]&&!pulsekickleft)users|=1;if(active[1])users|=2;
+    if(active[2]&&waveengine!=3)users|=4;if(active[3]&&!drumnoiseowned)users|=8;
+    if(drumnoiseowned){if(noiseleft[0])users|=32;if(noiseleft[1])users|=64;}if(pulsekickleft)users|=128;
+    if(users&eval_lfousers)needed|=1;if(users&eval_envusers)needed|=2;
+    if(needed){eval_mod_frame(needed);mixfill();eval_audio_frame();}
+   }
+  }
   if(midiage)midiage--;
  }
 }

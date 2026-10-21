@@ -1,0 +1,147 @@
+MOD optimization port to main - 21 October 2026
+
+Status
+
+Ported to main as extracted changes, without importing the dispatch branch.
+Functional checks below passed. Performance validation is mixed:
+there are measured CPU/timing regressions as well as substantial savings. This is
+not a clean timing acceptance pass and does not establish hardware reliability.
+
+Baseline
+
+Main commit: 5d70577. The recent existing ROM was archived, then the normal build
+command reproduced it byte for byte. No full baseline rebuild was necessary.
+Baseline SHA256:
+c879747148ae66000ed902507f44d6e7ff3c7a09005b067fc8123d3f85cd7684
+Candidate SHA256:
+14b3fabb45b7ecd796526cee912cc38044e7e778ef4c3eeabb1c2bfb4b975960
+Baseline ROM/symbol/map: build/mod-port-baseline/GAYBOY.*
+Other pre-existing working-tree edits were left untouched.
+
+Changes
+
+1. evaluation.c: exact synced-LFO quotient/remainder caching; preserve the
+   frame timebase, musical clock wrap, clamp, retriggers and envelope cadence.
+   Settings changes seed the fraction from the retained musical clock.
+   Long gaps use binary accumulation, bounded to eight iterations, rather than
+   dispatch's potentially 255 frame iterations. Free-rate clock catch-up is
+   batched too. Neither path does hidden elapsed-time work while idle.
+
+2. evaluation.c/global.c: independent configured LFO/envelope route masks and
+   live activity/ownership checks. Both signed fine and coarse depths and their
+   independent source selectors count; ADSR volume counts without pitch depth.
+   Native voices 0..3, noise 5/6 and kick 7 are included. Slot 4 is mixer gains,
+   not a voice. PCM, kick and noise ownership excludes displaced native voices.
+   LFO-only notes do not start the envelope. Route removal clears held-envelope
+   users and starts a remaining tail's release when the last held user vanishes.
+   The last configured LFO route resets phase/clock; adding another route to an
+   already configured LFO preserves phase. Inactive consumers pause free phase.
+   pattern_generation handles UI, MIDI/program and user-preset mutation paths;
+   defaults/eval restore dirty the cache explicitly. coarse_restore also dirties
+   it, covering the independently restored coarse destinations.
+   Zero-depth waveform evaluation already short-circuited on main.
+
+3. evaluation.c: eval_arp_wait/eval_seq_tick exclude empty chords before clock
+   or period work. Main's existing scheduler still wakes song rows and gates.
+   Empty clocks pause. Chord rebuilds wake arps with retain/retrigger rules intact.
+
+No chord staging, alternate timer, storage rewrite, attack fast path or capacity
+reduction was imported. Main's scheduler, storage format and memory map remain.
+
+Functional validation
+
+python tools/build_rom.py
+python tools/test_mod_port_lfo.py
+python tools/test_mod_port_idle.py
+python tools/test_mod_port_arp.py
+python tools/test_mod_port_cost.py
+python tools/test_mod_port_compare.py
+
+All commands completed. The compare command records measurements, not a timing
+pass: its JSON preserves timing_target_met and foreground_load_exercised flags.
+
+The LFO test made 1,836 exact baseline/candidate phase/clock comparisons: all 17
+divisions and 3 timings; BPM changes, sync/free switching, retriggers, clock wrap,
+zero-frame updates and gaps including the binary-path boundaries and 255 frames.
+The test documents the main-specific private-state offsets; they must be updated
+if the leading evaluation object layout changes.
+
+The arp test matched 47 populated configurations (all 11 orders, straight/triplet/
+dotted/free-ms clocks and retained phase). Additional tests empty and rebuild a
+song chord and check paused/resumed clocks with retrigger both off and on.
+
+The idle test covered 28 signed fine/coarse/source/voice combinations plus mixed
+sources, no engine/audio calls when unused, zero-to-nonzero wakeup, free-phase
+pause, source edits during a note, release tails, overlapping held voices, actual
+overlapping MIDI keys, native ownership exclusions, tone restore, user-preset
+restore and defaults. Raw fixture writes dirty the route cache explicitly or
+increment pattern_generation.
+
+Existing suites passed:
+test_stripped_engine.py, test_stripped_resident.py, test_stripped_theory.py,
+test_stripped_master_transport.py, test_stripped_ui.py, test_stripped_settings.py.
+These cover shared generators/envelopes, tone round trips, resident storage,
+generator UI, transport, instrument controls and settings.
+
+Four existing suites failed identically on the archived baseline and candidate:
+- test_tones_incremental.py: tones_pack_begin call fixture does not return.
+- test_pulse_release.py: active-state assertion at line 42.
+- test_drum_noise_release.py and test_pattern_retrigger.py: old UI fixture cannot
+  select removed page 11.
+They are not counted as passes. Baseline comparison redirected both PyBoy's ROM
+and Path.read_text's main symbol file, with tools on sys.path. Logs live under
+build/mod-port-test_*.log and build/mod-baseline-test_*.log.
+
+ROM-bank, SRAM/WRAM and stack-reservation checks passed. Ordinary WRAM use grew
+22 bytes; headroom below audio tables is 2,395 bytes, versus 2,417 before.
+The 512-byte stack reservation remains. Attack-write stack samples stayed at or
+above DF50 in these workloads; this is sampling, not a full stack watermark test.
+
+CPU measurements (DMG cycles, isolated warmed paths)
+
+                                      Before        After
+LFO/envelope frame, sync 240/div8      16274.25      1637.00
+255-frame LFO catch-up                17716         12784
+Idle service, active ordinary voices  22770.25       844.00
+Four active fine routes, synced       44949.75     31252.50
+Four active fine routes, free rate    34033.625    35061.625
+Four envelope routes, global sync     44614.25     29556.00
+
+The active free-rate case regresses by 1,028 cycles/frame (3.02% in this isolated
+service path), from activity checks/split servicing. This is not a 3% whole-app
+CPU claim. Idle savings and sync savings likewise describe only these paths.
+
+Playback measurements (maximum APU interval error, milliseconds)
+
+                                      Before        After
+240 BPM arps, wave/noise                33.187       33.933
+Same + synced LFO                      48.021       37.134
+150 BPM arps + LFO + PCM/noise          66.046       67.988
+60 BPM native + injected drawing load  31.941       39.860
+
+There are observed regressions of about 0.75 ms in the arp case, 1.94 ms in the
+PCM case and 7.92 ms in the drawing-load case. The LFO stress peak improves by
+about 10.89 ms. These short deterministic emulator runs are not worst-case bounds.
+
+The 60 BPM drawing case exercised 59 baseline and 62 candidate stall calls.
+The high-load arp/LFO/PCM runs exercised none, so they lack drawing-load coverage.
+The 300 BPM native comparison improved idle/navigation peak from 9.482 to 8.169
+ms, but its stall phase had zero baseline stalls and one candidate stall (40.230
+ms error); that phase is not an equivalent-load comparison or a coverage pass.
+All paired cases recorded zero PCM underruns. None met the 4 ms timing target.
+
+The imported dispatch timing harness initially hooked all local/stack writes in
+play; that made one candidate navigation run hang in PyBoy. The main adaptation
+hooks the emitted BC pulse-trigger writes and direct wave/noise writes instead,
+and checks their counts against play entry counts. With that coverage assertion,
+all paired measurement commands complete. Measurement-mode incomplete drawing
+coverage remains explicit rather than being silently accepted as a pass.
+
+Machine-readable local reports:
+build/mod-port-lfo.json, mod-port-idle.json, mod-port-cost.json,
+mod-port-comparison.json, mod-before-*.json and mod-after-*.json.
+
+Physical hardware/cable sync was not tested. The port improves CPU efficiency
+but does not resolve the existing timing target or drawing starvation, and its
+measured active-free and mixed-workload regressions should be considered before
+committing/merging it. No next-investigation work has been started.

@@ -1,0 +1,83 @@
+NEWGEN GENERATOR
+===============
+
+Branch: NEWGEN, starting at stripped d0ffbc6.
+Open Start > Edit > Generate from the sequence you want to change.
+The instrument track or highlighted drum voice is captured at entry.
+
+Up/down chooses a field. Hold A or B and use arrows to edit.
+All arrows change one value at a time; left/down decrease, right/up increase.
+Each edit previews immediately under the LIVE PREVIEW title. Choose APPLY to
+accept or CANCEL to restore. The opening control hint becomes a setting tip
+as soon as you navigate or edit. Apply and Cancel align with setting values.
+Select also cancels. Opening Start cancels the preview before showing the menu.
+Playback continues during previews. The existing track clipboard is used as the
+rollback snapshot, replacing its previous contents.
+
+INSTRUMENTS
+Role: Melody uses chord tones on quarter-note positions and scale tones between
+  them. Bass follows roots, with occasional fifths between quarter notes. Arp
+  Line outlines the diatonic triad as separate notes. Chord (P1/P2/Wave) writes
+  all three notes simultaneously, for the instrument's existing arp to read.
+  Selecting Chord starts with Rhythm CHANGES, Length TO NEXT, Voicing ROOT.
+  It leaves the instrument's MONO/ARP mode unchanged. Enable ARP on that
+  instrument to cycle its held chord; MONO plays the lowest held note.
+Key / Scale: Major, natural minor, Dorian, or minor pentatonic.
+  Dorian differs from natural minor only at the sixth degree (raised one
+  semitone). Their tonic minor triad is identical, so HOLD I chords match.
+  For example, A minor IV is D-F-A; A Dorian IV is D-F#-A. The scale tip
+  explains the raised sixth and shared tonic triad.
+Chords: Hold I, I-IV, I-V-VI-IV, or II-V-I (the final I lasts two changes).
+  Roman numerals identify scale degrees; chord quality follows the selected
+  mode. Minor pentatonic uses minor harmony; single-note roles stay within its
+  five notes. Set the same key, scale, progression and change rate on accompanying
+  tracks to align their harmony.
+Change: Quarter note, half note, one bar, two bars, or four bars per chord.
+  Bars follow sequencer meter. For a full four-chord progression in a default
+  sixteen-step loop, choose 1/4. For one chord per 4/4 bar, set loop length to
+  64 steps or more. A too-long change rate is flagged in the menu.
+Rhythm: Quarter, eighth, sixteenth, offbeat eighths, tresillo (0,6,12), backbeat
+  (4,12), or Euclidean. Positions in parentheses are sixteenth steps in 4/4.
+  Instruments also offer CHANGES: an attack at each harmonic change.
+Length: 1/16, 1/8, 1/4, 1/2, 1/1, or To Next. These are maximum lengths.
+  Notes stop at the next attack or the loop end; successive attacks do not overlap.
+  1/1 is always sixteen steps; bars follow the selected meter.
+Contour: Repeat, Rise, Fall, Arch, or Steps. A two-bar motif repeats over the
+  progression. The seed chooses its starting point within the contour and
+  the small movements in Steps.
+Variation: None, Low, Medium, or High. Later phrase endings can change pitch;
+  the rhythm remains fixed. None repeats the motif exactly under held harmony.
+  For Chord, Contour becomes Voicing (root, first inversion, second inversion).
+  Chord variation chooses occasional different inversions, preserving chord
+  quality and timing. Its seed is inactive with Variation None.
+  Minor pentatonic uses full natural-minor triads for Chord; the menu states
+  PENT USES MIN CHORDS. The single-note roles remain pentatonic.
+Octave: Base MIDI register. High notes fold down by octaves to stay in range.
+Hits: Exact attacks per bar, only used by Euclidean rhythm. Zero means silence.
+  Other rhythms show -- because their hit patterns are fixed. Select EUCLID
+  in Rhythm first to enable the numeric Hits field.
+Seed: Repeatable pitch interpretation; it never randomizes attack positions.
+
+DRUMS
+The highlighted name selects the voice even with velocity sliders hidden.
+Only that voice's attacks inside the active loop are replaced. Other voices,
+other tracks, and notes outside the loop are retained.
+Rhythm / Length / Hits: Same timing rules as instruments.
+Rotate: Shift the rhythm later by a chosen number of sixteenth steps.
+Accent: Flat, Beats, Offbeat, or Bar Start. Other hits play at 75% of the track's
+  default velocity. Beats follows the sequencer beat unit.
+Variation / Seed: Repeatable softer hits, starting in the first bar, preserving
+  the chosen rhythmic mask. With Variation None, Seed shows VAR OFF and the
+  menu explains that Seed needs Variation.
+
+STORAGE
+Previews count required events before editing the resident 256-event pool.
+Each simultaneous chord counts as three events.
+A preview that would exceed capacity leaves the previous sequence intact and
+cannot be kept. Cancel still restores the original entry snapshot.
+
+VALIDATION
+python tools/build_rom.py
+python tools/test_seq_gen.py
+python tools/test_gen_chords.py
+A host C compiler can run tools/test_gen_music.c to check the pure musical rules.

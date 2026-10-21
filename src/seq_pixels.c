@@ -599,7 +599,7 @@ void seq_playhead(void) BANKED {
  OAM_item_t *sprite;
  if(rollbuilding){HIDE_SPRITES;return;}
  const uint8_t line[16]={0,128,0,128,0,128,0,128,0,128,0,128,0,128,0,128};
- if(navopen||seqpopup){HIDE_SPRITES;return;}
+ if(navopen||seqpopup||genopen){HIDE_SPRITES;return;}
  SPRITES_8x8;OBP0_REG=0xE4;
  if(seqplaying&&seqposition[c]>=seqbase&&seqposition[c]<seqbase+seqcols){
   if(rollplaypos!=seqposition[c]||rollplaybase!=seqbase||rollplaycols!=seqcols||rollplaytrack!=c||rollplayx==255){

@@ -1,0 +1,76 @@
+Combined MOD + NEWGEN hardware build - 21 October 2026
+
+Main base: 5d70577; generator port: NEWGEN 16880ef.
+Both ports are integrated into main.
+Unrelated pre-existing local edits were preserved.
+
+Initial combined hardware ROM SHA256 (before the GEN UI follow-up):
+7daaf7efc69eee5cd3adb42a47a7ca72155dd107c4dbe592b9a4c770e5b24c66
+Target: 1 MiB MBC5 ROM, 32 KiB battery RAM.
+
+GEN UI follow-up ROM: build/GAYBOY.gb
+SHA256: 10cc021bf5cde3680a0b11682c00e445cddd1bc477d04ce2b1452e3ea421f8ff
+This fixes the piano-roll cursor/playhead overlay on GEN and displays -- for
+inactive Hits fields. Select Rhythm EUCLID to enable the numeric hit count.
+Generator/chord suites passed again on forced DMG and CGB; contextual Generate
+and general UI checks passed. The cursor is hidden in GEN and returns on exit.
+The named build/hardware package retains the initial combined ROM above.
+
+Includes all three MOD changes: exact synced-LFO accumulation, unused-modulation
+sleeping (including main's coarse routes) and empty-arp sleeping. LFO/arp fresh
+defaults were already tempo-clocked. Freerun remains available; existing saved
+clock selections are preserved.
+
+Ported all seven NEWGEN files from 16880ef. These add explicit harmony/rhythm
+rules, per-voice drum generation, held three-note chords and live preview/help.
+The old contextual Theory regression was adapted to Generate's new fields/title.
+The user's pre-existing docs/gen-hardware.txt edits were not overwritten; current
+generator instructions are in docs/newgen.txt and the hardware package README.
+
+Validation
+
+Build and ROM/SRAM/WRAM layout checks passed. WRAM headroom is 2,355 bytes;
+the 512-byte stack reservation is intact. The generator adds 40 bytes over the
+MOD-only build (62 bytes total over original main).
+
+Passed: test_seq_gen, test_gen_chords, test_mod_port_lfo, test_mod_port_idle,
+test_mod_port_arp, test_mod_port_cost, test_stripped_engine,
+test_stripped_resident, test_stripped_master_transport, test_stripped_ui,
+test_stripped_settings and the adapted test_stripped_theory.
+
+Both generator UI/chord suites also passed with forced CGB emulation. The host C
+musical-rules test passed using the local Zig C compiler. No physical hardware or
+cable validation has been performed; this ROM is provided for that testing.
+
+The paired timing measurements were rerun on this exact combined ROM. Worst
+interval errors, old main -> combined build, in milliseconds:
+  240 BPM arp workload:          33.187 -> 33.929
+  Same with synced LFO:          48.021 -> 37.134
+  150 BPM arp/LFO/PCM workload:   66.046 -> 67.957
+  60 BPM drawing-load workload:  31.941 -> 39.738
+All recorded zero PCM underruns. High-load runs still lack adequate injected
+drawing coverage; the 60 BPM case exercised 59 old/62 new stalls. The 4 ms target
+is not met. These are short emulator measurements, not worst-case guarantees.
+The known isolated active-freerun service overhead remains approximately 3%.
+No additional generator investigation or timing redesign was undertaken.
+
+The four legacy test failures described in docs/mod-optimization-port.txt already
+reproduced on pre-port main and remain excluded from passing validation claims.
+That document records the earlier MOD-only ROM/hash; build/mod-port-*.json and
+mod-after-*.json now describe this combined ROM. The hardware package captures
+the combined reports so subsequent builds cannot overwrite its evidence.
+
+Rebuild with python tools/build_rom.py (or build.ps1). Run the new generator tests,
+MOD tests and tools/test_mod_port_compare.py to reproduce the integration checks.
+
+Hardware test
+
+Use the named ROM in build/hardware. A fresh save initializes normally; this
+package contains no replacement battery save. Existing settings retain their
+clock selection.
+
+From a sequencer track: hold Start, choose Edit > Generate, release Start.
+Up/down selects a field; hold A or B with arrows to edit. APPLY accepts the live
+preview; Select or CANCEL restores entry notes. Preview uses the copy clipboard.
+On DRUM, the highlighted drum voice alone is regenerated. For held triads, choose
+Role CHORD, then enable the instrument's existing ARP mode to cycle its notes.

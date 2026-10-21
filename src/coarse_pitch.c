@@ -17,4 +17,4 @@ uint16_t coarse_apply(uint8_t c,uint16_t base) BANKED {int16_t semitones=(int8_t
 /* Use the 24 reserved bytes already present in the 320-byte tone record. */
 static const uint16_t offsets[24]={27,28,29,30,31,59,60,61,62,63,91,92,93,94,95,123,124,125,126,127,166,167,318,319};
 void coarse_capture(uint8_t *raw) BANKED {uint8_t i;for(i=0;i<24;i++)raw[offsets[i]]=((uint8_t *)coarsepitch)[i];}
-void coarse_restore(const uint8_t *raw,const uint8_t *mod) BANKED {uint8_t i;for(i=0;i<22;i++)((uint8_t *)coarsepitch)[i]=raw[offsets[i]];((uint8_t *)coarsepitch)[22]=mod[142];((uint8_t *)coarsepitch)[23]=mod[143];}
+void coarse_restore(const uint8_t *raw,const uint8_t *mod) BANKED {uint8_t i;for(i=0;i<22;i++)((uint8_t *)coarsepitch)[i]=raw[offsets[i]];((uint8_t *)coarsepitch)[22]=mod[142];((uint8_t *)coarsepitch)[23]=mod[143];eval_moddirty=1;}
