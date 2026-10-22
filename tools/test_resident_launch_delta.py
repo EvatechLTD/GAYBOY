@@ -52,7 +52,7 @@ try:
     offset = 0
     for c in range(7):
         if args.wave_noise:
-            events = [[0, 49, 100, 16]] if c == 2 else [[s, 43, 100, 1] for s in range(16)] if c == 3 else []
+            events = [[0, 49, 100, 16]] if c == 2 else [[s, 11, 100, 1] for s in range(16)] if c == 6 else []
         else:
             events = [[0, 61, 100, 16]] if c == 0 else [[0, 1, 127, 1]] if c == 6 else []
         word('seqeventoffsets', offset, c*2); word('seqeventcounts', len(events), c*2)
@@ -60,6 +60,11 @@ try:
             p.memory[1, 0xa000+768+offset*4:0xa000+772+offset*4] = e
             offset += 1
     put('pattern_dirty', 1)
+    # Raw fixture writes bypass the editor's drum cache invalidation.
+    a=S['_eval_drum_dirty'];code=list(p.memory[a>>16,a&65535:(a&65535)+5])
+    assert code[0]==0x21 and code[3:]==[0x36,1],code
+    drum_dirty_at=code[1]|code[2]<<8
+    p.memory[drum_dirty_at]=1
     launch(1)  # Autosnapshot pad zero through the real launch request.
     p.memory[1, 0xa800:0xb000] = list(p.memory[1, 0xa000:0xa800])
     launch(0)
@@ -81,6 +86,8 @@ try:
         def count(_, name=name): counts[name] += 1
         a = S['_' + name]; p.hook_register(a >> 16, a & 65535, count, None)
     if args.wave_noise:
+        p.memory[drum_dirty_at]=1
+        a=S['_drum_noise'];p.hook_register(a>>16,a&65535,lambda _:timing.append(('play',p._cycles())),None)
         p.tick(180)
         idle = [t for n,t in timing if n == 'play']
         intervals = [(b-a)*1000/4194304 for a,b in zip(idle,idle[1:])]

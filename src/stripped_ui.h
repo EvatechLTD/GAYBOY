@@ -1,5 +1,5 @@
-static const uint8_t native_ids[4][20]={{0,1,2,3,4,5,6,7,8,21,25},{0,1,2,3,7,8,21,25},{14,15,16,8,21,25},{1,2,3,18,19,20,7,8,21,25}};
-static const uint8_t native_counts[]={11,8,6,10},kickmax[]={15,96,3,7,7,7,64,1},noisemax[]={15,15,7,1,7};
+static const uint8_t native_ids[3][20]={{0,1,2,3,4,5,6,7,8,21,25},{0,1,2,3,7,8,21,25},{14,15,16,8,21,25}};
+static const uint8_t native_counts[]={11,8,6},kickmax[]={15,96,3,7,7,7,64,1},noisemax[]={15,15,7,1,7};
 static uint8_t native_value(uint8_t id){if(id==26)return seqgate[selected];if(id==10)return master&7;if(id==12)return(master>>4)&7;if(id==11)return !!(vin&8);if(id==13)return !!(vin&128);return param[selected][id];}
 static int16_t clamp(int16_t n,int16_t lo,int16_t hi){return n<lo?lo:n>hi?hi:n;}
 static int16_t delta(uint8_t e){return e&J_UP?1:e&J_DOWN?-1:e&J_RIGHT?10:e&J_LEFT?-10:0;}

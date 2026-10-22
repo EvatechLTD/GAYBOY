@@ -43,12 +43,11 @@ const char * const arpnames[]={"OFF","MAJOR","MINOR","FIFTH","OCTAVE"};
 const char * const dutynames[]={"OFF","CYCLE","ALTERNATE","ACCENT"};
 const char * const modnames[]={"SPEED","ARPEGGIO","DUTY SEQ","VIBRATO","SLIDE","GATE","TABLE MODE","TABLE LEN"};
 const char * const paramnames[]={"DUTY","VOLUME","ENV DIR","ENV RATE","SWP TIME","SWP DIR","SWP SHIFT","LENGTH","LENGTH ON","MUTE","MASTER R","VIN R","MASTER L","VIN L","WAVE SHAPE","WAVE LEVEL","WAVE LENGTH","WAVE DAC OFF","CLOCK","WIDTH","NOISE DIV","PAN","DAC OFF","SUSTAIN","STOP","BEND"};
-const uint8_t toneids[4][20]={
+const uint8_t toneids[3][20]={
  {0,1,2,3,4,5,6,7,8,9,21,22,25,10,12,11,13},
  {0,1,2,3,7,8,9,21,22,25,10,12,11,13},
- {14,15,16,17,8,9,21,25,10,12,11,13},
- {1,2,3,18,19,20,7,8,9,21,22,10,12,11,13}};
-const uint8_t tonecount[]={17,14,12,15};
+ {14,15,16,17,8,9,21,25,10,12,11,13}};
+const uint8_t tonecount[]={17,14,12};
 const uint8_t modmax[]={15,4,3,7,16,63};
 const char * const tablenames[]={"OFF","LOOP","ONCE","NOTE"};
 /* Yield between UI strings so audio macros and incoming MIDI never wait for a page. */
@@ -143,7 +142,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
    if(navchoice==8||navchoice>=28){uint8_t track=navchoice==8?lastseqtrack:navchoice-28;seqmode=track==4;seqtrack=track;if(track<4)ui_channel(track);page=8;seq_open();}
    else {if(navchoice>=11&&navchoice<=15){ui_channel(menuchannel[navchoice-11]);page=1;}else page=navchoice;
     eval_row=eval_col=0;if(page==1||page==17)eval_tab=0;else if(page==2)eval_tab=1;else if(page==6)eval_tab=2;
-    if((page>=18&&page<=20)||page==24||page==25)mixer_open();if(page==7)monoenable();if(page==8||page==10){seq_open();if(page==10)seqfocus=1;}if(page==9&&!noisesaved)noise_open();}
+    if((page>=18&&page<=20)||page==24||page==25)mixer_open();if(page==7)monoenable();if(page==8||page==10){seq_open();if(page==10)seqfocus=1;}}
    dirty=1;
   }return;
  }
@@ -153,7 +152,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
  if((edge&J_START)&&!navblocked){theorytrack=page==8?seqtrack:255;if(page==8)lastseqtrack=seqtrack;gen_cancel();seqpopup=0;clear_capture();drum_file_capture_context();if(page==18){mixer_view_capture();mixer_prepare_cancel();}tonepresetopen=0;monoedit=0;pageconfig=0;navopen=1;navcategory=0;finder_first();dirty=1;return;}
 
  if(page==28){mixer_settings_input(p,edge);return;}if(page==27){sync_ui_input(p,edge);return;}if(page==23){kits_input(p,edge);return;}if(page>=18){mixer_input(p,edge);return;}if(page==17){eval_input(p,edge);return;}if(page==16){global_input(p,edge);return;}if(page==8||page==10){seq_input(p,edge);return;}
- if(page==2||selected<4&&(page==1||page==6)){eval_input(p,edge);return;}if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%4;choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}
+ if(page==2||selected<4&&(page==1||page==6)){eval_input(p,edge);return;}if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%3;choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}
  if(selected==4){w2_input(p,edge);return;}
  if(page==0||page==3){if(p&(J_A|J_B)){if(edge&J_UP)browse(1);if(edge&J_DOWN)browse(-1);if(edge&J_LEFT)browse(-10);if(edge&J_RIGHT)browse(10);}if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))){page=page==0?3:0;dirty=1;}}
  else if(page==4){if(edge&J_UP)cursor[4]=cursor[4]?cursor[4]-1:78;if(edge&J_DOWN)cursor[4]=(cursor[4]+1)%79;if(edge&J_LEFT)cursor[4]=cursor[4]>=7?cursor[4]-7:0;if(edge&J_RIGHT)cursor[4]=cursor[4]<72?cursor[4]+7:78;dirty=1;}

@@ -5,7 +5,7 @@ void seq_native_touch(void) NONBANKED;
 #include "tones.h"
 void mixer_pattern_changed(void) BANKED;
 void seq_native_launch_clear(void) BANKED;
-void event(uint8_t s,uint8_t a,uint8_t b) BANKED {uint8_t c=s&15,t=s&0xf0;if(mixer_midi(s,a,b))return;if(c==1&&!monomode&&eval_mode(0)==2&&(t==0x90||t==0x80))return;if(t==0xb0||t==0xc0)mixer_pattern_changed();if(!experimental_mode&&c>3)return;if(waveengine==3&&(c==2||c==5)&&!experimental_mode){
+void event(uint8_t s,uint8_t a,uint8_t b) BANKED {uint8_t c=s&15,t=s&0xf0;if(mixer_midi(s,a,b)||c==3)return;if(c==1&&!monomode&&eval_mode(0)==2&&(t==0x90||t==0x80))return;if(t==0xb0||t==0xc0)mixer_pattern_changed();if(!experimental_mode&&c>3)return;if(waveengine==3&&(c==2||c==5)&&!experimental_mode){
  if(mixrunning||drumon[0]|drumon[1]||t!=0x90||!b)return;
  TAC_REG=0;enginestop();waveengine=0;TMA_REG=TIMA_REG=240;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;if(seqplaying)TAC_REG=4;
  }if(!experimental_mode&&c==3&&drumnoiseowned&&(t==0x90||t==0x80))return;if(c>=4)return;if(monomode){if(c==4)monoevent(t,a,b);return;}if(c==5){w2_event(t,a,b);return;}if(c==4){polyevent(t,a,b);return;}if(c>3)return;

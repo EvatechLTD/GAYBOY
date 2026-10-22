@@ -39,7 +39,7 @@ def attacks(site):
 def event_total():return sum(get('seqeventcounts',c*2)|(get('seqeventcounts',c*2+1)<<8) for c in range(7))
 try:
  enter_app(p,S)
- tracks=[[[s,49,110,1] for s in range(0,64,4)],[[s,61,100,1] for s in range(64)],[[0,49,100,16]],[[s,43,100,1] for s in range(0,64,2)],[],[],[]]
+ tracks=[[[s,49,110,1] for s in range(0,64,4)],[[s,61,100,1] for s in range(64)],[[0,49,100,16]],[],[],[],[]]
  if args.drums:tracks[2]=[];tracks[6]=[[s,4,100,1] for s in range(0,64,4)]
  editor=6 if args.drums else 1
  offset=0

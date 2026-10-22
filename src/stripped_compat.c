@@ -6,7 +6,6 @@ uint8_t expconfig[27],exprelease[3],expactive,expwaveon,expecho,exppan,expoutlev
 int16_t expoffset[3]; volatile uint8_t exppending; volatile uint16_t expblocks,expdrops;
 uint8_t expenv[3],expstage[3],expdirty,expzvolume[2],expampmap[16],expdelayenabled;
 uint16_t exppcmstep[2];
-uint8_t noisevalues[16],noisecursor,noiseedit,noiseon,noisepitch,noisesaved;
 void exp_changed(void) BANKED {} void exp_note(uint8_t n) BANKED {(void)n;}
 uint8_t exp_off(void) BANKED {return 0;} void exp_frame(void) BANKED {}
 void exp_service(void) BANKED {} void exp_fill(void) BANKED {} void exp_pitch(void) BANKED {}

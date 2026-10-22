@@ -169,7 +169,7 @@ uint8_t link_receive(uint8_t b) BANKED {
 }
 uint8_t link_command(uint8_t track,uint8_t field,uint8_t value) BANKED {
  /* Queue behind an in-flight packet; service publishes only after it drains. */
- if(syncmode!=1||syncslave||linkstate!=2||linkmirror.quant>7)return 0;
+ if(syncmode!=1||syncslave||linkstate!=2||linkmirror.quant>6)return 0;
  if(field==4||field==6){if(track>=8)return 0;}else if(field==5){if(value<1||value>7)return 0;}else if(track>=20||field>=4||(field==3&&value>3)||(field<2&&value>1)||value>127)return 0;
  if(waiting){if(field<6){if(nextfield<6&&(nexttrack!=track||nextfield!=field))return 0;nexttrack=track;nextfield=field;nextvalue=value;nextepoch=linkmirror.epoch;return 1;}return 0;}
  commandtrack=track;commandfield=field;commandvalue=value;commandepoch=linkmirror.epoch;request=(request+1)&127;waiting=2;retries=0;sentframe=link_frames();return 1;

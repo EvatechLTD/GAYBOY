@@ -87,7 +87,7 @@ void seq_number(uint8_t x,uint8_t y,uint16_t n,uint8_t digits,uint8_t inv){uint8
 uint16_t seq_dur(uint8_t c,uint8_t s){return seq_duration_get(c,s); }
 uint8_t seq_vel(uint8_t c,uint8_t s){return seq_velocity_get(c,s); }
 #pragma opt_code_speed
-uint8_t seq_enabled(uint8_t c){return c<4||c==6||(c==TWINK_TRACK&&syncmode==SYNC_TWINK);}
+uint8_t seq_enabled(uint8_t c){return c<3||c==6||(c==TWINK_TRACK&&syncmode==SYNC_TWINK);}
 void seq_off(uint8_t c){uint8_t note;if(seqservicing&&seqnativelaunchfired)return;eval_seq_off(c);seq_native_cancel_voice(c);if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
 void seq_clear_release(uint8_t track) BANKED {if(!editbuffer_reading&&editbuffer_active())return;seq_off(track);}
 
@@ -103,7 +103,7 @@ extern uint8_t resident_same_tones;
 void seq_fire(uint8_t c){
  uint8_t data[4],s,note,v=0,oldvelocity=0,oldlevel=0,level,pan,keep=0;
  if(editirq_owned(c))return;
- if(c==seqrecordtrack)return;
+ if(c==3||c==seqrecordtrack)return;
  if(c<6&&!seq_event_count(c)){if(seqowned[c])seq_off(c);return;}
  if((c<3||c==4)&&seq_audible(c)&&eval_seq_fire(c))return;
  if(!experimental_mode&&(c==2||(c==5&&syncmode!=SYNC_TWINK))&&waveengine==3&&(mixrunning||drumon[0]|drumon[1]))return;
@@ -195,18 +195,17 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;if(seqplaying){if(sy
 /* Hardware timer time is independent of video refresh. 1024 time units/sec;
    the existing 256 Hz audio-block interrupt contributes four units per tick. */
 uint8_t seq_native_fx_idle(void) BANKED;
-void seq_frame(void) BANKED {uint8_t c,expired,boundary,half,idle,budget=4;uint16_t ticks,left,slice,advance,over;if(!seqplaying||seqservicing)return;seqservicing=1;editbuffer_reading=editbuffer_active();idle=seq_native_fx_idle();
+void seq_frame(void) BANKED {uint8_t c,expired,boundary,idle,budget=4;uint16_t ticks,left,slice,advance,over;if(!seqplaying||seqservicing)return;seqservicing=1;editbuffer_reading=editbuffer_active();idle=seq_native_fx_idle();
  __critical {ticks=seqticks;seqticks=0;}
  if(syncmode&&!syncslave)ticks=sync_advance(ticks);
  while(ticks&&seqplaying){
-  slice=ticks>128?128:ticks;if(!idle){uint16_t wait=eval_arp_wait();if(wait<slice)slice=wait;}half=mx.quant==7&&seqclock<(seqthreshold>>1);left=half?(seqthreshold>>1)-seqclock:seqclock>=seqthreshold?0:seqthreshold-seqclock;advance=slice*seqbpm;boundary=advance>=left;
+  slice=ticks>128?128:ticks;if(!idle){uint16_t wait=eval_arp_wait();if(wait<slice)slice=wait;}left=seqclock>=seqthreshold?0:seqthreshold-seqclock;advance=slice*seqbpm;boundary=advance>=left;
   if(boundary){over=advance-left;
    /* Normal timer wakeups overshoot by at most a few units. Keep the generic
       division for delayed foreground catch-up rather than looping unbounded. */
    if(over<(seqbpm<<2)){while(over>=seqbpm){slice--;advance-=seqbpm;over-=seqbpm;}}
    else{slice=(left+seqbpm-1)/seqbpm;advance=slice*seqbpm;}
   }
-  half=half&&boundary;if(half)boundary=0;
   expired=0;
   for(c=0;c<SEQ_TRACKS;c++)if(seqgateleft[c]){if(seqgateleft[c]<=slice){
    /* At an adjacent pulse onset, replace the note directly. A rest still
@@ -215,7 +214,6 @@ void seq_frame(void) BANKED {uint8_t c,expired,boundary,half,idle,budget=4;uint1
    else if(c<SEQ_NOTE_TRACKS&&boundary){seqgateleft[c]=0;expired|=1<<c;}else seq_off(c);
   }else seqgateleft[c]-=slice;}
   if(!seqnativelaunchfired){if(!idle)eval_seq_tick(slice);if(drumnoiseowned||pulsekickleft)drum_tick(slice);}seqclock+=advance;ticks-=slice;
-  if(half){if(ticks){__critical {seqticks+=ticks;}}if(mixer_half_boundary())break;if(ticks){__critical {seqticks-=ticks;}}}
   if(boundary){seqclock-=seqthreshold;seqswingphase^=1;seqthreshold=30720U-seqthreshold;
    /* A quantized handoff may service the new pattern while copying its tail.
       Publish any time already elapsed beyond this boundary before that call. */
@@ -417,9 +415,7 @@ void seq_tiles(void){uint8_t tile,y,lo,hi,buf[16];
   buf[y*2]=lo;buf[y*2+1]=hi;}ui_upload_tile(244+tile,buf,0);seq_audio();}
  seqtilesready=1;previewshape=255;
 }
-void seq_open(void) BANKED {seqpopup=0;seqlengthpause=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;seqtrack=seqtrack==TWINK_TRACK&&syncmode==SYNC_TWINK?TWINK_TRACK:seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_track_view();seq_clamp_cursor();dirty=1;}
-void seq_name(uint8_t pitch,char *s){uint8_t n=pitch%12,oct=pitch/12;s[0]="CCDDEFFGGAAB"[n];s[1]=(0x54A&(1U<<n))?'#':' ';if(!oct){s[2]='-';s[3]='1';}else{s[2]='0'+oct-1;s[3]=' ';}s[4]=0;}
-void seq_field(uint8_t field,uint8_t x,uint8_t y,const char *label,uint16_t value,uint8_t digits){uint8_t inv=seqfocus==field;seq_audio();seq_text(x,y,label,inv&&(seqedit||(lastpad&J_B)));seq_number(x+3+(field==3||field==6),y,value,digits,inv);}
+void seq_open(void) BANKED {seqpopup=0;seqlengthpause=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;if(selected==3)selected=0;if(seqtrack==3)seqtrack=0;seqtrack=seqtrack==TWINK_TRACK&&syncmode==SYNC_TWINK?TWINK_TRACK:seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_track_view();seq_clamp_cursor();dirty=1;}
 uint8_t roll_selection_update(void) BANKED;
 extern uint8_t rollcancelled;
 extern uint8_t lastseqtrack;

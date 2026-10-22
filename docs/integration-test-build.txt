@@ -38,3 +38,27 @@ modes retain foreground dispatch. No production release or merge performed.
 SHA256
 GAYBOY.gb  a5a4fd4b560c651786436c11a6e06d7ea75e86db83d471d5781166e18d5c3eea
 MONOSIMP.gb fc46c20e44dbc8f2086fc160429a3335125e2509d9ad2a0dc959bc21dd5cdda2
+
+Final merge changes
+-------------------
+Standalone NOISE sequencing, native noise instrument navigation, mixer strips,
+noise note insertion/MIDI dispatch and native timer lane have been removed.
+Drum synth noise voices, presets, envelopes/modulation and hardware routing stay.
+Dedicated retired noise UI state and noise timer patch/gate state were reclaimed;
+WRAM headroom is now 1607 bytes (35 bytes recovered), stack reserve 512 bytes.
+Shared hardware-indexed channel/track arrays retain their indices; no save
+conversion or old-pattern compatibility layer was added.
+Launch quantization now stops at 1/16. A+Up saturates at 1/16 while repeating;
+NOW remains available through the launch setting as a one-shot action.
+Half-step scheduling has been removed from the sequencer and drum deadlines.
+No standalone noise editor or mixer strip can be enabled through layout settings.
+
+Final validation: standalone-noise absence/navigation/MIDI, held quantization,
+MIDI controls with active edit buffering, deferred edits and transport restart,
+48 PCM gate cases and duplicate wave + drum-synth noise pad continuity pass.
+The retained editor fixture (P1/P2/Wave) measures <=0.786 ms P1 interval error
+through painting/multiselect at 180 BPM; this differs from the original fixture
+because standalone noise notes were removed. TWINK cable and buffered-local +
+remote sustain pass 17 loops, 2009 sustained samples, 156/156 intact packets.
+These are emulator measurements; the user approved the earlier combined build before these final changes. Earlier SHA256 entries identify that
+prior combined build, not the final ROM.

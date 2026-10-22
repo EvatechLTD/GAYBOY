@@ -14,9 +14,10 @@ static const char * const tracks[7]={"P1","P2","WV","N","","","DR"};
 static uint8_t layout_hidden(uint8_t id){return mixer_hidden[(mx.focus==5?4:0)+(id>>3)]&(1U<<(id&7));}
 static void text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+(uint16_t)y*20+x;while(*s&&x++<20)*d++=*s++-32+(inv?96:0);}
 static void num(uint8_t x,uint8_t y,uint8_t n,uint8_t inv){char s[4];s[0]='0'+n/100;s[1]='0'+n/10%10;s[2]='0'+n%10;s[3]=0;text(x,y,s,inv);}
-void mixer_layout_render(void) BANKED{uint8_t i,start=layout_cursor>5?layout_cursor-5:0;char label[17];if(start>8)start=8;
+static uint8_t layout_id(uint8_t row){return row<3?row:row==3?6:row<7?row+13:row;}
+void mixer_layout_render(void) BANKED{uint8_t i,start=layout_cursor>5?layout_cursor-5:0;char label[17];if(start>7)start=7;
  memset(canvas,0,360);memset(canvas,96,20);text(0,0,mx.focus==5?"LINK LAYOUT":"LOCAL LAYOUT",1);
- for(i=start;i<start+10;i++){uint8_t row=3+i-start,id=i<4?i:i==4?6:i<8?i+12:i-1;num(0,row,i+1,layout_cursor==i);
+ for(i=start;i<start+10;i++){uint8_t row=3+i-start,id=layout_id(i);num(0,row,i+1,layout_cursor==i);
   if(id<7)text(4,row,mx.focus==5?linked_tracks[id]:tracks[id],layout_cursor==i);
   else if(id<20)text(4,row,mixer_drum_name(mx.focus==5?linkmirror.kit:drumkit,id-7),layout_cursor==i);
   else {if(mx.focus==5){memcpy(label,linkmirror.names[i-20],16);label[16]=0;}else getname(i-20,label);text(4,row,label[0]?label:"PAD",layout_cursor==i);}
@@ -25,10 +26,9 @@ void mixer_layout_render(void) BANKED{uint8_t i,start=layout_cursor>5?layout_cur
  text(0,14,"B+ARROWS SHOW/HIDE",0);text(0,15,"RELEASE B NAVIGATES",0);text(0,17,"SELECT CLOSE",0);
 }
 
-extern uint8_t syncrole,noisesaved;
-void noise_close(void) BANKED;
+extern uint8_t syncrole;
 static const char * const settings_modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE","TWINK"};
-void mixer_settings_open(void) BANKED {if(noisesaved)noise_close();mx.focus=mx.edit=0;layout_cursor=0;mx.error=0;}
+void mixer_settings_open(void) BANKED {mx.focus=mx.edit=0;layout_cursor=0;mx.error=0;}
 void mixer_settings_render(void) BANKED {uint8_t i;static const char * const labels[]={"MIXER VIEW","PAIR PATS","SYNC TYPE","SYNC ROLE","LOCAL LAYOUT","LINK LAYOUT","BACK TO MIXER"};
  if(mx.edit){mixer_layout_render();return;}
  memset(canvas,0,360);memset(canvas,96,20);text(0,0,"MIXER SETTINGS",1);
@@ -43,10 +43,10 @@ static void settings_adjust(int8_t delta){int8_t current,target;
  else if(mx.focus==2||mx.focus==3){current=mx.focus==2?syncmode:syncmode==1?syncrole:syncslave;target=current+delta;if(target<0)target=0;if(target>(mx.focus==2?6:syncmode==1?2:1))target=mx.focus==2?6:syncmode==1?2:1;while(current!=target){sync_setting_edit(mx.focus-2,current<target?J_RIGHT:J_LEFT);current+=current<target?1:-1;}}
 }
 void mixer_settings_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;uint8_t device,*cell,mask,id;int8_t d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;
- if(mx.edit){device=mx.focus==5;if(edge&J_SELECT){mx.edit=0;dirty=1;return;}id=layout_cursor<4?layout_cursor:layout_cursor+2;cell=mixer_hidden+device*4+(id>>3);mask=1U<<(id&7);
+ if(mx.edit){device=mx.focus==5;if(edge&J_SELECT){mx.edit=0;dirty=1;return;}id=layout_id(layout_cursor);cell=mixer_hidden+device*4+(id>>3);mask=1U<<(id&7);
   if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))){*cell^=mask;mixer_layout_dirty=1;}
   else if(p&(J_A|J_B)){if(d){if(d>0)*cell&=~mask;else *cell|=mask;mixer_layout_dirty=1;}}
-  else{if(edge&J_UP)layout_cursor=layout_cursor?layout_cursor-1:17;if(edge&J_DOWN)layout_cursor=(layout_cursor+1)%18;}
+  else{if(edge&J_UP)layout_cursor=layout_cursor?layout_cursor-1:16;if(edge&J_DOWN)layout_cursor=(layout_cursor+1)%17;}
  }else{
   if(edge&J_SELECT){page=18;mixer_open();dirty=1;return;}
   if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))){if(mx.focus>=4){if(mx.focus==6){page=18;mixer_open();}else{mx.edit=1;layout_cursor=0;}}else if(mx.focus<2)settings_adjust((mx.focus?linkpair:mixer_device)?-1:1);else if(mx.focus==3&&syncmode!=1)settings_adjust(syncslave?-1:1);}

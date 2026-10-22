@@ -702,7 +702,6 @@ void seq_next_deadline(void) BANKED {uint8_t c,idle=seq_native_fx_idle();uint16_
  if(seqclock>=seqthreshold)next=1;
  else if(seqswing==50&&seqcachedbpm==seqbpm&&seqclock<seqbpm)next=seqstepunits+(15360U-seqstepunits*seqbpm>seqclock);
  else next=(seqthreshold-seqclock+seqbpm-1)/seqbpm;
- if(mx.quant==7&&seqclock<(seqthreshold>>1)){step=((seqthreshold>>1)-seqclock+seqbpm-1)/seqbpm;if(step<next)next=step;}
  step=next;
  for(c=0;c<SEQ_TRACKS;c++)if(seqgateleft[c]&&seqgateleft[c]<next){
   /* Full pulse gates rounded one unit short still occupy their whole step. */

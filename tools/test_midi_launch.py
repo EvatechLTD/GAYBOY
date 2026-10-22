@@ -24,7 +24,7 @@ try:
   a=S['_drummutemask'];mask=p.memory[a]|p.memory[a+1]<<8
   assert bool(mask&1)==(value==127)
  # Current pad retriggers on musical boundaries while held, independent of UI.
- p.memory[0,S['_mx']+3]=7
+ p.memory[0,S['_mx']+3]=6
  launches=[]
  a=S['_seq_pattern_handoff'];p.hook_register(a>>16,a&65535,lambda _:launches.append(1),None)
  send(0x90,24,100)

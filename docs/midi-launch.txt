@@ -13,7 +13,8 @@ queued launch still completes. The newest pressed pad is the retrigger target.
 CC120/123 release held pad notes on the message's MIDI channel.
 
 Faders: CC71-77 set the seven track levels in their stored mixer order
-(P1, P2, WAVE, NOISE, MONO/POLY, WAVE2, DRUM). CC78-80 set the three drum
+(P1, P2, WAVE, reserved, MONO/POLY, MS, DRUM).
+CC74 and the standalone noise mute mapping are inactive. CC78-80 set the three drum
 synthesis levels. Values 0-127 set the level directly.
 
 Mutes: CC11-30 follow mixer strip order: the seven tracks above, the three
@@ -23,3 +24,5 @@ their fixed CC numbers.
 
 Verification: python tools/test_midi_launch.py exercises the ROM's MIDI receive
 queue in PyBoy. Physical Arduinoboy hardware has not been tested here.
+
+Launch quantization is limited to 1/16 or slower. NOW remains one-shot.

@@ -8,7 +8,7 @@ extern uint8_t globalmod[10],seqgate[7],drumsynthvoice,pulsekickpatch[8],noisepa
 #include "stripped_ui.h"
 void eval_input(uint8_t p,uint8_t e) BANKED {if(!e)return;uint8_t c=eval_instrument(),id=0,n,col=1,*cell,hi;int16_t d=delta(e),v;
  if(page==2){c=0;n=10;}else{n=eval_tab==3?5:tone_count(c);id=eval_tab==3?0:tone_id(c,eval_row);if(id==102||id==107)col=3;}
- if(page!=2&&(p&J_SELECT)&&(e&(J_LEFT|J_RIGHT))){uint8_t part=page==17?4:selected;part=(part+(e&J_RIGHT?1:4))%5;if(part==4){page=17;drumsynthvoice=0;}else {page=1;selected=part;choice=program[part];}eval_tab=eval_row=eval_col=0;previewshape=255;dirty=1;return;}
+ if(page!=2&&(p&J_SELECT)&&(e&(J_LEFT|J_RIGHT))){uint8_t part=page==17?4:selected;part=(part+(e&J_RIGHT?1:4))%5;if(part==3)part=e&J_RIGHT?4:2;if(part==4){page=17;drumsynthvoice=0;}else {page=1;selected=part;choice=program[part];}eval_tab=eval_row=eval_col=0;previewshape=255;dirty=1;return;}
  if(page==17&&(e&J_SELECT)){drumsynthvoice=(drumsynthvoice+1)%3;eval_row=eval_col=0;dirty=1;return;}
  if(!(p&(J_A|J_B))){if(e&J_UP)eval_row=eval_row?eval_row-1:n-1;if(e&J_DOWN)eval_row=(eval_row+1)%n;if((e&J_LEFT)&&eval_col)eval_col--;else if((e&J_RIGHT)&&eval_col+1<col)eval_col++;else if(e&(J_LEFT|J_RIGHT)){if(page!=2){if(page==17)drumsynthvoice=(drumsynthvoice+(e&J_RIGHT?1:2))%3;else if(c<3)eval_tab=eval_tab==3?0:3;n=eval_tab==3?5:tone_count(eval_instrument());if(eval_row>=n)eval_row=n-1;eval_col=0;previewshape=255;}}dirty=1;return;}
  if(page!=2&&eval_tab!=3&&id>=103&&id<=105&&(e&(J_A|J_B))&&!d){tone_user_open(id-103);return;}

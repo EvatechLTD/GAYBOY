@@ -39,12 +39,11 @@ extern uint16_t seqcachedbpm,seqdeadline;
 uint8_t experimental_mode=1;
 const char * const native_voices[]={"PULSE1","PULSE2","WAVE1","NOISE"};
 const char * const native_names[]={"DUTY","VOLUME","ENV DIR","ENV RATE","SWEEP TIME","SWEEP DIR","SWEEP SHIFT","LENGTH","LENGTH ON","MUTE","MASTER R","VIN R","MASTER L","VIN L","WAVE SHAPE","WAVE LEVEL","WAVE LENGTH","WAVE DAC OFF","NOISE SHIFT","NOISE WIDTH","NOISE DIV","PAN","DAC OFF","SUSTAIN","STOP","BEND RANGE"};
-const uint8_t native_ids[4][20]={
+const uint8_t native_ids[3][20]={
  {0,1,2,3,4,5,6,7,8,9,21,22,25,10,12,11,13},
  {0,1,2,3,7,8,9,21,22,25,10,12,11,13},
- {14,15,16,17,8,9,21,25,10,12,11,13},
- {1,2,3,18,19,20,7,8,9,21,22,10,12,11,13}};
-const uint8_t native_counts[]={17,14,12,15};
+ {14,15,16,17,8,9,21,25,10,12,11,13}};
+const uint8_t native_counts[]={17,14,12};
 
 void global_text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+y*20+x;while(*s&&x++<20)*d++=*s++-32+(inv?96:0);}
 void global_number(uint8_t x,uint8_t y,uint16_t n,uint8_t digits,uint8_t inv){uint16_t place=digits==3?100:10;uint8_t d;while(digits--){d=0;while(n>=place){n-=place;d++;}canvas[y*20+x++]=16+d+(inv?96:0);place/=10;}}
@@ -78,7 +77,7 @@ void native_render(void) BANKED {
  if(page==1){global_text(1,13,"LOAD PRESET",cursor[1]==native_counts[selected]);global_text(0,14,cursor[1]==native_counts[selected]?"A: OPEN PRESET LIST":"A: RESET  B: SOUND",0);global_text(0,16,"B+ARROWS: EDIT",0);if(cursor[1]<native_counts[selected])eval_native_footer(native_ids[selected][cursor[1]]);}
 }
 void native_input(uint8_t p,uint8_t edge) BANKED {
- int8_t d=0;uint8_t i;if(edge&J_SELECT){selected=(selected+1)%4;cursor[1]=0;dirty=1;return;}
+ int8_t d=0;uint8_t i;if(edge&J_SELECT){selected=(selected+1)%3;cursor[1]=0;dirty=1;return;}
  if(page==0){if(edge&J_A){page=1;dirty=1;}return;}
  if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))&&cursor[1]<native_counts[selected]&&native_ids[selected][cursor[1]]<26&&limits[native_ids[selected][cursor[1]]]==1){native_edit(native_value(native_ids[selected][cursor[1]])?-1:1,0);dirty=1;return;}
  if(p&(J_A|J_B)){if(edge&J_UP)d=1;if(edge&J_DOWN)d=-1;if(edge&J_LEFT)d=-10;if(edge&J_RIGHT)d=10;

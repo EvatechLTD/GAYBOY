@@ -53,7 +53,7 @@ void editbuffer_service(void) BANKED {uint8_t e[4],hash,mask,*dst,*bits,*head,v,
  if(editbuffer_valid&&(padsampled&(J_A|J_B)))return;
  if((eb_building||editbuffer_ready)&&eb_generation!=pattern_generation){eb_building=editbuffer_ready=0;editbuffer_restarts++;}
  if(editbuffer_ready)return;
- if(!eb_building){eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);eb_generation=pattern_generation;eb_left=total();eb_buildtrack=6;eb_newmask=15;for(hash=0;hash<4;hash++)if(seqlength[hash]>64)eb_newmask&=~(1<<hash);for(hash=4;hash<7;hash++)if(eb_newcounts[hash])eb_newmask&=~(1<<(hash-4));
+ if(!eb_building){eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);eb_generation=pattern_generation;eb_left=total();eb_buildtrack=6;eb_newmask=7;for(hash=0;hash<4;hash++)if(seqlength[hash]>64)eb_newmask&=~(1<<hash);for(hash=4;hash<7;hash++)if(eb_newcounts[hash])eb_newmask&=~(1<<(hash-4));
   __critical{SWITCH_RAM_MBC5(2);memset((void *)(eb_target+EB_BITS),0,32);SWITCH_RAM_MBC5(0);}eb_building=1;return;}
  if(!eb_left){editbuffer_ready=1;eb_building=0;return;}
  at=--eb_left;while(eb_buildtrack&&at<eb_newoffsets[eb_buildtrack])eb_buildtrack--;readnote(at,e);hash=e[0]+eb_buildtrack*64;
@@ -161,7 +161,7 @@ uint8_t seq_event_next_step(uint8_t c,uint8_t step,uint16_t *cursor,uint8_t *e) 
 uint8_t seq_note_event(uint8_t c,uint8_t step,uint8_t *e) BANKED {uint16_t i=0;uint8_t next[4],found=0;while(seq_event_next_step(c,step,&i,next))if(!found||next[1]<e[1]){memcpy(e,next,4);found=1;}return found;}
 void native_edit_mark(uint8_t c,const uint8_t *old,const uint8_t *next) BANKED;
 void seq_event_erase(uint8_t c,uint16_t i) BANKED {uint16_t at;uint8_t old[4];if(c>=7||i>=seqeventcounts[c])return;at=seqeventoffsets[c]+i;readnote(at,old);native_edit_mark(c,old,0);resident_move(at*4,(at+1)*4,(total()-at-1)*4);seqeventcounts[c]--;changed(c);}
-uint8_t seq_event_put(uint8_t c,uint16_t i,const uint8_t *event) BANKED {uint8_t e[4],old[4];uint16_t at,n;if(c>=7||!event[1]||event[2]>127)return 0;memcpy(e,event,4);if(c<3&&eval_mode(c)&&i==65535U&&seq_note_event(c,e[0],old))e[2]=old[2];
+uint8_t seq_event_put(uint8_t c,uint16_t i,const uint8_t *event) BANKED {uint8_t e[4],old[4];uint16_t at,n;if(c==3||c>=7||!event[1]||event[2]>127)return 0;memcpy(e,event,4);if(c<3&&eval_mode(c)&&i==65535U&&seq_note_event(c,e[0],old))e[2]=old[2];
  if(i!=65535U){if(i>=seqeventcounts[c])return 0;at=seqeventoffsets[c]+i;readnote(at,old);native_edit_mark(c,old,e);resident_write(mx.slot,RESIDENT_EVENTS+at*4,e,4);
   /* Velocity cannot change address chains or drum voice admission. */
   if(old[0]==e[0]){if(!editbuffer_active()){if(c!=6)eval_chord_dirty(c);else if(old[1]!=e[1]||old[3]!=e[3])eval_drum_dirty();}resident_events_changed();seqeventfull=0;}else changed(c);return 1;}
@@ -173,6 +173,6 @@ static uint16_t find(uint8_t c,uint8_t step,uint8_t note){uint16_t cursor=0;uint
 uint8_t seq_note_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[1]:0;}
 uint8_t seq_velocity_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[2]:0;}
 uint16_t seq_duration_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[3]?e[3]:256U:0;}
-uint8_t seq_note_set(uint8_t c,uint8_t step,uint8_t note,uint8_t velocity,uint16_t duration) BANKED {uint16_t i;uint8_t e[4];if((c>=4&&!(c==TWINK_TRACK&&syncmode==SYNC_TWINK))||duration>256)return 0;i=find(c,step,note?note:seqpitch[c]+1);if(!note){if(i!=65535U)seq_event_erase(c,i);return 1;}e[0]=step;e[1]=note;e[2]=velocity;e[3]=duration;return seq_event_put(c,i,e);}
+uint8_t seq_note_set(uint8_t c,uint8_t step,uint8_t note,uint8_t velocity,uint16_t duration) BANKED {uint16_t i;uint8_t e[4];if(c==3||(c>=4&&!(c==TWINK_TRACK&&syncmode==SYNC_TWINK))||duration>256)return 0;i=find(c,step,note?note:seqpitch[c]+1);if(!note){if(i!=65535U)seq_event_erase(c,i);return 1;}e[0]=step;e[1]=note;e[2]=velocity;e[3]=duration;return seq_event_put(c,i,e);}
 void storage_sorted_dirty(void) BANKED {indexvalid=0;} void storage_sorted_install(uint8_t mask) BANKED {(void)mask;}
 void storage_sorted_prepare(void) BANKED {prepare_index();} void storage_cursor_reset(void) BANKED {}
