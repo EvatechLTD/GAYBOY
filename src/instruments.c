@@ -8,25 +8,13 @@ void seq_native_launch_clear(void) BANKED;
 void event(uint8_t s,uint8_t a,uint8_t b) BANKED {uint8_t c=s&15,t=s&0xf0;if(mixer_midi(s,a,b)||c==3)return;if(c==1&&!monomode&&eval_mode(0)==2&&(t==0x90||t==0x80))return;if(t==0xb0||t==0xc0)mixer_pattern_changed();if(!experimental_mode&&c>3)return;if(waveengine==3&&(c==2||c==5)&&!experimental_mode){
  if(mixrunning||drumon[0]|drumon[1]||t!=0x90||!b)return;
  TAC_REG=0;enginestop();waveengine=0;TMA_REG=TIMA_REG=240;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;if(seqplaying)TAC_REG=4;
- }if(!experimental_mode&&c==3&&drumnoiseowned&&(t==0x90||t==0x80))return;if(c>=4)return;if(monomode){if(c==4)monoevent(t,a,b);return;}if(c==5){w2_event(t,a,b);return;}if(c==4){polyevent(t,a,b);return;}if(c>3)return;
+ }if(!experimental_mode&&c==3&&drumnoiseowned&&(t==0x90||t==0x80))return;if(c>=4)return;if(monomode)return;
  if(c==2&&waveengine&&!(experimental_mode&&waveengine==3)&&(t==0x90||t==0x80)){if(t==0x90&&b)enginenote(a,b,0);else engineoff(a);return;}
  if(t==0x90||t==0x80)keyevent(c,a,t==0x90?b:0);
  else if(t==0xe0){seq_native_launch_clear();seq_native_touch();wheellast[c]=((uint16_t)b<<7)|a;if(c==2&&waveengine==2)pitchdirty=1;else bendupdate(c);}
  else if(t==0xb0)cc(c,a,b);else if(t==0xc0&&a<100){load(c,a);if(c==selected)choice=a;}
 }
 
-uint8_t w2enabled,w2settings[5]={24,15,45,24,0},w2age,w2velocity,w2pitch,w2row;
-uint8_t w2tablemode,w2tablelen=8,w2tablespeed=6,w2tablestep,w2tableclock;
-int8_t w2tables[8][3]={{0,0,15},{0,0,15},{0,0,15},{0,0,15},{0,0,15},{0,0,15},{0,0,15},{0,0,15}};
-const uint8_t w2defaults[5]={24,15,45,24,0};
-const char *w2pagetitles[]={"WAVE2","TONE","MODULATION","BANK","CC","TABLE","FX"};
-const char *w2names[]={"PITCH","LEVEL","DECAY","PITCH DROP","WAVEFORM"};
-const uint8_t w2hi[5]={48,15,120,48,3};
-const uint8_t w2sine[32]={8,9,10,12,13,14,14,15,15,15,14,14,13,12,10,9,8,6,5,3,2,1,1,0,0,0,1,1,2,3,5,6};
-#include "w2_gain.h"
-uint8_t w2lastshape=255,w2lastlevel=255;
-void w2_frame(void) BANKED {} void w2_event(uint8_t t,uint8_t a,uint8_t b) BANKED {(void)t;(void)a;(void)b;}
-void w2_render(void) BANKED {} void w2_input(uint8_t p,uint8_t e) BANKED {(void)p;(void)e;}
 /* Elapsed VBlank time keeps acceleration consistent, with quick grid repeats. */
 /* Samples of 8 + 20*log2(1 + seconds*2), in level units per second.
    Interpolate at quarter-second intervals; retain fractional steps so slow
@@ -58,7 +46,6 @@ uint8_t ui_repeat(uint8_t p,uint8_t edge) BANKED {uint8_t axis,interval,resetmas
 void mixer_pattern_changed(void) BANKED;
 extern uint8_t seqrecordtrack;
 void seq_record_finish(void) BANKED;
-extern uint8_t seqnativelaunchfired;
 /* A427 is dedicated input state; B4E3 overlaps the retained grid tiles. */
 void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();edge=ui_repeat(p,edge);for(i=0;i<repeatsteps;i++){mixfill();/* Only value gestures can change a tone; grid mutations mark themselves. */if(edge&&!navopen&&!(p&(J_START|J_SELECT))&&page!=8&&(page<18||page==23)&&(p&(J_A|J_B)))mixer_pattern_changed();ui_action(p,edge);}*(uint8_t *)0xA427=0;}
 
@@ -67,7 +54,7 @@ void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;*(uint8_t *)0xA427=1;if(
 static uint32_t gate_multiply(uint32_t value,uint8_t count){uint32_t total=0;while(count){if(count&1)total+=value;count>>=1;if(count)value<<=1;}return total;}
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED {uint32_t total=duration?gate_multiply(units,duration):(uint32_t)units<<8;(void)gate;return total?total:1;}
 
-void load(uint8_t c,uint8_t n) BANKED {seq_native_touch();keycount[c]=0;stop(c);if(c<3)polyowner[c]=0;memcpy(param[c],patch(n)->v,26);memset(mods[c],0,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=0;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;if(!syncmode)seq_irq_refresh(c);dirty=1;}
+void load(uint8_t c,uint8_t n) BANKED {seq_native_touch();keycount[c]=0;stop(c);memcpy(param[c],patch(n)->v,26);memset(mods[c],0,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=0;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;if(!syncmode)seq_irq_refresh(c);dirty=1;}
 
 void eval_polyload(uint8_t n) BANKED {(void)n;}
 void eval_polyevent(uint8_t t,uint8_t a,uint8_t b) BANKED {(void)t;(void)a;(void)b;}

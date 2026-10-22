@@ -244,50 +244,11 @@ uint16_t pool_object_size(uint16_t o) BANKED {return o<5?POOL_TONE_BYTES:0;}uint
 void resident_user_read(uint16_t offset,uint8_t *d,uint16_t n) BANKED {io(3,0xA000U+offset,d,n,0);}
 void resident_user_write(uint16_t offset,const uint8_t *d,uint16_t n) BANKED {io(3,0xA000U+offset,(uint8_t *)d,n,1);}
 
-volatile uint8_t seqnativepending;uint8_t seqnativeearly,seqnativeconfiguration,seqnativeautoarm,seqnativelaunchfired,seqnativefallback;uint16_t seqnativehits,seqnativemisses;
 __at (0xFF98) volatile uint8_t seqirqready;__at (0xFF99) volatile uint8_t seqirqfired;__at (0xFFAA) uint8_t seqirqsuppress;__at (0xFFAE) uint8_t seqirqdirty;__at (0xFF9C) uint8_t seqirqstep[2];__at (0xFF9E) uint8_t seqirqnote[2];
-void seq_native_hardware(void) NONBANKED {}
-uint8_t seq_native_launch_copy(uint8_t slot) BANKED {(void)slot;return 0;}
-void seq_native_prepare(void) BANKED {}
-void seq_native_cached_compat(uint8_t value) BANKED {(void)value;}
-uint8_t seq_native_fx_idle(void) BANKED {return 0;}
-uint8_t seq_native_supported(void) BANKED {return 0;}
-void seq_native_reset(void) BANKED {}
-void seq_native_launch(void) BANKED {}
 void seq_irq_launch(void) BANKED;
 extern volatile uint8_t editirq_running;
 void seq_native_launch_clear(void) BANKED {if(editirq_running)seq_irq_launch();}
-void seq_native_launch_request_clear(void) BANKED {}
 void seq_native_touch(void) NONBANKED {resident_tone_generation++;}
-void seq_native_prime(void) BANKED {}
-uint8_t seq_native_fire(uint8_t expired) BANKED {(void)expired;return 0;}
-
-void seq_native_cancel_voice(uint8_t c) BANKED {(void)c;}
-void seq_native_launch_clear_voices(void) BANKED {}
-void seq_native_launch_irq(void) BANKED {}
-void seq_native_schedule_tick(uint8_t elapsed) BANKED {(void)elapsed;}
-uint8_t seq_native_restore_pulse1(void) BANKED {return 0;}
-uint8_t seq_native_committed(uint8_t c) BANKED {(void)c;return 0;}
-void seq_native_launch_begin(uint8_t slot,uint8_t count,uint8_t overflow) BANKED {(void)slot;(void)count;(void)overflow;}
-uint8_t seq_native_launch_service(void) BANKED {return 0;}
-void seq_native_launch_installed(uint8_t slot) BANKED {(void)slot;}
-uint8_t seq_native_launch_early(uint8_t slot) BANKED {(void)slot;return 0;}
-uint8_t seq_native_live_ready(void) BANKED {return 0;}
-void seq_native_launch_future_store(uint8_t step) BANKED {(void)step;}
-void seq_native_live_service(void) BANKED {}
-uint8_t seq_native_live_commit(void) BANKED {return 0;}
-void seq_native_launch_future_begin(uint8_t slot,uint8_t step) BANKED {(void)slot;(void)step;}
-void seq_native_launch_ring_ready(void) BANKED {}
-uint8_t seq_native_launch_locked(void) BANKED {return 0;}
-void seq_native_launch_request_begin(void) BANKED {}
-void seq_native_launch_arm(void) BANKED {}
-uint8_t seq_native_launch_boundary(void) BANKED {return 0;}
-void seq_native_launch_clock(void) BANKED {}
-
-
-
-
-
 uint8_t sparse_load_pad_pattern(uint8_t index,uint8_t pad) BANKED {uint8_t b[16];uint16_t at;if(index>=5||pad>=5)return 0;if(index==pad)return 1;for(at=0;at<2048;at+=16){resident_read(index,at,b,16);resident_write(pad,at,b,16);}if(pad==mx.slot)sparse_restore(pad);return 1;}
 
 /* User kits occupy free bank 2 A800..ACFF, outside the five resident pools. */

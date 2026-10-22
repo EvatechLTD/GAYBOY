@@ -34,7 +34,7 @@ uint16_t rawfreq[3];
 int16_t bend[4];
 uint16_t wheellast[4]={8192,8192,8192,8192};
 uint8_t wavepending;
-uint8_t polymode,polyowner[3],polynext,polysustain,polyprogram;
+uint8_t polymode;
 uint8_t master=0x77,route=0xff,power=1,vin=0;
 const uint8_t limits[26]={3,15,1,7,7,1,7,63,1,1,7,1,7,1,31,3,255,1,15,1,7,3,1,1,1,24};
 #include "engine_state.h"
@@ -45,8 +45,6 @@ void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){twink_
  } SB_REG=0; SC_REG=0x80; if(n==rd) overflow=1; else {rx[wr]=b;wr=n;} }
 void globals(void) {NR52_REG=power?0x80:0; if(power){NR50_REG=master|(monomode?0:vin);NR51_REG=route;}}
 void panic_audio(void) BANKED;
-void seq_native_prepare(void) BANKED;
-void seq_native_cancel_voice(uint8_t c) BANKED;
 void seq_native_touch(void) NONBANKED;
 void panic(void){panic_audio();}
 const int8_t arp[5][4]={{0,0,0,0},{0,4,7,12},{0,3,7,12},{0,7,12,7},{0,12,0,-12}};
@@ -73,10 +71,10 @@ void liveparam(uint8_t c,uint8_t i){uint8_t *v=param[c];if(c==0&&pulsekickleft||
 uint8_t eval_attack_volume(uint8_t c,uint8_t vel) BANKED;
 uint8_t editirq_owned(uint8_t c) NONBANKED;
 void play(uint8_t c,uint8_t note,uint8_t vel){uint8_t *v=param[c],vol;uint16_t f,amplitude;
- if(!seqservicing)seq_native_cancel_voice(c);
+
  if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}
  if(c==2&&waveengine&&!(experimental_mode&&waveengine==3)){enginenote(note,vel,0);return;}
- if(c<3)polyowner[c]=0;
+
  if(!power)return;phase[c]=age[c]=stepclock[c]=0;held[c]=note;basepitch[c]=note;velocity[c]=vel;active[c]=1;tablepos[c]=tablemode[c]==3?(notestep[c]++%tablelen[c]):0;livepitch[c]=note;liveduty[c]=v[0];if(experimental_mode)eval_note(c==1&&eval_mode(0)==2?0:c,1);if(c==0&&pulsekickleft||experimental_mode&&(c<3&&(mono_owned&(1<<c))||c==2&&waveengine==3||c==3&&drumnoiseowned)){eval_audio_note(c);return;}
  if(seqservicing&&editirq_owned(c))return;
  tablerow[c]=tablepos[c];if(c<3)f=pitchvalue(c);else f=0;amplitude=(uint16_t)v[1]*vel;/* Exact floor(x/127), x <= 15*127. */vol=(amplitude+1+(amplitude>>7))>>7;if(experimental_mode&&c!=2)vol=eval_attack_volume(c,vel);
@@ -92,12 +90,7 @@ void eval_polyload(uint8_t n) BANKED;
 void polyload(uint8_t n){eval_polyload(n);}
 void polynote(uint8_t n,uint8_t v){(void)n;(void)v;}
 void polyevent(uint8_t t,uint8_t a,uint8_t b){(void)t;(void)a;(void)b;}
-extern uint8_t seqnativeautoarm,seqnativelaunchfired;
-void seq_native_schedule_tick(uint8_t elapsed) BANKED;
-void input_vblank_native(void){input_vblank();if(seqnativeautoarm)seq_native_schedule_tick((((seqfraction+9)&63)+183U)>>6);}
-#define input_vblank input_vblank_native
 #include "engine_stream.h"
-#undef input_vblank
 #include "mono.h"
 /* Keep direct mono channels sounding when the newest held key is released. */
 void keyevent(uint8_t c,uint8_t note,uint8_t vel){uint8_t i,j,n=keycount[c],last=n?keystack[c][n-1]:255;for(i=0;i<n;i++)if(keystack[c][i]==note){for(j=i;j+1<n;j++){keystack[c][j]=keystack[c][j+1];keyvel[c][j]=keyvel[c][j+1];}n--;break;}
@@ -106,10 +99,9 @@ void keyevent(uint8_t c,uint8_t note,uint8_t vel){uint8_t i,j,n=keycount[c],last
 void midi(uint8_t b){if(syncmode==SYNC_TWINK)return;if(syncmode&&sync_receive(b))return;midiage=12;if(b>=0xf8)return;if(b&128){count=0;st=b<0xf0?b:0;return;}if(!st)return;
  if((st&0xe0)==0xc0){event(st,b,0);return;}if(!count){first=b;count=1;}else{event(st,first,b);count=0;}}
 /* Frame-clock macros update pitch/duty without retriggering hardware envelopes. */
-uint8_t seq_native_supported(void) BANKED;
 void service_frame(void) BANKED;
 void roll_feedback_service(void) BANKED;
-void service(void){uint8_t b,budget=8;mixfill();while(syncmode!=SYNC_TWINK&&rd!=wr&&budget--&&!seqnativelaunchfired){b=rx[rd++];midi(b);mixfill();}if(lastframe!=sys_time)service_frame();}
+void service(void){uint8_t b,budget=8;mixfill();while(syncmode!=SYNC_TWINK&&rd!=wr&&budget--){b=rx[rd++];midi(b);mixfill();}if(lastframe!=sys_time)service_frame();}
 void exp_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) NONBANKED {uint8_t saved=CURRENT_BANK;SWITCH_ROM(bank);memcpy(dst,(const void *)(0x4000+offset),16);SWITCH_ROM(saved);}
 extern uint16_t seqdeadline;
 void mixer_prepare_service(void) BANKED;
@@ -120,13 +112,13 @@ extern uint8_t mixer_layout_dirty;
 void mixer_layout_service(void) BANKED;
 void mixer_poll_input(void) BANKED;
 void eval_audio_resume_wave(void) BANKED;
-void mixfill(void){if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&!seqnativelaunchfired&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode!=SYNC_TWINK&&rd!=wr&&!seqnativelaunchfired&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
+void mixfill(void){if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode!=SYNC_TWINK&&rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */
  if(seqplaying&&!seqservicing&&seqeventcache>=2){seqservicing=1;sparse_service();seqservicing=0;}
- if((rd==wr||seqnativelaunchfired||(syncmode==1&&!syncslave))&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
- 
+ if((rd==wr||(syncmode==1&&!syncslave))&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
+
  if(waveengine==3&&drumtail&&!mixrunning&&!drumon[0]&&!drumon[1])eval_audio_resume_wave();
  if(padread==padwrite&&sparse_enabled==1&&seqplaying&&!seqservicing&&(page==18||link_ui_hold))sparse_prepare_service();}
 /* Intro audio can interrupt graphics in any ROM bank. Restore that bank before

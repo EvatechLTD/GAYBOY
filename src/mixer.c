@@ -137,13 +137,10 @@ uint8_t mixer_velocity(uint8_t c,uint8_t v) BANKED {if(mx.magic!=0xD3||mx.level[
 uint8_t mixer_pan(uint8_t c) BANKED {return mx.magic==0xD3?mx.pan[c]:3;}
 /* Source cache is16-byte aligned; destination WRAM need not be. Timer IRQs
    stay enabled and produce PCM independently while the complete pool installs. */
-extern uint8_t seqnativeearly,seqnativelaunchfired,lastpad;
-void seq_native_launch_installed(uint8_t slot) BANKED;
-uint8_t seq_native_launch_boundary(void) BANKED;uint8_t seq_native_live_commit(void) BANKED;
 static uint8_t retrigger(uint8_t quantized){uint8_t busy=seqservicing;seqservicing=1;
  mx.pending=255;mx.presaved=mx.openempty=0;if((!syncmode||!syncslave)&&!MIXER_KEEP_SYNC_GRID)mx.boundary=0;
  /* Same-pad repeats keep the pad image; queued/playing changes are diffed. */
- if(seqplaying){if(seqnativelaunchfired==mx.slot+1){seqnativeearly=1;seqnativelaunchfired=0;seq_native_launch_installed(mx.slot);}else seq_native_live_commit();seqrecordtrack=255;seqrecordlength=0;if(!quantized&&(!syncmode||!syncslave)){__critical {seqclock=seqticks=seqfraction=0;}}seq_pattern_handoff();}
+ if(seqplaying){seqrecordtrack=255;seqrecordlength=0;if(!quantized&&(!syncmode||!syncslave)){__critical {seqclock=seqticks=seqfraction=0;}}seq_pattern_handoff();}
  else {memset(seqposition,0,7);seqclock=seqticks=seqfraction=0;seqdeadline=1;}
  seqservicing=busy;if(page!=18||!mx.padcache||pad_image_playing!=mx.slot||pad_image_queued!=255)dirty=1;return 1;
 }
@@ -172,7 +169,7 @@ static void held_rearm(void){
  }
 static uint8_t launch_pending(void){if(link_pair_phase==2){link_pair_phase=5;sync_pattern();}return mx.pending==mx.slot?retrigger(1):switchslot(mx.pending);}
 uint8_t mixer_boundary(void) BANKED {uint8_t interval;if(mx.magic!=0xD3)return 0;held_rearm();
- mx.boundary=(mx.boundary+1)&15;if(seq_native_launch_boundary())return 0;if(mx.pending==255||mixer_prepare_busy())return 0;if(link_pair_hold)return 0;interval=mx.quant&&mx.quant<5?1U<<mx.quant:1;if(mx.quant==5?longest_boundary():!(mx.boundary&(interval-1))){
+ mx.boundary=(mx.boundary+1)&15;if(mx.pending==255||mixer_prepare_busy())return 0;if(link_pair_hold)return 0;interval=mx.quant&&mx.quant<5?1U<<mx.quant:1;if(mx.quant==5?longest_boundary():!(mx.boundary&(interval-1))){
  /* Both sides are prepared. Publish this boundary before installing the
     master's patch, so the slave installs alongside it rather than after it. */
  return launch_pending();}return 0;}
@@ -367,7 +364,7 @@ void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
  if(mx.focus==64){
   if(syncmode&&syncslave&&(syncmode!=1||syncrole||seqplaying)&&((p&J_A)||(edge&J_B)))return;
   if(p&(J_A|J_B)){if(!seqglobalbpm){seqglobalbpm=seqbpm;}else {int16_t bpm=seqglobalbpm;if(edge&J_UP)bpm++;if(edge&J_DOWN)bpm--;if(edge&J_LEFT)bpm-=10;if(edge&J_RIGHT)bpm+=10;if(seqplaying)seq_frame();seqglobalbpm=seqbpm=bpm<30?30:bpm>300?300:bpm;seqcachedbpm=0;seqdeadline=1;}}
-  
+
   else if(edge&J_UP)mx.focus=1;
   else if(edge&J_DOWN){c=firststrip();mx.focus=c<20?stripfocus(c,0):firstpad();}
   else if(edge&(J_LEFT|J_RIGHT))mx.focus=0;

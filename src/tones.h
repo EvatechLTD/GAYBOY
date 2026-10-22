@@ -20,7 +20,7 @@ void tones_apply_cached(void) BANKED;
 void tones_finalize(void) BANKED;
 uint8_t tones_apply_object(uint16_t object) BANKED;
 uint8_t tones_scatter_object(uint16_t object) BANKED;
-extern uint8_t tonepresetopen,w2program;
+extern uint8_t tonepresetopen;
 void tone_preset_open(void) BANKED;
 void tone_preset_render(void) BANKED;
 void tone_preset_input(uint8_t edge) BANKED;

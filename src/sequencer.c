@@ -22,14 +22,8 @@ uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED;
 void mixer_pattern_changed(void) BANKED;
 void seq_audition_stop(void) BANKED;
 void seq_irq_launch(void) BANKED;
-uint8_t seq_native_fire(uint8_t expired) BANKED;
-void seq_native_reset(void) BANKED;
-void seq_native_prime(void) BANKED;
-void seq_native_launch(void) BANKED;
-extern uint8_t seqnativelaunchfired;
 extern volatile uint8_t padread,padwrite;
 void seq_native_launch_clear(void) BANKED;
-void seq_native_cancel_voice(uint8_t c) BANKED;
 /* Zero is a rest; notes 0..127 are stored as 1..128. Patterns are volatile. */
 
 uint16_t seqlength[SEQ_TRACKS]={16,16,16,16,16,16,16};
@@ -88,10 +82,10 @@ uint16_t seq_dur(uint8_t c,uint8_t s){return seq_duration_get(c,s); }
 uint8_t seq_vel(uint8_t c,uint8_t s){return seq_velocity_get(c,s); }
 #pragma opt_code_speed
 uint8_t seq_enabled(uint8_t c){return c<3||c==6||(c==TWINK_TRACK&&syncmode==SYNC_TWINK);}
-void seq_off(uint8_t c){uint8_t note;if(seqservicing&&seqnativelaunchfired)return;eval_seq_off(c);seq_native_cancel_voice(c);if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
+void seq_off(uint8_t c){uint8_t note;eval_seq_off(c);if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
 void seq_clear_release(uint8_t track) BANKED {if(!editbuffer_reading&&editbuffer_active())return;seq_off(track);}
 
-void seq_stop(void){uint8_t c;seq_native_launch_clear();editbuffer_reset();if(!syncmode)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;seq_native_reset();if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
+void seq_stop(void){uint8_t c;seq_native_launch_clear();editbuffer_reset();if(!syncmode)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
 uint8_t seq_audible(uint8_t c){uint8_t solos=seqsolo&(syncmode==SYNC_TWINK?111:experimental_mode?95:79);if(drumsolomask&&(!seqmode||experimental_mode))solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
 void seq_gates(void) BANKED;
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED;
@@ -139,19 +133,16 @@ void seq_fire(uint8_t c){
 }
 /* A prepared, same-mode pattern handoff keeps the timer's pending elapsed
    time. Stopping/restarting transport here would lose time on every change. */
-uint8_t seq_native_supported(void) BANKED;
 void seq_pattern_release(void) BANKED {uint8_t c,busy=seqservicing;if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;seqrecordtrack=255;seqrecordlength=0;
- /* Native voices remain audible through the prepared handoff. Incoming
-    onsets replace their own voices; incoming rests release here. */
- if(!seq_native_supported()){for(c=0;c<SEQ_TRACKS;c++)seq_off(c);}
- else{uint8_t onsets=*(uint8_t *)0xACCF;for(c=0;c<SEQ_NOTE_TRACKS;c++,onsets>>=1)if(!seq_enabled(c)||!seq_audible(c)||!(onsets&1))seq_off(c);drum_stop();}
+ /* A full pattern release clears foreground track ownership. Prepared
+    same-pattern continuity is handled by the ordinary handoff path. */
+ for(c=0;c<SEQ_TRACKS;c++)seq_off(c);
  seqservicing=busy;}
-void seq_native_launch_clock(void) BANKED;
 static void pattern_start(uint8_t preserve){uint8_t c,busy=seqservicing;if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);if(!preserve)seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
- seq_native_reset();seq_native_launch();seq_native_launch_clock();
+
  if(seqcachedbpm!=seqbpm)seq_gates();if(!preserve)mixer_clock_reset();if(syncmode&&(!preserve||syncslave))sync_pattern();
  seqlaunching=1;
- if(!seq_native_fire(0)){for(c=0;c<SEQ_NOTE_TRACKS;c++){if(seq_enabled(c))seq_fire(c);else seq_off(c);}
+ {for(c=0;c<SEQ_NOTE_TRACKS;c++){if(seq_enabled(c))seq_fire(c);else seq_off(c);}
  if(seq_enabled(6))seq_fire(6);}seqlaunching=0;resident_same_tones=0;resident_first_clear();seqservicing=busy;
 }
 /* Transport and a received native beat-one marker establish a new grid.
@@ -183,23 +174,22 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;if(seqplaying){if(sy
  if(waveengine!=3&&seq_enabled(6)&&seq_audible(6)){uint8_t e[4];uint16_t cursor=0,bit;
   while(seq_event_next_step(6,0,&cursor,e))if(e[1]&&e[1]<=10){bit=1U<<(e[1]-1);if(!(drummutemask&bit)&&(!drumsolomask||(drumsolomask&bit))){drum_init();drum_enable();break;}}
  }
- storage_sorted_prepare();eval_drum_prepare();seq_native_prime();
+ storage_sorted_prepare();eval_drum_prepare();
  __critical {TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;}
  if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}
  seq_irq_launch();
- if(!seq_native_fire(0)){for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);
+ {for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);
  if(seq_enabled(6))seq_fire(6);}seq_next_deadline();seq_irq_prepare();seqservicing=0;dirty=1;
 }
 /* The timer keeps elapsed time even while no event is due. Avoid rescanning
    seven gates on every audio block: wake only for the next gate or step. */
 /* Hardware timer time is independent of video refresh. 1024 time units/sec;
    the existing 256 Hz audio-block interrupt contributes four units per tick. */
-uint8_t seq_native_fx_idle(void) BANKED;
-void seq_frame(void) BANKED {uint8_t c,expired,boundary,idle,budget=4;uint16_t ticks,left,slice,advance,over;if(!seqplaying||seqservicing)return;seqservicing=1;editbuffer_reading=editbuffer_active();idle=seq_native_fx_idle();
+void seq_frame(void) BANKED {uint8_t c,expired,boundary,budget=4;uint16_t ticks,left,slice,advance,over;if(!seqplaying||seqservicing)return;seqservicing=1;editbuffer_reading=editbuffer_active();
  __critical {ticks=seqticks;seqticks=0;}
  if(syncmode&&!syncslave)ticks=sync_advance(ticks);
  while(ticks&&seqplaying){
-  slice=ticks>128?128:ticks;if(!idle){uint16_t wait=eval_arp_wait();if(wait<slice)slice=wait;}left=seqclock>=seqthreshold?0:seqthreshold-seqclock;advance=slice*seqbpm;boundary=advance>=left;
+  slice=ticks>128?128:ticks;{uint16_t wait=eval_arp_wait();if(wait<slice)slice=wait;}left=seqclock>=seqthreshold?0:seqthreshold-seqclock;advance=slice*seqbpm;boundary=advance>=left;
   if(boundary){over=advance-left;
    /* Normal timer wakeups overshoot by at most a few units. Keep the generic
       division for delayed foreground catch-up rather than looping unbounded. */
@@ -213,7 +203,7 @@ void seq_frame(void) BANKED {uint8_t c,expired,boundary,idle,budget=4;uint16_t t
    if(c<SEQ_NOTE_TRACKS&&!monomode&&seqgate[c]==100&&!boundary&&seqgateleft[c]==slice&&advance+seqbpm>=left)seqgateleft[c]=1;
    else if(c<SEQ_NOTE_TRACKS&&boundary){seqgateleft[c]=0;expired|=1<<c;}else seq_off(c);
   }else seqgateleft[c]-=slice;}
-  if(!seqnativelaunchfired){if(!idle)eval_seq_tick(slice);if(drumnoiseowned||pulsekickleft)drum_tick(slice);}seqclock+=advance;ticks-=slice;
+  {eval_seq_tick(slice);if(drumnoiseowned||pulsekickleft)drum_tick(slice);}seqclock+=advance;ticks-=slice;
   if(boundary){seqclock-=seqthreshold;seqswingphase^=1;seqthreshold=30720U-seqthreshold;
    /* A quantized handoff may service the new pattern while copying its tail.
       Publish any time already elapsed beyond this boundary before that call. */
@@ -226,7 +216,7 @@ void seq_frame(void) BANKED {uint8_t c,expired,boundary,idle,budget=4;uint16_t t
    editbuffer_boundary();
    for(c=0;c<SEQ_TRACKS;c++)if(seq_enabled(c)){if(++seqposition[c]>=seqlength[c])seqposition[c]=0;}
    if(seqrecordtrack!=255&&seqrecordlength&&seqrecordlength<seqlength[seqrecordtrack]){seqrecordlength++;if(seq_note_set(seqrecordtrack,seqrecordstart,seqowned[seqrecordtrack],seqrecordvelocity,seqrecordlength))mixer_pattern_changed();if(page==8&&seqtrack==seqrecordtrack){seqdrawvalid=0;dirty=1;}}
-   if(!seq_native_fire(expired)){for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);
+   {for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);
    if(seq_enabled(6))seq_fire(6);}for(c=0;c<SEQ_NOTE_TRACKS;c++)if((expired&(1<<c))&&!seqgateleft[c])seq_off(c);if(page==8)seqflushpending=1;}
   if((page==18&&padread!=padwrite)||!--budget){if(ticks){__critical {seqticks+=ticks;}}break;}
  }

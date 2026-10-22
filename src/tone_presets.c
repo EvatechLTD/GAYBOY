@@ -4,11 +4,9 @@
 #include "user_presets.h"
 #include "mixer_shared.h"
 #include "link_control.h"
-uint8_t tonepresetopen,w2program;
+uint8_t tonepresetopen;
 static uint8_t presetchoice;
 extern uint8_t seqbused;
-extern uint8_t w2row,w2tablemode,w2tablelen,w2tablespeed;
-extern int8_t w2tables[8][3];
 static const char * const banks[10]={"TETRIS","MARIO LAND","ZELDA LA","POKEMON RB","KIRBY DL","METROID II","MEGA MAN","CASTLEVANIA","WARIO LAND","DK LAND"};
 static void text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *d=canvas+(uint16_t)y*20+x;while(*s&&x++<20){uint8_t c=*s++;if(c>='a'&&c<='z')c-=32;*d++=c-32+(inv?96:0);}}
 /* Browser state fits three bytes; rename text uses modal-only preview scratch. */
