@@ -230,10 +230,15 @@ matching held wave notes preserve oscillator continuity across pad switches.
 Hold A on a pad to repeat launches. While holding A, Up selects faster repeats
 and Down selects slower repeats. Launch quantization extends through 1/32.
 Normal-play browser ROM and both main downloads have SHA256:
-5b95a518f0c6be289389ae95dd5209cdef50e7474398766fe9c1af8942fdc3d9
+f3ff8d7fee1864c3d430b6993d568b91a452dbf808b32c964cc4d85fd6de65ce
 Tutorial lessons retain the separate compatible practice cartridge. Existing
 shared-beat cartridges remain pinned to their original symbol maps.
 
 The same cartridge is designated stable 1.0 (Git tag v1.0). VERSION controls
 package labels; GAYBOY-1.0.gb is the versioned stable download. Browser save
 keys remain unchanged so this release retains existing resident-format saves.
+
+Held-pad slide update: A+Left/Right launches the adjacent pattern while A stays
+held, retaining the current launch interval. Arp/LFO tempo divisions and the
+launch header use Up/Right for faster and Down/Left for slower. Same-pad repeats
+reuse unchanged pad graphics. See briefspatternlaunch.md for the launch design.

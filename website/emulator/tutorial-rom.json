@@ -1,6 +1,6 @@
 {
   "rom": "emulator/roms/GAYBOY.gb",
-  "sha256": "5b95a518f0c6be289389ae95dd5209cdef50e7474398766fe9c1af8942fdc3d9",
+  "sha256": "f3ff8d7fee1864c3d430b6993d568b91a452dbf808b32c964cc4d85fd6de65ce",
   "version": "1.0",
   "channel": "stable",
   "symbols": {
