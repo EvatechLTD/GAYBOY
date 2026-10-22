@@ -28,6 +28,8 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  press(1,'start');
  const preset=Number(process.env.TWINK_PRESET||3);for(let n=0;n<preset;n++)press(1,'right');
  const tracks=[[],[],[],[],[],[[0,61,111,8],[8,65,111,8],[16,68,111,8],[24,73,111,8]],[[0,13,110,1],[4,13,110,1],[8,13,110,1],[12,13,110,1]]];
+ const localAudio=process.env.TWINK_LOCAL_AUDIO==='1';
+ if(localAudio){choose(8);tracks[0]=[0,4,8,12].map(s=>[s,49,110,1]);tracks[6]=[0,4,8,12].map(s=>[s,4,100,1]);}
  const slot=v(0,'mx',1),bank=1+(slot>>2),base=0xa000+(slot&3)*2048;let offset=0;
  for(let c=0;c<7;c++){writeword(0,'seqeventcounts',tracks[c].length,c*2);writeword(0,'seqeventoffsets',offset,c*2);writeword(0,'seqlength',c===5?32:16,c*2);for(const event of tracks[c]){event.forEach((x,j)=>{core._link_write(0,0x4000,bank);core._link_write(0,base+768+offset*4+j,x);});offset++;}}core._link_write(0,0x4000,0);
  put(0,'seqeventcache',0);put(0,'pattern_dirty',1);writeword(0,'pattern_generation',word(0,'pattern_generation')+1);
@@ -49,7 +51,8 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  function crc(body){let c=0;for(let b of body)for(let i=0;i<7;i++){let top=(c^b)&64;c=(c<<1)&127;if(top)c^=9;b<<=1;}return c;}
  const packetErrors=[0,0],packetCounts=[0,0],bodies=[null,null];
  for(const e of events){const side=e.side,b=e.byte;if(b===0xf3)bodies[side]=[];else if(b>=0x80&&b<=0xbf||b===0xf9)continue;else if(b&128)bodies[side]=null;else if(bodies[side]){bodies[side].push(b);if(bodies[side].length===4){const body=bodies[side];packetCounts[side]++;if(body[3]!==crc(body.slice(0,3)))packetErrors[side]++;bodies[side]=null;}}}
- const report={preset,frames,loops,samples,badframes,navTaps:navframes.length,maxNavFrames:Math.max(...navframes),packetCounts,packetErrors,unarmed:core._link_unarmed_edges(),aborts:core._link_wire_aborts(),failures};
+ if(localAudio){assert(v(0,'editbuffer_valid'),'Playback snapshot remains active with TWINK');assert(v(0,'editirq_enabled')&1,'Local pulse timer dispatch remains active with TWINK');}
+ const report={preset,localAudio,frames,loops,samples,badframes,navTaps:navframes.length,maxNavFrames:Math.max(...navframes),packetCounts,packetErrors,unarmed:core._link_unarmed_edges(),aborts:core._link_wire_aborts(),failures};
  console.log(JSON.stringify({...report,failures:failures.slice(0,2)},null,2));fs.writeFileSync('build/twink-sustain-'+preset+'-wire.json',JSON.stringify(events));fs.writeFileSync('build/twink-sustain-'+preset+'-report.json',JSON.stringify(report,null,2));
  assert.equal(badframes,0,'Sustained ascending MS notes must not disappear between boundaries');assert.deepEqual(packetErrors,[0,0],'Both transmitted and received packets remain intact');assert.deepEqual(packetCounts.slice(0,1),packetCounts.slice(1),'No lost serial packets');assert.equal(report.unarmed,0,'No bits arrive before the receiver rearms');assert.equal(report.aborts,0,'No serial transfer is overwritten');
 })().catch(e=>{console.error(e);process.exit(1);});

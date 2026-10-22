@@ -144,6 +144,7 @@ void legacyfill(void) BANKED {}
 __at (0xA400) uint8_t waveimage[16];
 static uint8_t wavevalid,waveshape,wavecustom;
 void wave(void) BANKED {uint8_t i,shape=param[2][14]&31;const uint8_t *source;if(waveengine==3)return;NR30_REG=0;if(wavevalid&&wavecustom==custom&&(custom?!memcmp(waveimage,customwave,16):waveshape==shape))return;source=custom?customwave:monowaves[shape];for(i=0;i<16;i++)REG(0xff30+i)=waveimage[i]=source[i];waveshape=shape;wavecustom=custom;wavevalid=1;}
+void editirq_wave_capture(uint8_t *out) BANKED {memcpy(out,custom?customwave:monowaves[param[2][14]&31],16);}
 void stagewave(void) BANKED {seq_native_touch();memcpy(customwave,monowaves[param[2][14]&31],16);}
 void w2_start(uint8_t n,uint8_t v) BANKED {(void)n;(void)v;}
 void drum_enable(void) BANKED {uint8_t pan=mixer_pan(6),level=mixer_velocity(6,127);pcmoutlevel=level?level>84?1:level>42?2:3:0;route&=~0x44;if(pan&1)route|=4;if(pan&2)route|=0x40;NR51_REG=route;drumtail=0;if(waveengine==3)return;wavevalid=0;TAC_REG=0;enginestop();waveengine=3;w2enabled=0;drumsub=0;TMA_REG=TIMA_REG=73;if(syncarmed)sync_timer_config();IF_REG&=~TIM_IFLAG;TAC_REG=6;NR32_REG=0x20;}

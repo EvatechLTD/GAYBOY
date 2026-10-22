@@ -118,14 +118,15 @@ void streamblock(void) __naked {
 /* DDS stays in main; PCM renders its next block after the current upload. */
 void drum_timer(void) BANKED;
 void input_vblank(void);
+uint8_t editirq_elapsed(uint8_t fallback) NONBANKED;
 void engine_timer(void){uint8_t n;
  sync_clock_isr();
  if(syncarmed){
-  if(waveengine!=3&&seqplaying)seqticks++;
+  if(waveengine!=3&&seqplaying){n=editirq_elapsed(1);seqticks+=n;if(!syncslave)seq_irq_tick(n);}
   syncsub++;if(syncsub<syncdivider)return;syncsub=0;
  }
  /* Sample after the PCM upload. Delayed VBlank sampling alone can miss a
     one-frame tap; both interrupt producers run without nesting. */
- if(waveengine==3){if(!syncmode&&seqplaying)seq_irq_tick(((uint16_t)seqfraction+183U)>>6);drum_timer();input_vblank();return;}
- if(seqplaying&&!syncarmed&&(!syncmode||!syncslave)){n=64-(TMA_REG>>2);if(!syncmode)seq_irq_tick(n);seqticks+=n;}if(!power)return;
+ if(waveengine==3){drum_timer();input_vblank();return;}
+ if(seqplaying&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));seq_irq_tick(n);seqticks+=n;}if(!power)return;
 }

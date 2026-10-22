@@ -15,10 +15,15 @@ def pulse_write_sites(symbols):
  tree=ast.parse((Path(pyboy.__file__).parent/"core/opcodes.py").read_text())
  lengths=next(ast.literal_eval(n.value.args[1]) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="OPCODE_LENGTHS" for t in n.targets))
  sites=[]
- for name in ('_play','_seq_irq_tick','_seq_native_hardware'):
+ for name in ('_play','_seq_irq_tick','_seq_native_hardware','_editirq_commit'):
   if name not in symbols:continue
   pc=symbols[name]
   end=min(v for k,v in symbols.items() if k.startswith("_") and pc<v<0x4000)
+  # Memory-mapped register symbols (e.g. rROMB0 at $2000) are not code
+  # boundaries. The edit-buffer ISR can legitimately span that address.
+  if name=='_editirq_commit':end=symbols['_seq_irq_tick']
+  if name=='_seq_irq_tick' and symbols.get('_seq_native_pcm_tick',0)>pc:
+   end=symbols['_seq_native_pcm_tick']
   while pc<end:
    op=rom[pc];length=2 if op==0xcb else lengths[op]
    if op in (0x02,0x12,0x22,0x32,0x36,0x77,0xe0,0xe2,0xea):

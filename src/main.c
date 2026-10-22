@@ -71,12 +71,14 @@ void liveparam(uint8_t c,uint8_t i){uint8_t *v=param[c];if(c==0&&pulsekickleft||
  else if(i==25)bendupdate(c);
 }
 uint8_t eval_attack_volume(uint8_t c,uint8_t vel) BANKED;
+uint8_t editirq_owned(uint8_t c) NONBANKED;
 void play(uint8_t c,uint8_t note,uint8_t vel){uint8_t *v=param[c],vol;uint16_t f,amplitude;
  if(!seqservicing)seq_native_cancel_voice(c);
  if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}
  if(c==2&&waveengine&&!(experimental_mode&&waveengine==3)){enginenote(note,vel,0);return;}
  if(c<3)polyowner[c]=0;
  if(!power)return;phase[c]=age[c]=stepclock[c]=0;held[c]=note;basepitch[c]=note;velocity[c]=vel;active[c]=1;tablepos[c]=tablemode[c]==3?(notestep[c]++%tablelen[c]):0;livepitch[c]=note;liveduty[c]=v[0];if(experimental_mode)eval_note(c==1&&eval_mode(0)==2?0:c,1);if(c==0&&pulsekickleft||experimental_mode&&(c<3&&(mono_owned&(1<<c))||c==2&&waveengine==3||c==3&&drumnoiseowned)){eval_audio_note(c);return;}
+ if(seqservicing&&editirq_owned(c))return;
  tablerow[c]=tablepos[c];if(c<3)f=pitchvalue(c);else f=0;amplitude=(uint16_t)v[1]*vel;/* Exact floor(x/127), x <= 15*127. */vol=(amplitude+1+(amplitude>>7))>>7;if(experimental_mode&&c!=2)vol=eval_attack_volume(c,vel);
  if(c<2){uint16_t base;if(!syncmode&&(seqirqsuppress&(1<<c))){if(v[9]||v[22])stop(c);return;}base=c?0xff16:0xff11;if(!c)NR10_REG=(v[4]<<4)|(v[5]<<3)|v[6];
  REG(base)=(v[0]<<6)|v[7];REG(base+1)=experimental_mode&&evalpatch[c==1&&eval_mode(0)==2?0:c][EV_LEVEL_MODE]==128?(vol<<4)|8:!vol&&!v[2]?8:(vol<<4)|(v[2]<<3)|v[3];REG(base+2)=(uint8_t)f;REG(base+3)=0x80|(v[8]<<6)|(f>>8);
@@ -132,11 +134,12 @@ void mixfill(void){if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){
 void intro_audio_tick(void);
 void intro_timer(void){uint8_t saved=CURRENT_BANK;SWITCH_ROM(21);intro_audio_tick();SWITCH_ROM(saved);}
 void mixer_fader_service(void) BANKED;
+void editbuffer_service(void) BANKED;
 void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();drum_init();startup();eval_defaults();ui_loading_begin();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
  disable_interrupts();padsampled=lastpad;add_VBL(input_vblank);add_SIO(link_serial_isr);add_TIM(engine_timer);SB_REG=0;SC_REG=0x80;set_interrupts(VBL_IFLAG|SIO_IFLAG|TIM_IFLAG);enable_interrupts();
  /* Preparation runs on Mixer; its private journal commit (phase18 atACB4)
     also finishes off-page. Avoid an idle bank round-trip on other pages. */
- *(uint8_t *)0xA427=0;lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();if(sparse_enabled)sparse_service();else if(page==18||link_ui_hold||*(volatile uint8_t *)0xACB4==18)mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
+ *(uint8_t *)0xA427=0;lastframe=sys_time;{uint16_t inputframe=sys_time;uint8_t end;while(1){service();editbuffer_service();if(sparse_enabled)sparse_service();else if(page==18||link_ui_hold||*(volatile uint8_t *)0xACB4==18)mixer_prepare_service();if(inputframe!=sys_time||padread!=padwrite){__critical{inputframe=sys_time;end=padwrite;p=padsampled;}
  if(syncmode>1&&syncslave&&seqplaying)sync_advance(0);
  if(syncmode==1)link_service();
  if(mixer_layout_dirty&&!seqplaying)mixer_layout_service();

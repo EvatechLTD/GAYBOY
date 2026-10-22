@@ -1,0 +1,25 @@
+MIDI performance controls
+=========================
+
+These mappings apply on every MIDI channel and take priority over instrument
+notes and CCs with the same numbers. Other MIDI keeps its existing behavior.
+
+Pads: C1, C#1, D1, D#1, E1 (MIDI notes 24-28) launch pads 1-5.
+C1 follows the octave labels in GAYBOY; controller octave labels may differ.
+A positive-velocity note-on launches the pad and starts stopped playback.
+Holding the note repeats the active pad at the selected mixer quantization.
+NOW is one-shot. Note-off or velocity-zero note-on stops rearming; an already
+queued launch still completes. The newest pressed pad is the retrigger target.
+CC120/123 release held pad notes on the message's MIDI channel.
+
+Faders: CC71-77 set the seven track levels in their stored mixer order
+(P1, P2, WAVE, NOISE, MONO/POLY, WAVE2, DRUM). CC78-80 set the three drum
+synthesis levels. Values 0-127 set the level directly.
+
+Mutes: CC11-30 follow mixer strip order: the seven tracks above, the three
+drum synthesis strips, then the ten sample drum strips. Value 127 enables
+mute; every lower value disables mute. Hidden/experimental strips retain
+their fixed CC numbers.
+
+Verification: python tools/test_midi_launch.py exercises the ROM's MIDI receive
+queue in PyBoy. Physical Arduinoboy hardware has not been tested here.

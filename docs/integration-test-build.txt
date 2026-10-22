@@ -1,0 +1,40 @@
+Combined MIDI + TWINK + edit-buffer test build
+2026-10-22
+Branch: integration/midi-twink-editbuffer
+
+Sources: TWINK 5d6b67a (including MIDI-launch branch c5e641b), the three
+uncommitted MIDI performance source files and their documentation/test from
+GAYBOY, and the edit-buffer prototype source/tests from GAYBOY-editbuffer.
+Original worktrees were not changed. Main and hosted downloads were not changed.
+
+Use GAYBOY.gb on the sequencer unit. For TWINK, use the included MONOSIMP.gb
+on the second unit, enable its TWINK INPUT and select TWINK sync on GAYBOY.
+See docs/twink.txt and docs/midi-launch.txt for controls.
+MIDI input and TWINK use the same physical serial port; they are alternative
+link modes. Including both features does not provide two simultaneous ports.
+
+Validation on the combined ROM:
+- Build and ROM/WRAM layout audit pass: 1572 bytes WRAM headroom, 512-byte stack.
+- MIDI faders, mutes, pad launches, held repeats and release pass.
+- MIDI levels, mutes and held launch with active edit snapshots pass.
+- Cell edits, paint, multiselect and selected-note moves pass; native P1 trigger
+  interval error <=0.724 ms at 180 BPM. With PCM fixture <=1.368 ms.
+- Deferred deletion, snapshot publication, stop/restart and kit/clipboard
+  preservation pass. Unsupported ARP retains foreground playback.
+- Real emulated two-ROM cable: TWINK UI, MS lane, notes/velocity, clock, tempo,
+  stopped heartbeat, stop, disconnect/reconnect and MIDI mode toggle pass.
+- Velvet Keys sustained TWINK test: 34 loops, 4001 sustain samples, zero bad
+  samples; 202 packets sent and received, zero CRC errors or transfer aborts.
+- Combined local buffered P1 + PCM hats + remote MS: 17 loops, 2012 sustain
+  samples, zero bad samples; 156 packets sent/received intact. Active playback
+  snapshot and native pulse timer dispatch asserted. Receiver short navigation
+  taps captured (17/17). This is emulator testing; hardware remains to test.
+- All 48 PCM gate/restart cases pass; duplicate-pad wave/noise continuity passes.
+
+Accepted prototype limitations remain: dense paint can delay UI while audio
+stays stable; 1/32 held retrigger spacing is not guaranteed. Unsupported synth
+modes retain foreground dispatch. No production release or merge performed.
+
+SHA256
+GAYBOY.gb  a5a4fd4b560c651786436c11a6e06d7ea75e86db83d471d5781166e18d5c3eea
+MONOSIMP.gb fc46c20e44dbc8f2086fc160429a3335125e2509d9ad2a0dc959bc21dd5cdda2

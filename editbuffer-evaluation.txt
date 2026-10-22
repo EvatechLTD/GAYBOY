@@ -1,0 +1,45 @@
+EDITBUFFER EXPERIMENT - 2026-10-22
+Branch: editbuffer; isolated worktree G:/DEVELOPMENT/GAYBOY-editbuffer.
+Stable 1.0 and its online/download builds are unchanged.
+
+Implementation
+Two prepared playback snapshots occupy cartridge SRAM bank 2, AD00..BF3F.
+Live editing remains separate; complete snapshots become audible at a loop boundary.
+Basic native notes use timer dispatch with independent elapsed DIV accounting.
+Unsupported synthesis modes, linked operation and long patterns retain foreground dispatch.
+Build reports 1636 bytes WRAM headroom and a 512-byte stack reserve.
+
+Measurement
+PyBoy forced DMG, disposable SRAM, actual P1 hardware trigger writes, 180 BPM.
+Real button input exercises edits, paint, selection and selected-note movement.
+Maximum trigger interval error (milliseconds), stable 1.0 -> experiment:
+Cell editing: 98.575 -> 0.777
+Paint: 66.496 -> 0.777
+Multiselect: 10.269 -> 0.778
+Selected-note movement: 58.866 -> 0.778
+Reports: build/editbuffer-baseline-final.json and build/editbuffer-final.json.
+PCM drum fixture also passed all edit workloads with max error <=1.401 ms
+on the preceding build (build/editbuffer-current-drums.json).
+These measurements are emulator register timing, not hardware validation.
+
+Outstanding regressions - not suitable for merging yet
+Dense paint workload took 21.35 seconds vs stable 17.13 seconds. Median input
+acknowledgement was 133.94 ms vs 92.09 ms. Drawing responsiveness needs work.
+Held-A 1/32 launch regression fails the existing 18..33ms interval assertion:
+experimental build reaches 55.51ms; stable baseline passes (19.77..32.48ms).
+The other held-launch quantization boundaries and NOW one-shot checks pass.
+
+Other checks
+Deferred deletion, next-loop publication, stop/restart, unsupported ARP fallback,
+and preserved kit/clipboard memory pass on final build.
+Identical-pad/changed-patch/rest/tempo launch checks and all 48 PCM gate/restart
+cases passed before final inactive-path guards were added.
+
+Commands
+python tools/build_rom.py
+python tools/test_editbuffer_timing.py --output build/editbuffer-final.json
+python tools/test_editbuffer_timing.py --drums --output build/editbuffer-current-drums.json
+python tools/test_editbuffer_state.py
+python tools/test_resident_hold_launch.py
+python tools/test_resident_launch_delta.py
+python tools/test_pcm_gate_restart.py

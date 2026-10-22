@@ -13,8 +13,9 @@ void seq_native_cancel_voice(uint8_t c) BANKED;
    after writing zero volume, increasing direction, disabled envelope pace.
    No deferred release can silence a newer owner. Panic and DAC OFF retain
    explicit shutdown. Bank this control path to leave the fixed bank room. */
+uint8_t editirq_owned(uint8_t c) NONBANKED;
 void stop(uint8_t c) BANKED {
- seq_native_cancel_voice(c);
+ seq_native_cancel_voice(c);if(seqplaying&&seqservicing&&editirq_owned(c))return;
  /* A newly committed IRQ attack already replaced this sequencer release. */
  if(!syncmode&&c<2&&seqplaying&&seqservicing&&(seqirqfired&(1<<c)))return;
  if(c==0&&pulsekickleft){if(!eval_audio_release(c))active[c]=0;return;}

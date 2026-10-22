@@ -158,7 +158,12 @@ static uint8_t longest_boundary(void){uint8_t c,track=255;uint16_t longest=0;
  if(track==255){for(c=0;c<7;c++)if((!experimental_mode?(c<4||c==6):seqmode?c==4:c!=4)&&seqlength[c]>longest){longest=seqlength[c];track=c;}}
  return track<7&&(uint16_t)seqposition[track]+1>=longest;
 }
+/* Per-channel ownership prevents one controller's release clearing another. */
+static uint8_t midi_pad_keys[16];
+static uint8_t midi_pad_target=255;
+static uint8_t midi_pad_held(void){uint8_t c;if(midi_pad_target>=5)return 0;for(c=0;c<16;c++)if(midi_pad_keys[c]&(1<<midi_pad_target))return 1;return 0;}
 static void held_rearm(void){
+ if(midi_pad_target==mx.slot&&midi_pad_held()&&mx.quant&&mx.pending==255&&!mx.error&&!(linkpair&&MIXER_LINK_AVAILABLE)){mx.pending=mx.slot;mx.openempty=0;}
  /* Re-arm the live pad before testing this boundary. Holding A repeats at
     every eligible interval, including one-step LONG patterns. Retriggers use
     live data directly; switches and paired launches retain preparation.
@@ -304,6 +309,30 @@ void mixer_remote_apply(uint8_t c,uint8_t field,uint8_t value) BANKED {
   else if(field==3&&value<=3)change(c,field,(int8_t)value-mx.pan[c]);
  }else if(c<20&&field<2){uint16_t bit=1U<<(c-7);mixer_pattern_changed();if(field){if(value)drumsolomask|=bit;else drumsolomask&=~bit;}else {if(value)drummutemask|=bit;else drummutemask&=~bit;}seq_mixer_refresh();}
  dirty=1;
+}
+
+/* Performance mappings take precedence over instrument MIDI on every channel.
+   C1 is MIDI 24, matching the sequencer's octave labels. */
+uint8_t mixer_midi(uint8_t status,uint8_t note,uint8_t value) BANKED {
+ uint8_t type=status&0xf0,c=status&15,slot,bit;
+ if((type==0x90||type==0x80)&&note>=24&&note<29){
+  slot=note-24;bit=1<<slot;
+  if(type==0x80||!value){midi_pad_keys[c]&=~bit;return 1;}
+  midi_pad_keys[c]|=bit;midi_pad_target=slot;mixer_init();
+  mx.error=0;mixer_launch_request(slot,0);
+  if(!seqplaying&&mx.slot==slot&&!mx.error&&!mixer_prepare_busy()){mx.openempty=0;seq_transport();}
+  dirty=1;return 1;
+ }
+ if(type!=0xb0)return 0;
+ if(note==120||note==123){midi_pad_keys[c]=0;return 0;}
+ if(note>=71&&note<81){
+  mixer_init();c=note-71;
+  if(c<7)mixer_remote_apply(c,2,value);
+  else {mixer_pattern_changed();evalpatch[4][c-7]=value;dirty=1;}
+  return 1;
+ }
+ if(note>=11&&note<31){mixer_init();mixer_remote_apply(striporder[note-11],0,value==127);return 1;}
+ return 0;
 }
 
 void mixer_tempo_edit(int16_t delta) BANKED {int16_t bpm;if(syncmode&&syncslave&&(syncmode!=1||syncrole||seqplaying))return;if(!syncmode){seqirqready=0;seqirqdirty=1;}if(seqplaying)seq_frame();bpm=(int16_t)seqbpm+delta;seqbpm=bpm<30?30:bpm>300?300:bpm;if(seqglobalbpm)seqglobalbpm=seqbpm;seqcachedbpm=0;seqdeadline=1;dirty=1;}

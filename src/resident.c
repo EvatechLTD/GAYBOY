@@ -254,12 +254,14 @@ uint8_t seq_native_fx_idle(void) BANKED {return 0;}
 uint8_t seq_native_supported(void) BANKED {return 0;}
 void seq_native_reset(void) BANKED {}
 void seq_native_launch(void) BANKED {}
-void seq_native_launch_clear(void) BANKED {}
+void seq_irq_launch(void) BANKED;
+extern volatile uint8_t editirq_running;
+void seq_native_launch_clear(void) BANKED {if(editirq_running)seq_irq_launch();}
 void seq_native_launch_request_clear(void) BANKED {}
 void seq_native_touch(void) NONBANKED {resident_tone_generation++;}
 void seq_native_prime(void) BANKED {}
 uint8_t seq_native_fire(uint8_t expired) BANKED {(void)expired;return 0;}
-void seq_native_pcm_tick(void) NONBANKED {}
+
 void seq_native_cancel_voice(uint8_t c) BANKED {(void)c;}
 void seq_native_launch_clear_voices(void) BANKED {}
 void seq_native_launch_irq(void) BANKED {}
@@ -281,10 +283,10 @@ void seq_native_launch_request_begin(void) BANKED {}
 void seq_native_launch_arm(void) BANKED {}
 uint8_t seq_native_launch_boundary(void) BANKED {return 0;}
 void seq_native_launch_clock(void) BANKED {}
-void seq_irq_refresh(uint8_t c) BANKED {(void)c;}
-void seq_irq_prepare(void) BANKED {seqirqdirty=0;}
-void seq_irq_launch(void) BANKED {}
-void seq_irq_tick(uint8_t elapsed) NONBANKED {(void)elapsed;}
+
+
+
+
 
 uint8_t sparse_load_pad_pattern(uint8_t index,uint8_t pad) BANKED {uint8_t b[16];uint16_t at;if(index>=5||pad>=5)return 0;if(index==pad)return 1;for(at=0;at<2048;at+=16){resident_read(index,at,b,16);resident_write(pad,at,b,16);}if(pad==mx.slot)sparse_restore(pad);return 1;}
 
