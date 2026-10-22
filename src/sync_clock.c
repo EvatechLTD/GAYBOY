@@ -60,6 +60,12 @@ sync_clock_due$:
  bit 7,a
  jr nz,sync_clock_pending$
  ldh a,(_syncmode)
+ cp #6
+ jr nz,sync_clock_native$
+ ldh a,(_synctick)
+ or #0x80
+ jr sync_clock_send$
+sync_clock_native$:
  dec a
  jr nz,sync_clock_raw$
  ldh a,(_synctick)

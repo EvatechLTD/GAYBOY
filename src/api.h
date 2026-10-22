@@ -205,4 +205,5 @@ void mixer_settings_open(void) BANKED;
 void mixer_settings_render(void) BANKED;
 void mixer_settings_input(uint8_t p,uint8_t edge) BANKED;
 void sync_setting_edit(uint8_t row,uint8_t edge) BANKED;
+#include "twink.h"
 #endif

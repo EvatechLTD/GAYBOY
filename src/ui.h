@@ -140,7 +140,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
    if(navchoice==45){page=28;mixer_settings_open();dirty=1;return;}
    if(navchoice==21||navchoice==22||navchoice==26||navchoice>=35){if(!finder_edit_action(navchoice))navopen=1;dirty=1;return;}
    if(page==9&&navchoice!=9)noise_close();
-   if(navchoice==8||navchoice>=28){uint8_t track=navchoice==8?lastseqtrack:navchoice-28;seqmode=track==4;seqtrack=track;if(track<4||track==5)ui_channel(track==5?4:track);page=8;seq_open();}
+   if(navchoice==8||navchoice>=28){uint8_t track=navchoice==8?lastseqtrack:navchoice-28;seqmode=track==4;seqtrack=track;if(track<4)ui_channel(track);page=8;seq_open();}
    else {if(navchoice>=11&&navchoice<=15){ui_channel(menuchannel[navchoice-11]);page=1;}else page=navchoice;
     eval_row=eval_col=0;if(page==1||page==17)eval_tab=0;else if(page==2)eval_tab=1;else if(page==6)eval_tab=2;
     if((page>=18&&page<=20)||page==24||page==25)mixer_open();if(page==7)monoenable();if(page==8||page==10){seq_open();if(page==10)seqfocus=1;}if(page==9&&!noisesaved)noise_open();}

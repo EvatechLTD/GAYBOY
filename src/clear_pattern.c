@@ -11,7 +11,7 @@ uint8_t mixer_file_load(void) BANKED;
 uint8_t mixer_file_save(void) BANKED;
 extern uint8_t seqselectused;
 extern uint8_t seqauditionnote,seqauditiontrack;
-void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=0;if(n)event(0x80|c,n-1,0);}
+void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=0;if(n){if(c==TWINK_TRACK)twink_note(0,n-1,0);else event(0x80|c,n-1,0);}}
 uint8_t seq_group_contains(uint8_t step,uint8_t pitch) BANKED {return seqgrouptrack==seqtrack&&step>=seqgroupx0&&step<=seqgroupx1&&pitch>=seqgroupy0&&pitch<=seqgroupy1;}
 uint8_t mixer_clear_saved(uint8_t slot) BANKED;
 static void clear_text(uint8_t x,uint8_t y,const char *text,uint8_t inverse){uint8_t c;while(*text&&x<20){c=*text++;if(c>='a'&&c<='z')c-=32;canvas[(uint16_t)y*20+x++]=c-32+(inverse?96:0);}mixfill();}

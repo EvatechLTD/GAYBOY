@@ -38,7 +38,7 @@ uint32_t seqgateleft[SEQ_TRACKS];
 uint16_t seqbpm=120;
 /* Zero follows each pattern; otherwise all patterns share this tempo. */
 uint16_t seqglobalbpm;
-static uint16_t seqwholeunits;
+uint16_t seqwholeunits;
 uint8_t seqswing=50,seqswingphase;
 uint16_t seqthreshold=15360U;
 void seq_swing_step(void) BANKED;
@@ -73,8 +73,8 @@ uint8_t seqgrouptrack=255,seqgroupx0,seqgroupx1,seqgroupy0,seqgroupy1;
 uint8_t seqrecordtrack=255,seqrecordstart,seqrecordvelocity;
 uint16_t seqrecordlength;
 uint8_t seqzoom=1,seqbase,seqcols=16,seqrows=17,seqheight=8,seqtilecount,seqtileoverflow;
-const char seqshort[7][5]={"P1","P2","WV","NS","M5","W2","DRUM"};
-const char seqchannels[7][7]={"PULSE1","PULSE2","WAVE","NOISE","MONO5","WAVE2","DRUM"};
+const char seqshort[7][5]={"P1","P2","WV","NS","M5","MS","DRUM"};
+const char seqchannels[7][7]={"PULSE1","PULSE2","WAVE","NOISE","MONO5","MS","DRUM"};
 void seq_audio(void){mixfill();if(monomode&&expconfig[0])exp_fill();}
 /* Keep drawing helpers in the same bank as the roll. */
 void seq_text(uint8_t x,uint8_t y,const char *s,uint8_t inv){uint8_t *dst=canvas+(uint16_t)y*20+x;while(*s&&x++<20)*dst++=*s++-32+(inv?96:0);}
@@ -82,13 +82,13 @@ void seq_number(uint8_t x,uint8_t y,uint16_t n,uint8_t digits,uint8_t inv){uint8
 uint16_t seq_dur(uint8_t c,uint8_t s){return seq_duration_get(c,s); }
 uint8_t seq_vel(uint8_t c,uint8_t s){return seq_velocity_get(c,s); }
 #pragma opt_code_speed
-uint8_t seq_enabled(uint8_t c){return c<4||c==6;}
-void seq_off(uint8_t c){uint8_t note;if(seqservicing&&seqnativelaunchfired)return;eval_seq_off(c);seq_native_cancel_voice(c);if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
+uint8_t seq_enabled(uint8_t c){return c<4||c==6||(c==TWINK_TRACK&&syncmode==SYNC_TWINK);}
+void seq_off(uint8_t c){uint8_t note;if(seqservicing&&seqnativelaunchfired)return;eval_seq_off(c);seq_native_cancel_voice(c);if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
 void seq_clear_release(uint8_t track) BANKED {seq_off(track);}
 
 void seq_stop(void){uint8_t c;seq_native_launch_clear();if(!syncmode)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;seq_native_reset();if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
-uint8_t seq_audible(uint8_t c){uint8_t solos=seqsolo&(experimental_mode?95:79);if(drumsolomask&&(!seqmode||experimental_mode))solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
-void seq_gates(void){uint8_t c,busy=seqservicing;memset(seqgate,100,SEQ_TRACKS);if(seqcachedbpm==seqbpm){for(c=0;c<SEQ_TRACKS;c++)if(seqcachedgate[c]!=seqgate[c])break;if(c==SEQ_TRACKS)return;}seqservicing=1;seqstepunits=15360U/seqbpm;seqwholeunits=(245760UL+seqbpm-1)/seqbpm;for(c=0;c<SEQ_TRACKS;c++){seqgateunits[c]=seqstepunits;seqcachedgate[c]=seqgate[c];mixfill();}seqcachedbpm=seqbpm;seqservicing=busy;}
+uint8_t seq_audible(uint8_t c){uint8_t solos=seqsolo&(syncmode==SYNC_TWINK?111:experimental_mode?95:79);if(drumsolomask&&(!seqmode||experimental_mode))solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
+void seq_gates(void) BANKED;
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED;
 void seq_pulse_fire(uint8_t c,const uint8_t *event) BANKED;
 uint8_t resident_first_note(uint8_t c,uint8_t *e) BANKED;
@@ -100,7 +100,7 @@ void seq_fire(uint8_t c){
  if(c==seqrecordtrack)return;
  if(c<6&&!seqeventcounts[c]){if(seqowned[c])seq_off(c);return;}
  if((c<3||c==4)&&seq_audible(c)&&eval_seq_fire(c))return;
- if(!experimental_mode&&(c==2||c==5)&&waveengine==3&&(mixrunning||drumon[0]|drumon[1]))return;
+ if(!experimental_mode&&(c==2||(c==5&&syncmode!=SYNC_TWINK))&&waveengine==3&&(mixrunning||drumon[0]|drumon[1]))return;
  if(!experimental_mode&&c==3&&drumnoiseowned)return;
  if(c==6){if(seq_audible(c))drum_fire(seqposition[c]);else if(seqlaunching)drum_stop();return;}
  s=seqposition[c];keep=seqlaunching?resident_first_note(c,data):2;if(!(keep==2?seq_note_event(c,s,data):keep)||!seq_audible(c)){if(seqlaunching)seq_off(c);return;}note=data[1];keep=0;
@@ -121,6 +121,7 @@ void seq_fire(uint8_t c){
  else seqgateleft[c]=seq_gate_length(seqstepunits,data[3],seqgate[c]);
  if(!seqgateleft[c])seqgateleft[c]=1;if(keep)return;seq_audio();
  if(c<4){param[c][21]=mx.magic==0xD3?mx.pan[c]:3;liveparam(c,9);}
+ if(c==TWINK_TRACK){twink_note(1,note-1,data[2]);return;}
  if(c==5){pan=mixer_pan(c);route&=~0x44;if(pan&1)route|=4;if(pan&2)route|=0x40;NR51_REG=route;}
  if(c>=2||monomode){v=data[2];v=mixer_velocity(c,v);}
  if(!experimental_mode&&c==2&&waveengine!=2){oldlevel=param[2][15];level=v?(v>84?1:v>42?2:3):0;if(level&&oldlevel){level+=oldlevel-1;if(level>3)level=3;}else level=0;param[2][15]=level;}
@@ -307,15 +308,9 @@ void seq_record_finish(void) BANKED {uint8_t c=seqrecordtrack;if(c==255)return;s
 void seq_record_start(void){uint8_t c=seqtrack,n=seqpitch[c]+1,v=eval_plotvel[c];seq_record_finish();
  if(seqplaying){if(!seq_note_set(c,seqposition[c],n,v,1))return;mixer_pattern_changed();}
  seq_off(c);seqrecordtrack=c;seqrecordstart=seqposition[c];seqrecordvelocity=v;seqrecordlength=seqplaying?1:0;
- seqsource[c]=seqrecordstart;seqowned[c]=n;seqgateleft[c]=0;event(0x90|c,n-1,mixer_velocity(c,v));seqdrawvalid=0;dirty=1;
+ seqsource[c]=seqrecordstart;seqowned[c]=n;seqgateleft[c]=0;if(c==TWINK_TRACK)twink_note(1,n-1,v);else event(0x90|c,n-1,mixer_velocity(c,v));seqdrawvalid=0;dirty=1;
 }
-static uint8_t seq_track_neighbor(uint8_t track,uint8_t right){
- 
- return right?(track+1)%7:(track?track-1:6);
-}
-static uint8_t seq_track_page(uint8_t right){uint8_t next=seqtrack,tries;
- for(tries=0;tries<7;tries++){next=seq_track_neighbor(next,right);if(eval_visible(next))return next;}return seqtrack;
-}
+uint8_t seq_track_page(uint8_t right) BANKED;
 uint8_t seq_region_duplicate(void) BANKED;
 static void seq_popup_input(uint8_t edge){uint8_t ok;
  repeatsteps=1;seqselectused=1;
@@ -339,7 +334,7 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
  if(seqrecordtrack!=255&&(!(p&J_B)||(p&(J_START|J_SELECT))))seq_record_finish();
  if(edge&J_SELECT){seqselectused=0;seqpopupstep=seqcursor[c];seqpopuppitch=c==6?drumrow:seqpitch[c];}if(edge&J_B){seqbused=0;seqdrag=0;}if(!(p&J_B))seqdrag=0;
  if(p&J_SELECT){seqapending=0;seqdrag=0;if(edge&J_A){seqselectused=1;seq_transport();}if(edge&J_B){seqselectused=seqbused=1;seq_mute();}
-  if(edge&(J_LEFT|J_RIGHT)){seqselectused=1;seqtrack=seq_track_page(!(edge&J_LEFT));seq_dimensions();seq_track_view();if(!seqplaying)seqmode=seqtrack==4;if(seqtrack<4||seqtrack==5){selected=seqtrack==5?4:seqtrack;choice=selected<4?program[selected]:0;}dirty=1;}
+  if(edge&(J_LEFT|J_RIGHT)){seqselectused=1;seqtrack=seq_track_page(!(edge&J_LEFT));seq_dimensions();seq_track_view();if(!seqplaying)seqmode=seqtrack==4;if(seqtrack<4){selected=seqtrack==5?4:seqtrack;choice=selected<4?program[selected]:0;}dirty=1;}
   if(edge&(J_UP|J_DOWN)){seqselectused=1;seq_edit_value(10,edge&J_UP?-1:1);}return;
  }
  if((lastpad&J_SELECT)&&!seqselectused){if(page==8&&!seqhead&&!seqfocus&&seqgrouptrack==c){seqpopup=1;seqpopupchoice=seqpopuperror=0;seqselectused=1;seqapending=seqdrag=0;repeatsteps=1;dirty=1;return;}page=page==10?8:10;if(page==8){seq_dimensions();seq_track_view();}seqfocus=page==10?1:0;seqedit=seqhead=0;seqselectused=1;seqdrawvalid=0;dirty=1;return;}
@@ -353,7 +348,7 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   if(edge&J_DOWN){if(seqpitch[c])seqpitch[c]--;seq_clamp_cursor();dirty=1;}
   if(edge&J_RIGHT){seq_audition_stop();seqhead=0;dirty=1;}
   if(edge&J_LEFT&&seqbase){seqcursor[c]=seqbase>seqcols?seqbase-seqcols:0;dirty=1;}
-  if(edge&J_A){seq_audition_stop();if(c==4&&!monomode)monoenable();seqauditionnote=seqpitch[c]+1;seqauditiontrack=c;event(0x90|c,seqpitch[c],mixer_velocity(c,127));}
+  if(edge&J_A){seq_audition_stop();if(c==4&&!monomode)monoenable();seqauditionnote=seqpitch[c]+1;seqauditiontrack=c;if(c==TWINK_TRACK)twink_note(1,seqpitch[c],127);else event(0x90|c,seqpitch[c],mixer_velocity(c,127));}
   if(edge&J_B)seq_record_start();
   return;
  }
@@ -366,6 +361,7 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   return;
  }
  if(page==8&&seqhead){
+  if(seqhead==1&&(p&(J_A|J_B))&&(edge&(J_LEFT|J_RIGHT))){seq_audition_stop();seqtrack=seq_track_page(!!(edge&J_RIGHT));seq_dimensions();seq_track_view();seqdrawvalid=0;dirty=1;return;}
   if(c==6&&seqhead==1)seqhead=2;
   if(seqhead==1&&c<3&&(edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))){eval_set_mode(c,!eval_mode(c));seqbused=1;return;}
   if((edge&J_UP)&&c==6&&!seqedit&&!(p&(J_A|J_B)))return;
@@ -414,7 +410,7 @@ void seq_tiles(void){uint8_t tile,y,lo,hi,buf[16];
   buf[y*2]=lo;buf[y*2+1]=hi;}ui_upload_tile(244+tile,buf,0);seq_audio();}
  seqtilesready=1;previewshape=255;
 }
-void seq_open(void) BANKED {seqpopup=0;seqlengthpause=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;seqtrack=seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_track_view();seq_clamp_cursor();dirty=1;}
+void seq_open(void) BANKED {seqpopup=0;seqlengthpause=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;seqtrack=seqtrack==TWINK_TRACK&&syncmode==SYNC_TWINK?TWINK_TRACK:seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_track_view();seq_clamp_cursor();dirty=1;}
 void seq_name(uint8_t pitch,char *s){uint8_t n=pitch%12,oct=pitch/12;s[0]="CCDDEFFGGAAB"[n];s[1]=(0x54A&(1U<<n))?'#':' ';if(!oct){s[2]='-';s[3]='1';}else{s[2]='0'+oct-1;s[3]=' ';}s[4]=0;}
 void seq_field(uint8_t field,uint8_t x,uint8_t y,const char *label,uint16_t value,uint8_t digits){uint8_t inv=seqfocus==field;seq_audio();seq_text(x,y,label,inv&&(seqedit||(lastpad&J_B)));seq_number(x+3+(field==3||field==6),y,value,digits,inv);}
 uint8_t roll_selection_update(void) BANKED;
@@ -431,7 +427,7 @@ void seq_render(void) BANKED {
  if(seqdrawvalid==2){if(roll_selection_update()){seqflushpending=1;seqdrawvalid=1;}else seqdrawvalid=0;}
  if(seqdrawvalid){seq_audio();}
  else{roll_feedback_cancel();seqflushpending=1;seq_meterbuild();if(c==6)drum_render();else seq_pixels(navigation);if(rollcancelled){seqflushpending=0;seqdrawvalid=0;dirty=1;return;}seq_audio();memcpy(seqscreen,canvas,360);seqdrawvalid=1;}
- memset(canvas,96,20);seq_text(0,0,seqshort[c],1);if(c!=6)seq_text(4,0,eval_mode(c)==1?"ARP":"MONO",seqhead!=1);
+ memset(canvas,96,20);seq_text(0,0,seqshort[c],1);if(c!=6)seq_text(4,0,c==TWINK_TRACK?(twink_ready?"LINK":"WAIT"):eval_mode(c)==1?"ARP":"MONO",seqhead!=1);
  canvas[9]=244+((seqmuted>>c)&1)+(seqhead==2?2:0);canvas[11]=248+((seqsolo>>c)&1)+(seqhead==3?2:0);roll_header_range();
  eval_status();if(c==6&&!seqvelocityhidden)drum_velocity_status();
  if(eval_confirm){seq_text(0,7,"DISABLE OTHER MODE?",0);seq_text(0,9,"A CONTINUE B CANCEL",0);}if(seqeventfull)canvas[8]='!'-32+96;roll_selection_prepare(memcmp(seqscreen,canvas,20)!=0);if(memcmp(seqscreen,canvas,20)){seqflushpending=1;memcpy(seqscreen,canvas,20);}seq_audio();seq_playhead();

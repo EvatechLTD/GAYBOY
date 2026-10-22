@@ -38,7 +38,7 @@ uint8_t master=0x77,route=0xff,power=1,vin=0;
 const uint8_t limits[26]={3,15,1,7,7,1,7,63,1,1,7,1,7,1,31,3,255,1,15,1,7,3,1,1,1,24};
 #include "engine_state.h"
 #include "mono_state.h"
-void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode&&!syncslave){
+void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){if(syncstart&&synctxbyte==0xFA)syncstart=0;if(n!=rd){rx[wr]=b;wr=n;}else overflow=1;if(syncdue){syncdue=0;SB_REG=0x80|synctick;SC_REG=0x81;}return;} if(syncmode&&!syncslave){
  if(syncstart&&synctxbyte==0xFA)syncstart=0;synctxwait=3;if(waveengine==3&&syncdivider==1)synctxwait=1;
  if(syncdue){syncdue=0;SB_REG=syncmode==1?(0x80|synctick):0;SC_REG=0x81;}return;
  } SB_REG=0; SC_REG=0x80; if(n==rd) overflow=1; else {rx[wr]=b;wr=n;} }
@@ -100,13 +100,13 @@ void input_vblank_native(void){input_vblank();if(seqnativeautoarm)seq_native_sch
 void keyevent(uint8_t c,uint8_t note,uint8_t vel){uint8_t i,j,n=keycount[c],last=n?keystack[c][n-1]:255;for(i=0;i<n;i++)if(keystack[c][i]==note){for(j=i;j+1<n;j++){keystack[c][j]=keystack[c][j+1];keyvel[c][j]=keyvel[c][j+1];}n--;break;}
  if(vel){if(n==8){for(j=0;j<7;j++){keystack[c][j]=keystack[c][j+1];keyvel[c][j]=keyvel[c][j+1];}n--;}keystack[c][n]=note;keyvel[c][n++]=vel;keycount[c]=n;play(c,note,vel);}
  else {keycount[c]=n;if(last!=note)return;if(n)play(c,keystack[c][n-1],keyvel[c][n-1]);else {held[c]=255;if(!sustain[c])stop(c);}}}
-void midi(uint8_t b){if(syncmode&&sync_receive(b))return;midiage=12;if(b>=0xf8)return;if(b&128){count=0;st=b<0xf0?b:0;return;}if(!st)return;
+void midi(uint8_t b){if(syncmode==SYNC_TWINK)return;if(syncmode&&sync_receive(b))return;midiage=12;if(b>=0xf8)return;if(b&128){count=0;st=b<0xf0?b:0;return;}if(!st)return;
  if((st&0xe0)==0xc0){event(st,b,0);return;}if(!count){first=b;count=1;}else{event(st,first,b);count=0;}}
 /* Frame-clock macros update pitch/duty without retriggering hardware envelopes. */
 uint8_t seq_native_supported(void) BANKED;
 void service_frame(void) BANKED;
 void roll_feedback_service(void) BANKED;
-void service(void){uint8_t b,budget=8;mixfill();while(rd!=wr&&budget--&&!seqnativelaunchfired){b=rx[rd++];midi(b);mixfill();}if(lastframe!=sys_time)service_frame();}
+void service(void){uint8_t b,budget=8;mixfill();while(syncmode!=SYNC_TWINK&&rd!=wr&&budget--&&!seqnativelaunchfired){b=rx[rd++];midi(b);mixfill();}if(lastframe!=sys_time)service_frame();}
 void exp_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) NONBANKED {uint8_t saved=CURRENT_BANK;SWITCH_ROM(bank);memcpy(dst,(const void *)(0x4000+offset),16);SWITCH_ROM(saved);}
 extern uint16_t seqdeadline;
 void mixer_prepare_service(void) BANKED;
@@ -117,7 +117,7 @@ extern uint8_t mixer_layout_dirty;
 void mixer_layout_service(void) BANKED;
 void mixer_poll_input(void) BANKED;
 void eval_audio_resume_wave(void) BANKED;
-void mixfill(void){if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&!seqnativelaunchfired&&syncr!=syncw&&!synctxwait)sync_control_service();if(rd!=wr&&!seqnativelaunchfired&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
+void mixfill(void){if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&!seqnativelaunchfired&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode!=SYNC_TWINK&&rd!=wr&&!seqnativelaunchfired&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */

@@ -1,0 +1,68 @@
+TWINK v1 - GAYBOY / MONOSIMP
+
+GAYBOY: select TWINK in Sync Type (Sync page or Mixer Settings).
+TWINK fixes GAYBOY as MASTER. In the sequencer hold SELECT and press
+LEFT/RIGHT to reach MS. The title/navigation strip also supports
+A/B+LEFT/RIGHT when its first field is focused. MS uses the independent,
+previously inactive W2 pattern lane; active P1/P2/WV/NS/DR tracks remain.
+MS notes, velocity, duration, track length, swing, mute/solo, audition and
+pattern save/load use the normal sequencer controls and storage. Leaving
+TWINK hides MS and preserves its stored notes. MS has no local audio voice.
+
+MONOSIMP: press SELECT to reach LINK CONTROL (sixth page). INPUT selects
+MIDI or TWINK with A or LEFT/RIGHT. Default is MIDI for Arduinoboy/desktop
+compatibility. Switching input panics voices and clears parser/queued bytes.
+SYNC LFO enables clocked LFO phase; LFO DIV selects 4/1, 2/1, 1/1, 1/2,
+1/4, 1/8, 1/16 or 1/32. These settings are runtime controls, not patch data.
+START resets phase; STOP holds it. Sync off restores the patch's normal LFO.
+Other envelopes/effects/table/arp rates retain their existing behaviour.
+
+A standard compatible Game Boy link cable carries control, not audio.
+Combine headphone outputs externally. No MIDI adapter is used for TWINK.
+
+Wire contract
+-------------
+GAYBOY uses DMG internal serial clock, MONOSIMP external clock. TWINK input
+returns A5 on each exchange; MIDI returns zero. The master probes while
+stopped and suppresses notes until it sees A5. HELLO is repeated each second.
+A newly discovered endpoint receives HELLO, tempo and current transport.
+
+Frames: F3, type, a, b, CRC7. Type/a/b are seven-bit values. CRC polynomial
+09, initial zero, MSB first over seven bits of each type/a/b byte, exactly
+as in the linked-mixer CRC convention. No running status. A new F3 restarts
+a frame; invalid CRC, unknown types and incomplete frames do not sound notes.
+
+  type 1: a=session (1..127), b=version (1); establishes receiver session.
+  type 2: a=BPM high 7 bits, b=BPM low 7 bits; supported 30..300 BPM.
+  type 3: a=note 0..127, b=velocity 0..127; note-on (zero is release).
+  type 4: a=note 0..127, b=0; note-off.
+
+Realtime messages can interrupt a frame:
+  80..BF: numbered unswung 24-PPQN pulses, low six bits modulo 64.
+          Advance by the modulo difference, recovering isolated lost pulses.
+  F9: stopped heartbeat every 15 video frames; never advances musical phase.
+  FA: start/reset position; requires a negotiated session.
+  FC: stop and silence held notes; cancels incomplete frame.
+  FF: panic; cancels incomplete frame.
+
+Tempo updates also arrive while stopped. The receiver interpolates LFO phase
+between pulses at its normal modulation service rate, capped at one pulse
+past the most recent edge. Phase wraps after 384 pulses, divisible by every
+currently offered division. Clock loss clears the session/held notes after
+four expected pulse periods, with a minimum 30 video frames. Stopped timeout
+is 120 frames. Master connection display expires after 120 frames without A5.
+New HELLO and current transport reestablish playback; old notes are not replayed.
+
+Serial IRQ work remains bounded. Event frames use the existing 32-byte master
+queue; clocks have the existing interrupt-driven deadline and can interleave.
+Queue overflow panics/stops rather than dropping a release silently. Immediate
+events incur cable and service latency. No lookahead, parameter locks, remote
+patch loading, dotted/triplet divisions or multi-synth addressing in v1.
+
+Validation
+----------
+Build: python tools/build_rom.py; MONOSIMP: python tools/build_monosimp.py.
+Receiver: python tools/test_twink_input.py in MONOSIMP.
+Cable: node tools/test_twink_link.cjs [SameBoy cable core path] [MONOSIMP ROM].
+The cable test requires tools/build_sync_link.py's local SameBoy test core.
+Physical two-DMG latency/audio-load testing is still required before release.

@@ -1,4 +1,4 @@
-#pragma bank 59
+#pragma bank 61
 #include "api.h"
 #include "ui_fields.h"
 #include "drum_rows.h"
@@ -188,7 +188,7 @@ void seq_settings_render(void) BANKED {
  uint8_t c=seqtrack,i;const char *labels[]={"BPM","LENGTH","GATE %","VELOCITY","DURATION","MUTE","BEATS","BEAT UNIT","VELOCITY VIEW","ZOOM STEPS","SWING %"};
  uint16_t values[11];
  if(genopen){gen_render();return;}
- mixfill();memset(canvas,0,sizeof(canvas));memset(canvas,96,20);gen_text(0,0,"SEQ SETTINGS",1);gen_text(0,2,channels[c],0);
+ mixfill();memset(canvas,0,sizeof(canvas));memset(canvas,96,20);gen_text(0,0,"SEQ SETTINGS",1);gen_text(0,2,c==TWINK_TRACK?"MS":channels[c],0);
  gen_text(0,16,seqfocus==1?"QUARTER NOTES / MIN":seqfocus==2?"PATTERN STEP COUNT":seqfocus==5?"NEW NOTE DURATION":seqfocus==6?"MUTE THIS TRACK":seqfocus==7?"BEATS IN EACH BAR":seqfocus==8?"BAR BEAT UNIT":seqfocus==9?"SHOW VELOCITY SLIDERS":seqfocus==10?"VISIBLE STEPS IN ROLL":"LONG/SHORT STEP RATIO",0);gen_text(0,17,"A/B+ARROWS TO EDIT",0);
  values[0]=seqbpm;values[1]=seqlength[c];values[2]=seqgate[c];values[3]=seqdefaultvel[c];values[4]=seqdefaultdur[c];values[5]=!!(seqmuted&(1<<c));values[6]=seqbeats;values[7]=seqdenom;values[8]=!seqvelocityhidden;values[9]=seqcols;values[10]=seqswing;
  for(i=0;i<11;i++){if(i==2||i==3)continue;mixfill();gen_text(1,4+i,labels[i],seqfocus==i+1&&(seqedit||(lastpad&(J_A|J_B))));if(i==5||i==8)gen_text(16,4+i,values[i]?"ON ":"OFF",seqfocus==i+1);else if(i==4&&c==6&&!values[i])gen_text(16,4+i,"AUTO",seqfocus==i+1);else gen_number(16,4+i,values[i],3,seqfocus==i+1);}

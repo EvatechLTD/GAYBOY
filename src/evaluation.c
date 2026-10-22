@@ -61,7 +61,7 @@ void eval_capture(uint8_t *out) BANKED {memset(out,0,EVAL_BYTES);out[0]='S';out[
 void eval_restore(const uint8_t *in) BANKED {if(in[0]!='S'||in[1]!=1)return;if(!memcmp(evalpatch,in+2,128)&&!memcmp(globalmod,in+130,10))return;memcpy(evalpatch,in+2,128);memcpy(globalmod,in+130,10);eval_runtime_reset();eval_drum_dirty();seqirqdirty=1;}
 uint8_t eval_instrument(void) BANKED {return page==17?5+drumsynthvoice:page==7?4:selected;}
 uint8_t eval_mode(uint8_t c) BANKED {return c<3&&evalpatch[c][EV_MODE]==1;}
-uint8_t eval_visible(uint8_t c) BANKED {return c!=4&&c!=5&&!(eval_hidden&(1<<c));}
+uint8_t eval_visible(uint8_t c) BANKED {return c==TWINK_TRACK?syncmode==SYNC_TWINK:c!=4&&!(eval_hidden&(1<<c));}
 void eval_set_mode(uint8_t c,uint8_t mode) BANKED {if(c>=3)return;evalpatch[c][EV_MODE]=mode?1:0;evalpatch[c][EV_CHORD_HISTORY]=1;arpremaining[c]=0;eval_seq_off(c);seqdrawvalid=0;seqirqready=0;seqirqdirty=1;mixer_pattern_changed();dirty=1;}
 int8_t eval_signal(uint8_t c,uint8_t source) BANKED {uint8_t phase=lphase,n;(void)c;static const uint8_t sine[17]={0,6,12,19,24,30,36,41,45,49,53,56,59,61,63,64,64};if(!source)return env;switch(globalmod[4]){case 1:return (phase>>1)-64;case 2:return phase<128?64:-64;case 3:return (int8_t)((phase&0xC0)*73+37)/2;case 4:n=phase&63;if(phase&64)n=64-n;n=sine[n>>2];return phase&128?-(int8_t)n:n;default:return phase<128?(int16_t)phase-64:191-(int16_t)phase;}}
 int8_t eval_amount(uint8_t c,uint8_t destination) BANKED {int16_t value;uint8_t source;if(c>=8||destination>1)return 0;value=(int8_t)(destination?coarsepitch[c][1]:evalpatch[c][EV_DEPTH]);if(!value)return 0;source=destination?coarsepitch[c][2]:evalpatch[c][EV_SOURCES]&1;value*=eval_signal(0,source);return value<0?-((-value)>>6):value>>6;}

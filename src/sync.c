@@ -51,7 +51,7 @@ __at (0xFFC6) volatile uint8_t synctxwait;
 __at (0xFFC7) volatile uint8_t synctick;
 __at (0xFFC8) volatile uint8_t syncstart;
 __at (0xFFC9) volatile uint8_t synctxbyte;
-static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE"};
+static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE","TWINK"};
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
 void link_clock_abort(void) NONBANKED;
 void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED;
@@ -96,6 +96,7 @@ void sync_pattern(void) BANKED {uint32_t phase,elapsed;uint16_t position,part;ui
  send(0xF2);send(tick|(link_pair_phase==6?64:0));send(position>>7);send(position&127);
 }
 void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte,guard,reply;
+ if(syncmode==SYNC_TWINK&&!playing)twink_transport(0);
  if(!playing&&syncmode==1&&!syncslave&&syncarmed){send(0xFC);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
  if(syncarmed){__critical {syncarmed=0;syncdue=0;TMA_REG=TIMA_REG=syncreload;}}
  /* Disarm the consumer before clearing its optional bit ring. */
@@ -145,9 +146,10 @@ void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte
   if(linkcollision){link_reset();linkstate=4;syncslave=1;seqplaying=0;native_claimed=native_peer_running=0;__critical {rd=wr;SB_REG=0;SC_REG=0x80;}dirty=1;return;}
  }
  limit=(uint32_t)pulse_units()<<6;
- __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synclimit[0]=limit;synclimit[1]=limit>>8;synclimit[2]=limit>>16;synctick=0;syncstart=syncmode==1;syncarmed=1;synctxwait=0;}
+ __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synclimit[0]=limit;synclimit[1]=limit>>8;synclimit[2]=limit>>16;synctick=0;syncstart=syncmode==1;if(syncmode==SYNC_TWINK)syncstart=1;syncarmed=1;synctxwait=0;}
  sync_timer_config();sentbpm=0;tempo();
  if(syncmode==1){send(0xFA);while(syncstart)sync_control_service();}
+ if(syncmode==SYNC_TWINK){twink_transport(1);while(syncstart)sync_control_service();}
  __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synctick=0;seqticks=0;}
  if(syncmode==1)link_begin();
 }
@@ -210,7 +212,8 @@ void sync_render(void) BANKED {memset(canvas,0,360);memset(canvas,96,20);drawtex
  drawtext(1,8,"GLOBAL BPM",0);drawnumber(13,8,seqglobalbpm?seqglobalbpm:seqbpm);
  drawtext(0,11,"A/B+ARROWS TO EDIT",0);drawtext(0,13,"SELECT+A PLAY / STOP",0);
  if(linkstate==4)drawtext(0,16,"START CLASH - RETRY",0);
- if(syncmode>=4)drawtext(0,15,"PULSE ADAPTER NEEDED",0);
+ if(syncmode==SYNC_TWINK)drawtext(0,15,twink_ready?"MONOSIMP CONNECTED":"CONNECT MONOSIMP",0);
+ else if(syncmode>=4)drawtext(0,15,"PULSE ADAPTER NEEDED",0);
  else if(syncmode==3)drawtext(0,15,"LSDJ SYNC MODE",0);
  else drawtext(0,15,"GAME BOY LINK CABLE",0);
 }
@@ -218,16 +221,18 @@ void sync_input(uint8_t edge) BANKED {int8_t delta;
  if(edge&(J_UP|J_DOWN)){focus^=1;dirty=1;}
  if(edge&J_A){seq_transport();dirty=1;}
  if(!(edge&(J_LEFT|J_RIGHT)))return;
- if(seqplaying)seq_transport();delta=edge&J_LEFT?-1:1;
+ if(seqplaying)seq_transport();if(syncmode==SYNC_TWINK){twink_panic();while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}delta=edge&J_LEFT?-1:1;
  __critical {remove_SIO(syncmode==1?link_serial_isr:serial_isr);SC_REG=0;IF_REG&=~SIO_IFLAG;syncr=syncw=0;rd=wr;st=count=0;}
- if(!focus)syncmode=(syncmode+(delta<0?5:1))%6;
+ if(!focus)syncmode=(syncmode+(delta<0?6:1))%7;
  else if(syncmode==1)syncrole=(syncrole+(delta<0?2:1))%3;
- else syncslave^=1;
+ else if(syncmode!=SYNC_TWINK)syncslave^=1;
+ if(syncmode==SYNC_TWINK)syncslave=0;
  if(syncmode==1){if(syncrole==1)syncslave=0;else syncslave=1;}
  if(syncmode&&syncslave&&mx.magic==0xD3&&!mx.quant)mx.quant=4;
  syncpending=syncalign=remainder=tempo_state=pulsebpm=0;sentbpm=0;
  native_peer_running=native_claimed=0;
  if(syncmode){if(!seqglobalbpm)seqglobalbpm=seqbpm;seqbpm=seqglobalbpm;}
+ if(seqtrack==TWINK_TRACK&&syncmode!=SYNC_TWINK)seqtrack=0;twink_reset();
  link_reset();__critical {add_SIO(syncmode==1?link_serial_isr:serial_isr);SB_REG=0;SC_REG=(!syncmode||syncslave)?0x80:0;}dirty=1;
 }
 
@@ -243,6 +248,6 @@ void sync_ui_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;int8_t d=0,ta
  if((p&J_SELECT)&&(edge&(J_A|J_B))){seq_transport();dirty=1;return;}
  if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))&&focus&&syncmode!=1){sync_input(J_RIGHT);return;}
  if(!(p&(J_A|J_B))){if(edge&(J_UP|J_DOWN))focus^=1;}
- else{d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;if(d){current=!focus?syncmode:syncmode==1?syncrole:syncslave;target=current+d;if(target<0)target=0;if(target>(!focus?5:syncmode==1?2:1))target=!focus?5:syncmode==1?2:1;while(current!=target){sync_input(current<target?J_RIGHT:J_LEFT);current+=current<target?1:-1;}}}
+ else{d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;if(d){current=!focus?syncmode:syncmode==1?syncrole:syncslave;target=current+d;if(target<0)target=0;if(target>(!focus?6:syncmode==1?2:1))target=!focus?6:syncmode==1?2:1;while(current!=target){sync_input(current<target?J_RIGHT:J_LEFT);current+=current<target?1:-1;}}}
  dirty=1;
 }
