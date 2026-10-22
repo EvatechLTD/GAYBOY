@@ -58,7 +58,7 @@ void eval_defaults(void) BANKED {uint8_t c;memset(evalpatch,0,sizeof(evalpatch))
 }
 void eval_load_object(uint16_t object) BANKED {(void)object;}
 void eval_capture(uint8_t *out) BANKED {memset(out,0,EVAL_BYTES);out[0]='S';out[1]=1;memcpy(out+2,evalpatch,128);memcpy(out+130,globalmod,10);}
-void eval_restore(const uint8_t *in) BANKED {if(in[0]!='S'||in[1]!=1)return;memcpy(evalpatch,in+2,128);memcpy(globalmod,in+130,10);eval_runtime_reset();}
+void eval_restore(const uint8_t *in) BANKED {if(in[0]!='S'||in[1]!=1)return;if(!memcmp(evalpatch,in+2,128)&&!memcmp(globalmod,in+130,10))return;memcpy(evalpatch,in+2,128);memcpy(globalmod,in+130,10);eval_runtime_reset();eval_drum_dirty();seqirqdirty=1;}
 uint8_t eval_instrument(void) BANKED {return page==17?5+drumsynthvoice:page==7?4:selected;}
 uint8_t eval_mode(uint8_t c) BANKED {return c<3&&evalpatch[c][EV_MODE]==1;}
 uint8_t eval_visible(uint8_t c) BANKED {return c!=4&&c!=5&&!(eval_hidden&(1<<c));}

@@ -1,6 +1,7 @@
 #pragma bank 17
 #pragma opt_code_speed
 #include "api.h"
+#include "mixer_shared.h"
 #include "drum_rows.h"
 uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED;
 uint16_t roll_drum_onset(uint8_t step,uint8_t row) BANKED;
@@ -67,7 +68,7 @@ uint16_t drumsourceoffset[10],drumsourcelength[10];
 void drum_map_factory(uint8_t kit) BANKED {uint8_t i;if(kit>7)kit=1;drumkit=kit;for(i=0;i<10;i++){drumsourcekit[i]=kit;drumsourceslot[i]=i;drumsourcebank[i]=(kit?kitbank[kit-1]:amenbank)[i];drumsourceoffset[i]=(kit?kitoffset[kit-1]:amenoffset)[i];drumsourcelength[i]=(kit?kitlength[kit-1]:amenlength)[i];}drummapkit=kit;}
 void drum_map_assign(uint8_t dest,uint8_t kit,uint8_t sample) BANKED {if(dest>=10||kit>7||sample>=(kit?8:10))return;if(!DRUM_MAPPED)drum_map_factory(drumkit);drumsourcekit[dest]=kit;drumsourceslot[dest]=sample;drumsourcebank[dest]=(kit?kitbank[kit-1]:amenbank)[sample];drumsourceoffset[dest]=(kit?kitoffset[kit-1]:amenoffset)[sample];drumsourcelength[dest]=(kit?kitlength[kit-1]:amenlength)[sample];}
 void drum_map_capture(uint8_t *out) BANKED {if(!DRUM_MAPPED)drum_map_factory(drumkit);out[0]='D';out[1]=1;memcpy(out+2,drumsourcekit,10);memcpy(out+12,drumsourceslot,10);}
-void drum_map_restore(const uint8_t *in) BANKED {uint8_t i;drum_map_factory(drumkit);if(in[0]!='D'||in[1]!=1)return;for(i=0;i<10;i++)if(in[2+i]>7||in[12+i]>=10||in[2+i]&&in[12+i]>=8){/* Factory rows 9/10 are intentional silent placeholders. */if(in[2+i]!=drumkit||in[12+i]!=i)return;}for(i=0;i<10;i++){uint8_t k=in[2+i],s=in[12+i];drumsourcekit[i]=k;drumsourceslot[i]=s;drumsourcebank[i]=(k?kitbank[k-1]:amenbank)[s];drumsourceoffset[i]=(k?kitoffset[k-1]:amenoffset)[s];drumsourcelength[i]=(k?kitlength[k-1]:amenlength)[s];}}
+void drum_map_restore(const uint8_t *in) BANKED {uint8_t i;if(DRUM_MAPPED&&in[0]=='D'&&in[1]==1&&!memcmp(drumsourcekit,in+2,10)&&!memcmp(drumsourceslot,in+12,10))return;drum_map_factory(drumkit);if(in[0]!='D'||in[1]!=1)return;for(i=0;i<10;i++)if(in[2+i]>7||in[12+i]>=10||in[2+i]&&in[12+i]>=8){/* Factory rows 9/10 are intentional silent placeholders. */if(in[2+i]!=drumkit||in[12+i]!=i)return;}for(i=0;i<10;i++){uint8_t k=in[2+i],s=in[12+i];drumsourcekit[i]=k;drumsourceslot[i]=s;drumsourcebank[i]=(k?kitbank[k-1]:amenbank)[s];drumsourceoffset[i]=(k?kitoffset[k-1]:amenoffset)[s];drumsourcelength[i]=(k?kitlength[k-1]:amenlength)[s];}}
 uint8_t drumenabled,drumrow,druminit,drumsynthrow,drumsynthvoice;
 uint16_t drumanchor=65535U;
 uint8_t drumbused,drumnoiseowned;
@@ -156,7 +157,9 @@ void drum_fire(uint8_t step) BANKED {
  if(pending){__critical {
   if(pending&1){drumsamplevoice[0]=samples[0];drumpos[0]=starts[0];drumend[0]=ends[0];drumbankvoice[0]=banks[0];drumon[0]=1;}
   if(pending&2){drumsamplevoice[1]=samples[1];drumpos[1]=starts[1];drumend[1]=ends[1];drumbankvoice[1]=banks[1];drumon[1]=1;}
-  drumlast=last;mixrunning=1;if(!experimental_mode)active[2]=1;
+  /* The PCM IRQ may have finished the old voices while these attacks were
+     prepared. Publish their running state and clear that stale tail together. */
+  drumlast=last;drumtail=0;mixrunning=1;if(!experimental_mode)active[2]=1;
  }}if(changed)drum_noise();
 }
 /* Native-rate, direct PCM: no oscillator, pitch, envelope or DDS processing.
@@ -699,6 +702,7 @@ void seq_next_deadline(void) BANKED {uint8_t c,idle=seq_native_fx_idle();uint16_
  if(seqclock>=seqthreshold)next=1;
  else if(seqswing==50&&seqcachedbpm==seqbpm&&seqclock<seqbpm)next=seqstepunits+(15360U-seqstepunits*seqbpm>seqclock);
  else next=(seqthreshold-seqclock+seqbpm-1)/seqbpm;
+ if(mx.quant==7&&seqclock<(seqthreshold>>1)){step=((seqthreshold>>1)-seqclock+seqbpm-1)/seqbpm;if(step<next)next=step;}
  step=next;
  for(c=0;c<SEQ_TRACKS;c++)if(seqgateleft[c]&&seqgateleft[c]<next){
   /* Full pulse gates rounded one unit short still occupy their whole step. */

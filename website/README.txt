@@ -198,3 +198,38 @@ October 19, 2026: legacy /gayboy/ redirects to https://y2kcrisis.com/gayboy.
 Legacy asset links redirect to /apps/gayboy/ on Y2KCRISIS. Browser cartridges
 now live under emulator/roms/; downloads/GAYBOY.gb is for explicit downloads.
 Count those URL namespaces separately; cached older players may still use old URLs.
+
+October 21, 2026 MOD/NEWGEN update:
+Normal play and the canonical download now use the current main ROM, including
+the GEN cursor fix and gated-PCM restart fix. Package with package_web_rom.py;
+publish this narrow update with the VIBECHOPPER Python interpreter running
+tools/publish_web_rom.py. This targets the live Y2KCRISIS app, not the retired
+standalone mount, and backs up/rechecks changed files before HTTPS verification.
+The older publish_website.py is for the retired standalone package.
+
+emulator/tutorial-rom.json continues to identify the normal-play ROM and symbol
+map used for beat capture/server validation. emulator/practice-rom.json separately
+pins the existing lesson-compatible cartridge: main's resident event storage no
+longer has the lesson reader's old seqevents_lo/hi layout. The player loads that
+practice map only for lessons. Archived ROMs/maps remain available for shared
+beats. Old browser-save keys remain recoverable; current main uses a separate
+save key rather than loading the old storage format automatically.
+
+Release QA: verify_browser_demo.py passed desktop/mobile controls, audio, render,
+pause/restart, save export and multitouch. verify_web_rom_release.py checks the
+current ROM/download hashes, the pinned practice ROM, first-lesson startup and
+preservation of the paused normal machine and every SRAM byte on tutorial exit.
+The full older tutorial suite reached lesson 8, then failed its lesson-9 mute
+demonstration on the retained legacy cartridge; a full twelve-lesson pass is not
+claimed for this update.
+
+October 22, 2026 smooth pattern launches and DJ retriggers:
+The released main cartridge buffers incoming pad metadata, instruments and
+first notes before quantized launches. Matching instruments retain their runtime;
+matching held wave notes preserve oscillator continuity across pad switches.
+Hold A on a pad to repeat launches. While holding A, Up selects faster repeats
+and Down selects slower repeats. Launch quantization extends through 1/32.
+Normal-play browser ROM and both main downloads have SHA256:
+5b95a518f0c6be289389ae95dd5209cdef50e7474398766fe9c1af8942fdc3d9
+Tutorial lessons retain the separate compatible practice cartridge. Existing
+shared-beat cartridges remain pinned to their original symbol maps.

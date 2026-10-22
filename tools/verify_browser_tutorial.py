@@ -37,7 +37,7 @@ with sync_playwright() as p:
     expect(next_button).to_be_disabled()
     expect(page.locator('.tutorial-score')).to_have_text('0 / 1200 pts')
     expect(panel).to_have_attribute('data-stage','practice',timeout=30000)
-    metadata = page.evaluate("async()=>await(await fetch('emulator/tutorial-rom.json')).json()")
+    metadata = page.evaluate("async()=>await(await fetch('emulator/practice-rom.json')).json()")
     page.evaluate('(m)=>window.qaMap=m',metadata)
     page.evaluate("""()=>{
       window.qaRead=n=>qaCore._emulator_observe_mem(qaInstance,qaMap.symbols[n]);

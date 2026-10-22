@@ -1,0 +1,34 @@
+PCM gated-sample restart fix - 21 October 2026
+
+Reproduced the hardware report on the old ROM: kit 1 (808), 120 BPM, kick at
+step 0 lasting four steps, two different sample attacks at step 4. Neither new
+sample reached the PCM fetcher. Other kit/tempo combinations reproduced it too.
+
+The plotted source length was already capped correctly (2,864 bytes for that
+kick), so the kick's full source length was not the underlying problem.
+drum_enable cleared drumtail before foreground attack preparation. An IRQ in
+that preparation window could mark the old voices finished again. Publication
+then set the new voices and mixrunning, but left that finished flag set. The
+next timer could stop the mixer before priming it, leaving drumon slots occupied
+without consuming their samples.
+
+drum_start and drum_fire now clear drumtail in the critical section that publishes
+new sample ownership and running state. The interrupt-owned rendering path and
+the two-slot polyphony limit are unchanged.
+
+python tools/test_pcm_gate_restart.py
+python tools/test_pcm_gate_restart.py --cgb --out build/pcm-gate-restart-cgb.json
+
+Both passed all 48 cases: every kit, 120/150/240/300 BPM, one/four-step gates,
+correct source-byte limits, and both following sample attacks reaching the actual
+PCM fetcher. The archived pre-fix ROM failed ten of those cases, including the
+reported 808/four-step case. Before/after reports are under build/pcm-gate-*.json;
+the pre-fix ROM and symbols are under build/pcm-gate-baseline/.
+
+MOD phase/routing/arp, shared-engine, transport, generator and generated-chord
+checks passed again. Layout checks retained 2,355 bytes of WRAM headroom and the
+512-byte stack reservation. The old pattern-wave and PCM-isolation suites still
+stop at their removed page-11 setup and are not counted as passing checks.
+
+Fixed build/GAYBOY.gb SHA256:
+25477a3bfc636e7664e059719d13e9ad5d2f1c5715ac390f5a41f476d02b2508

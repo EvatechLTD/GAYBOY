@@ -14,6 +14,8 @@ void tones_capture(void) BANKED;
 void tones_pack(void) BANKED;
 uint8_t tones_decode(void) BANKED;
 void tones_apply(void) BANKED;
+void tones_apply_buffer(const uint8_t *raw) BANKED;
+uint8_t tones_match_buffer(const uint8_t *raw) BANKED;
 void tones_apply_cached(void) BANKED;
 void tones_finalize(void) BANKED;
 uint8_t tones_apply_object(uint16_t object) BANKED;

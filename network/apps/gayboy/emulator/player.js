@@ -27,8 +27,8 @@
   }
   expand.setAttribute('aria-expanded', 'false');
   expand.addEventListener('click', () => expanded(!root.classList.contains('demo-expanded')));
-  const SAVE_KEY = 'gayboy-browser-sram-0.3-622c7024';
-  const LEGACY_SAVE_KEYS = ['gayboy-browser-sram-0.3-4a7e3e79','gayboy-browser-sram-0.3-73d49395'];
+  const SAVE_KEY = 'gayboy-browser-sram-0.3-10cc021b';
+  const LEGACY_SAVE_KEYS = ['gayboy-browser-sram-0.3-622c7024','gayboy-browser-sram-0.3-4a7e3e79','gayboy-browser-sram-0.3-73d49395'];
   const CLOCK = 4194304;
   const AUDIO_FRAMES = 2048;
   const AUDIO_LEAD = 0.09;
@@ -106,7 +106,7 @@
     try {
       if (!instance) await powerOn();
       if (!instance) return;
-      const response = await fetch('emulator/tutorial-rom.json?v=rom-paths-20261019');
+      const response = await fetch('emulator/practice-rom.json?v=smooth-launch-dj-20261022');
       if (!response.ok) throw new Error('Tutorial information could not be loaded.');
       const metadata = await response.json();
       const download = await fetch(metadata.rom+'?v='+metadata.sha256);
@@ -353,7 +353,7 @@
         script.onerror = () => { script.remove(); reject(new Error('Emulator download failed')); };
         document.head.append(script);
       });
-      const metadataResponse=await fetch('emulator/tutorial-rom.json?v=rom-paths-20261019');
+      const metadataResponse=await fetch('emulator/tutorial-rom.json?v=smooth-launch-dj-20261022');
       if(!metadataResponse.ok)throw new Error('Cartridge information could not be loaded.');
       const metadata=await metadataResponse.json();
       const response = await fetch(metadata.rom+'?v='+metadata.sha256);
@@ -391,7 +391,7 @@
     },
     async capture() {
       if(!instance||loading||tutorialActive||beatBusy||beatParked)throw new Error('Start your own beat in the emulator before sharing.');
-      const metadata=await(await fetch('emulator/tutorial-rom.json?v=rom-paths-20261019')).json();
+      const metadata=await(await fetch('emulator/tutorial-rom.json?v=smooth-launch-dj-20261022')).json();
       if(!core._emulator_observe_mem(instance,metadata.symbols.seqplaying))
         throw new Error('Start your sequencer with SELECT + A, then share your beat.');
       release();
@@ -416,7 +416,7 @@
         if(!instance)throw new Error('Tap POWER ON, then try playing that beat again.');
         const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',rom)),b=>b.toString(16).padStart(2,'0')).join('');
         const targetHash=Array.from(bytes.slice(8,40),b=>b.toString(16).padStart(2,'0')).join('');
-        const versions=await(await fetch('emulator/rom-versions.json?v=rom-paths-20261019')).json();
+        const versions=await(await fetch('emulator/rom-versions.json?v=smooth-launch-dj-20261022')).json();
         const metadata=versions.versions[targetHash];
         if(!metadata)throw new Error('That beat uses an unavailable version of GAYBOY.');
         let beatRom=rom;

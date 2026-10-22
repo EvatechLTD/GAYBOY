@@ -2,6 +2,9 @@
 #define MIXER_SHARED_H
 typedef struct {uint8_t magic,slot,pending,quant,focus,edit,browser,naming,letter,padcache;uint16_t boundary;uint8_t level[7],pan[7];char name[17];uint16_t checksum;uint8_t checking,presaved,openempty,cachevalid,cacheslot,error,protectedslots;} Mixer;
 extern __at (0xAC80) Mixer mx;
+/* Preserve stored/wire IDs: 6 and 7 extend the original quantize choices. */
+#define MIXER_QUANT_UP(q) ((q)==0?7:(q)==7?6:(q)==6?1:(q)<5?(q)+1:5)
+#define MIXER_QUANT_DOWN(q) ((q)==1?6:(q)==6?7:(q)==7?0:(q)?(q)-1:0)
 #define MIXER_LINK_AVAILABLE (syncmode==1&&!syncslave&&linkstate==2)
 #define MIXER_LINK_VIEW (mixer_device&&MIXER_LINK_AVAILABLE)
 /* Independent quantized launches replace notes on the existing transport.

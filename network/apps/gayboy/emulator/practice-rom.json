@@ -1,0 +1,27 @@
+{
+  "rom": "emulator/roms/GAYBOY-622c70243cf4.gb",
+  "sha256": "622c70243cf4d4df0e17256f8ddedbbfdae4dd34cdb47e921465f99e4345bb88",
+  "symbols": {
+    "page": 51327,
+    "navopen": 51343,
+    "navchoice": 51344,
+    "seqplaying": 52900,
+    "seqtrack": 52901,
+    "seqcursor": 52846,
+    "seqpitch": 54114,
+    "seqhead": 52907,
+    "seqfocus": 52903,
+    "seqedit": 52904,
+    "seqapending": 53348,
+    "seqposition": 52839,
+    "seqevents_lo": 51785,
+    "seqevents_hi": 43008,
+    "seqeventcounts": 52809,
+    "seqeventoffsets": 52823,
+    "seqmuted": 52905,
+    "seqsolo": 52906,
+    "seqlength": 54072,
+    "lastpad": 53621
+  },
+  "mixer": 44160
+}

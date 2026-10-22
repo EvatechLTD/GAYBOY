@@ -19,10 +19,10 @@ static uint8_t first_strip(void){uint8_t c;for(c=0;c<20;c++)if(shown(c))return f
 static uint8_t pad(void){uint8_t c;for(c=0;c<8;c++)if(shown(c+20))return 30+c;return 0;}
 void mixer_link_render(void) BANKED {uint8_t c,n=0,col=0,selected=mx.focus>=38&&mx.focus<64?7+(mx.focus-38)/2:mx.focus>=2&&mx.focus<30?(mx.focus-2)/4:255;
  /* An idle AUTO start discovers its peer before sending the selected pad. */
- if(mx.browser&128){if(!seqplaying)mx.browser=0;else if(!syncslave&&linkstate==2&&linkmirror.quant<=5&&link_command(mx.browser&7,4,0))mx.browser=0;}
+ if(mx.browser&128){if(!seqplaying)mx.browser=0;else if(!syncslave&&linkstate==2&&linkmirror.quant<=7&&link_command(mx.browser&7,4,0))mx.browser=0;}
  memset(canvas,0,360);memset(canvas,96,20);text(0,0,"MIXER",1);text(16,0,"LINK",1);
  text(0,2,seqplaying?"STOP":"PLAY",mx.focus==0);text(0,3,"SYNC",0);text(7,3,syncmode!=1?"WAIT LINK":syncslave?(seqplaying?"SLAVE MODE":"PLAY TO LINK"):linkstate==2?"CONNECTED":linkstate==3?"STALE":"WAIT LINK",0);
- text(7,2,"LAUNCH",0);text(14,2,linkmirror.quant==1?"1/8":linkmirror.quant==2?"1/4":linkmirror.quant==3?"1/2":linkmirror.quant==5?"LONG":"1/1",mx.focus==1);
+ text(7,2,"LAUNCH",0);text(14,2,linkmirror.quant==7?"1/32":linkmirror.quant==6?"1/16":linkmirror.quant==1?"1/8":linkmirror.quant==2?"1/4":linkmirror.quant==3?"1/2":linkmirror.quant==5?"LONG":"1/1",mx.focus==1);
  for(c=0;c<20;c++)if(shown(c)){if(c==selected)col=n;n++;}if(selected<20){if(col<scroll)scroll=col;if(col>=scroll+6)scroll=col-5;}else if(scroll>=n)scroll=0;
  n=0;for(c=0;c<20;c++){uint8_t f,x;if(!shown(c))continue;col=n++;if(col<scroll||col>=scroll+6)continue;x=2+(col-scroll)*3;
   f=focus(c,0);if(c<7)field_center(x,4,3,names[c],0);else text(x,4,mixer_drum_name(linkmirror.kit,c-7),0);
@@ -34,8 +34,8 @@ void mixer_link_render(void) BANKED {uint8_t c,n=0,col=0,selected=mx.focus>=38&&
 }
 void mixer_link_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
  if(mx.focus<2){if(edge&(J_LEFT|J_RIGHT))mx.focus=mx.focus?0:1;if(edge&J_DOWN)mx.focus=first_strip();if(edge&J_UP)mx.focus=pad();
-  if(edge&(J_A|J_B)){if(!mx.focus)seq_transport();else if(mx.focus==1)link_command(0,5,linkmirror.quant>=5?1:linkmirror.quant+1);}dirty=1;return;}
- if(mx.focus>=30&&mx.focus<38){if(edge&(J_LEFT|J_RIGHT))mixer_pads_move(edge&J_LEFT?-1:1);
+  if(edge&(J_A|J_B)){if(!mx.focus)seq_transport();else if(mx.focus==1)link_command(0,5,linkmirror.quant==5?7:MIXER_QUANT_UP(linkmirror.quant));}dirty=1;return;}
+ if(mx.focus>=30&&mx.focus<38){if((p&J_A)&&(edge&(J_UP|J_DOWN))){uint8_t q=(edge&J_UP)?MIXER_QUANT_DOWN(linkmirror.quant):MIXER_QUANT_UP(linkmirror.quant);link_command(0,5,q?q:7);dirty=1;return;}if(edge&(J_LEFT|J_RIGHT))mixer_pads_move(edge&J_LEFT?-1:1);
   if(edge&J_UP)mx.focus=first_strip();else if(edge&J_A){if(!seqplaying){seq_transport();if(syncmode==1&&!syncslave&&seqplaying)mx.browser=128+mx.focus-30;}else link_command(mx.focus-30,4,0);}dirty=1;return;}
  c=mx.focus>=38?7+(mx.focus-38)/2:(mx.focus-2)/4;f=mx.focus>=38?(mx.focus-38)%2:(mx.focus-2)%4;
  if(c<7&&f>=2&&(p&(J_A|J_B))){int16_t v=link_target(c,f);if(!(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)))return;if(edge&J_UP)v++;if(edge&J_DOWN)v--;if(edge&J_LEFT)v-=10;if(edge&J_RIGHT)v+=10;link_command(c,f,v<0?0:v>(f==2?127:3)?(f==2?127:3):v);dirty=1;return;}

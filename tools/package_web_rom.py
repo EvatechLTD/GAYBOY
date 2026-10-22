@@ -12,10 +12,12 @@ digest=hashlib.sha256(rom).hexdigest()
 assert len(rom)==1048576 and rom[0x147]==0x1B and rom[0x149]==3
 assert (sum(rom)-rom[0x14e]-rom[0x14f])&65535==int.from_bytes(rom[0x14e:0x150],'big')
 names=('page navopen navchoice seqplaying seqtrack seqcursor seqpitch seqhead seqfocus '
-       'seqedit seqapending seqposition seqevents_lo seqevents_hi seqeventcounts '
+       'seqedit seqapending seqposition seqeventcounts '
        'seqeventoffsets seqmuted seqsolo seqlength lastpad').split()
 metadata={'rom':'emulator/roms/GAYBOY.gb','sha256':digest,
           'symbols':{name:symbols[name] for name in names},'mixer':symbols['mx']}
+for name in ('seqevents_lo','seqevents_hi'):
+    if name in symbols:metadata['symbols'][name]=symbols[name]
 snapshot=ROOT/'build/web-rom-releases'/digest
 snapshot.mkdir(parents=True,exist_ok=True)
 for name in ['GAYBOY.gb','GAYBOY.noi','GAYBOY.map']:
@@ -31,6 +33,16 @@ for folder in [ROOT/'website',ROOT/'network/apps/gayboy']:
         archived='emulator/roms/GAYBOY-'+old['sha256'][:12]+'.gb'
         (folder/archived).write_bytes(old_rom)
         registry['versions'][old['sha256']]={**old,'rom':archived}
+    # Lessons observe the legacy event layout. Keep their tested cartridge/map
+    # separate when a newer normal-play ROM uses resident note storage.
+    practice_path=folder/'emulator/practice-rom.json'
+    practice=json.loads(practice_path.read_text()) if practice_path.exists() else old
+    if 'seqevents_lo' not in metadata['symbols']:
+        if practice['sha256']==old['sha256'] and old['sha256']!=digest:
+            practice={**practice,'rom':archived}
+        assert 'seqevents_lo' in practice['symbols']
+        assert hashlib.sha256((folder/practice['rom']).read_bytes()).hexdigest()==practice['sha256']
+    else:practice=metadata
     # Keep every shared-beat cartridge outside the public download namespace.
     for version in registry['versions'].values():
         previous=folder/version['rom']
@@ -43,8 +55,10 @@ for folder in [ROOT/'website',ROOT/'network/apps/gayboy']:
     registry['current']=digest
     registry['versions'][digest]=metadata
     registry_path.write_text(json.dumps(registry,indent=2)+'\n')
-    for name in ['GAYBOY.gb','GAYBOY-0.3.gb','GAYBOY-tutorial.gb']:
+    for name in ['GAYBOY.gb','GAYBOY-0.3.gb']:
         (folder/'downloads'/name).write_bytes(rom)
+    (folder/'downloads/GAYBOY-tutorial.gb').write_bytes((folder/practice['rom']).read_bytes())
+    practice_path.write_text(json.dumps(practice,indent=2)+'\n')
     (folder/'emulator/tutorial-rom.json').write_text(json.dumps(metadata,indent=2)+'\n')
     checksums=''.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name+'\n'
                       for f in sorted((folder/'downloads').glob('*.gb')))

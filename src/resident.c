@@ -8,6 +8,17 @@ void storage_sorted_dirty(void) BANKED;
 #include "mixer_shared.h"
 #include "tones.h"
 extern volatile uint8_t padread,padwrite;
+extern uint8_t noisepatch[2][5],pulsekickpatch[8],drumkit;
+extern uint8_t globalmod[10];
+uint8_t coarse_matches(const uint8_t *raw) BANKED;
+uint8_t tones_match_buffer(const uint8_t *raw) BANKED {uint8_t c;
+ if(raw[164]!='S'||raw[165]!=1||raw[176]!='S'||raw[177]!=1)return 0;
+ for(c=0;c<4;c++)if(memcmp(param[c],raw+c*32,26)||program[c]!=raw[c*32+26])return 0;
+ if(custom!=raw[128]||memcmp(customwave,raw+129,16)||memcmp(finepitch,raw+145,6)||memcmp(noisepatch,raw+151,10)||drumkit!=raw[161]||master!=raw[162]||power!=raw[163]||memcmp(pulsekickpatch,raw+168,8))return 0;
+ if(memcmp(evalpatch,raw+178,128)||memcmp(globalmod,raw+306,10)||!coarse_matches(raw))return 0;
+ return DRUM_MAPPED&&raw[320]=='D'&&raw[321]==1&&!memcmp(drumsourcekit,raw+322,10)&&!memcmp(drumsourceslot,raw+332,10);
+}
+
 void seq_pattern_release(void) BANKED;void seq_pattern_handoff(void) BANKED;
 uint8_t sparse_enabled,sparse_install_slot=255,sparse_song=0,sparse_patterns=5;
 uint16_t sparse_slots[8],sparse_tones[8];char sparse_song_name[17]="STRIPPED";
@@ -15,6 +26,15 @@ uint8_t pool_root[128],pool_error,pool_used[38],sparse_journal_slot=255;
 extern uint8_t pattern_dirty,seqgate[7],seqbeats,seqdenom,seqcachedgate[7];
 extern uint16_t pattern_generation,seqcachedbpm,seqstepunits,seqgateunits[7],seqclock,seqdeadline;
 static uint16_t saved_generation,last_edit;static uint8_t io_busy;
+/* Private WRAM staging survives renderer scratch reuse and navigation. */
+static uint8_t launchdata[449],launchslot=255,launchequal,launchready,firstready;
+static uint8_t launchnotes[6][4];
+static uint16_t launchscan;
+static uint16_t launchbytes,launchgeneration;
+uint16_t resident_tone_generation;
+uint8_t resident_same_tones;
+void sparse_prepare_invalidate(void) BANKED;
+
 static void bank_copy(uint8_t *source,uint8_t *target,uint8_t bank,uint8_t n) __naked {__asm
  ldhl sp,#2
  ld a,(hl+)
@@ -48,7 +68,7 @@ resident_bank_done$:
 static void io(uint8_t bank,uint16_t address,uint8_t *data,uint16_t count,uint8_t writing){uint8_t n,buf[16];while(count){n=count>16?16:count;if(writing)memcpy(buf,data,n);__critical{if(writing)bank_copy(buf,(uint8_t *)address,bank,n);else bank_copy((uint8_t *)address,buf,bank,n);}if(!writing)memcpy(data,buf,n);address+=n;data+=n;count-=n;}}
 
 void resident_read(uint8_t slot,uint16_t offset,uint8_t *data,uint16_t count) BANKED {if(slot>=5){memset(data,0,count);return;}io(1+(slot>>2),0xA000U+(uint16_t)(slot&3)*2048U+offset,data,count,0);}
-void resident_write(uint8_t slot,uint16_t offset,const uint8_t *data,uint16_t count) BANKED {if(slot<5)io(1+(slot>>2),0xA000U+(uint16_t)(slot&3)*2048U+offset,(uint8_t *)data,count,1);}
+void resident_write(uint8_t slot,uint16_t offset,const uint8_t *data,uint16_t count) BANKED {if(slot==launchslot){launchbytes=0;launchready=0;launchequal=0;}if(slot<5)io(1+(slot>>2),0xA000U+(uint16_t)(slot&3)*2048U+offset,(uint8_t *)data,count,1);}
 uint16_t resident_move_left;uint8_t resident_move_bank,resident_move_ie;
 static void move_forward(uint8_t *target,uint8_t *source,uint16_t bytes,uint8_t bank) __naked {__asm
  ldhl sp,#2
@@ -172,14 +192,40 @@ move_backward_done$:
  __endasm;}
 void resident_move(uint16_t to,uint16_t from,uint16_t bytes) BANKED {uint8_t bank=1+(mx.slot>>2);uint16_t base=0xA000U+(uint16_t)(mx.slot&3)*2048U+RESIDENT_EVENTS;uint8_t *dst=(uint8_t *)(base+to),*src=(uint8_t *)(base+from);if(!bytes||to==from)return;if(to>from)move_backward(dst+bytes-1,src+bytes-1,bytes,bank);else move_forward(dst,src,bytes,bank);}
 void resident_events_changed(void) BANKED {last_edit=sys_time;mixer_pattern_changed();seqirqdirty=1;}
-static void metadata(uint8_t slot,uint8_t writing){uint8_t b[81];if(writing){memcpy(b,seqeventcounts,14);memcpy(b+14,seqlength,14);memcpy(b+28,seqdefaultdur,14);memcpy(b+42,seqdefaultvel,7);memcpy(b+49,seqgate,7);memcpy(b+56,mx.level,7);memcpy(b+63,mx.pan,7);b[70]=seqmuted;b[71]=seqsolo;b[72]=seqbeats;b[73]=seqdenom;b[74]=0;memcpy(b+75,&seqbpm,2);memcpy(b+77,&drummutemask,2);memcpy(b+79,&drumsolomask,2);resident_write(slot,32,b,81);resident_write(slot,16,(uint8_t *)mx.name,16);}else{resident_read(slot,32,b,81);applymeta(b);resident_read(slot,16,(uint8_t *)mx.name,16);mx.name[16]=0;seqstepunits=15360U/seqbpm;memset(seqcachedgate,100,7);seqcachedbpm=0;}}
+static void metadata(uint8_t slot,uint8_t writing){uint8_t b[81];if(writing){memcpy(b,seqeventcounts,14);memcpy(b+14,seqlength,14);memcpy(b+28,seqdefaultdur,14);memcpy(b+42,seqdefaultvel,7);memcpy(b+49,seqgate,7);memcpy(b+56,mx.level,7);memcpy(b+63,mx.pan,7);b[70]=seqmuted;b[71]=seqsolo;b[72]=seqbeats;b[73]=seqdenom;b[74]=0;memcpy(b+75,&seqbpm,2);memcpy(b+77,&drummutemask,2);memcpy(b+79,&drumsolomask,2);resident_write(slot,32,b,81);resident_write(slot,16,(uint8_t *)mx.name,16);}else{resident_read(slot,32,b,81);applymeta(b);resident_read(slot,16,(uint8_t *)mx.name,16);mx.name[16]=0;}}
 uint8_t sparse_snapshot(uint8_t slot) BANKED {if(slot>=5||slot!=mx.slot||io_busy)return 0;io_busy=1;metadata(slot,1);tones_capture();resident_write(slot,128,TONE_RAW,POOL_TONE_BYTES);saved_generation=pattern_generation;pattern_dirty=0;io_busy=0;return 1;}
-uint8_t sparse_restore(uint8_t slot) BANKED {if(slot>=5||sparse_enabled!=1)return 0;mx.slot=slot;storage_sorted_dirty();metadata(slot,0);resident_read(slot,128,TONE_RAW,POOL_TONE_BYTES);tones_apply();seqeventcache=0;eval_drum_dirty();saved_generation=pattern_generation;pattern_dirty=0;return 1;}
-uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t busy=seqservicing;if(slot>=5)return 0;seqservicing=1;if(seqplaying)seq_pattern_release();if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.padcache=0;seqdrawvalid=0;if(seqplaying)seq_pattern_handoff();seqservicing=busy;dirty=1;return 1;}
-void sparse_request(uint8_t slot,uint8_t edit) BANKED {if(slot>=5)return;if(edit&&slot==mx.slot){page=8;seq_open();dirty=1;return;}if(pattern_dirty)sparse_snapshot(mx.slot);mx.pending=slot;mx.openempty=edit;mx.cachevalid=0;if(!seqplaying||!mx.quant){mx.pending=255;mixer_activate(slot,edit);}dirty=1;}
-void sparse_service(void) BANKED {if(!io_busy&&pattern_dirty&&!seqservicing&&!seqplaying&&padread==padwrite&&(uint16_t)(sys_time-last_edit)>30)sparse_snapshot(mx.slot);}
+uint8_t sparse_restore(uint8_t slot) BANKED {if(slot>=5||sparse_enabled!=1)return 0;resident_same_tones=0;mx.slot=slot;storage_sorted_dirty();
+ if(slot==launchslot&&launchready){
+  applymeta(launchdata+16);memcpy(mx.name,launchdata,16);mx.name[16]=0;
+  if(launchequal&&launchgeneration==resident_tone_generation)resident_same_tones=1;
+  else tones_apply_buffer(launchdata+97);
+ }else {metadata(slot,0);resident_read(slot,128,TONE_RAW,POOL_TONE_BYTES);tones_apply();}
+ firstready=slot==launchslot&&launchready;sparse_prepare_invalidate();seqeventcache=0;saved_generation=pattern_generation;pattern_dirty=0;return 1;}
+uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t busy=seqservicing;if(slot>=5)return 0;seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.padcache=0;seqdrawvalid=0;if(seqplaying)seq_pattern_handoff();seqservicing=busy;dirty=1;return 1;}
+void sparse_request(uint8_t slot,uint8_t edit) BANKED {if(slot>=5)return;firstready=0;if(edit&&slot==mx.slot){page=8;seq_open();dirty=1;return;}if(pattern_dirty)sparse_snapshot(mx.slot);sparse_prepare_invalidate();launchslot=slot;mx.pending=slot;mx.openempty=edit;mx.cachevalid=0;if(!seqplaying||!mx.quant){mx.pending=255;mixer_activate(slot,edit);}dirty=1;}
+void sparse_service(void) BANKED {sparse_prepare_service();if(!io_busy&&pattern_dirty&&!seqservicing&&!seqplaying&&padread==padwrite&&(uint16_t)(sys_time-last_edit)>30)sparse_snapshot(mx.slot);}
 uint8_t sparse_boot(void) BANKED {uint8_t i,magic[4];io(3,0xBF80,magic,4,0);sparse_enabled=1;if(memcmp(magic,"GSR1",4)){if(magic[0]!=0&&magic[0]!=255){sparse_enabled=2;return 1;}{uint8_t z=0;uint16_t at;for(at=0;at<2080;at+=64)io(3,0xA000U+at,&z,1,1);}memset(pool_root,0,128);memcpy(pool_root,"GSR1",4);pool_root[8]=4;io(3,0xBF80,pool_root,128,1);mx.slot=0;defaults();eval_defaults();for(i=0;i<5;i++){mx.slot=i;mx.name[0]='P';mx.name[1]='1'+i;mx.name[2]=0;sparse_snapshot(i);}mx.slot=0;}else io(3,0xBF80,pool_root,128,0);for(i=0;i<8;i++)sparse_slots[i]=sparse_tones[i]=i<5?i:65535U;return 1;}
-void sparse_finish_install(void) BANKED {} void sparse_prepare_service(void) BANKED {} uint8_t sparse_prepare_busy(void) BANKED {return 0;}void sparse_prepare_invalidate(void) BANKED {}
+void sparse_finish_install(void) BANKED {}
+uint8_t resident_first_note(uint8_t c,uint8_t *e) BANKED {if(!firstready||c>=6)return 2;if(!launchnotes[c][1])return 0;memcpy(e,launchnotes[c],4);return 1;}
+void resident_first_clear(void) BANKED {firstready=0;}
+void sparse_prepare_service(void) BANKED {uint16_t source,left,end;uint8_t n,c,e[4];
+ if(io_busy||seqservicing||!seqplaying||mx.pending==255||mx.pending==mx.slot||launchslot!=mx.pending||launchready)return;
+ if(seqticks>=seqdeadline||seqdeadline-seqticks<8)return;
+ if(launchbytes<sizeof(launchdata)){
+  if(launchbytes<16){source=16+launchbytes;left=16-launchbytes;}
+  else if(launchbytes<97){source=32+launchbytes-16;left=97-launchbytes;}
+  else {source=128+launchbytes-97;left=sizeof(launchdata)-launchbytes;}
+  n=left>16?16:left;resident_read(launchslot,source,launchdata+launchbytes,n);launchbytes+=n;
+  if(launchbytes==sizeof(launchdata)){launchscan=0;memset(launchnotes,0,sizeof(launchnotes));}
+  return;
+ }
+ /* Resolve beat-one notes before launch, including sparse/unsorted tracks. */
+ end=0;for(c=0;c<6;c++){end+=launchdata[16+c*2]|((uint16_t)launchdata[17+c*2]<<8);if(launchscan<end)break;}
+ if(c<6){resident_read(launchslot,RESIDENT_EVENTS+launchscan*4,e,4);launchscan++;if(!e[0]&&e[1]&&(!launchnotes[c][1]||e[1]<launchnotes[c][1]))memcpy(launchnotes[c],e,4);return;}
+ launchequal=tones_match_buffer(launchdata+97);launchgeneration=resident_tone_generation;launchready=1;
+}
+uint8_t sparse_prepare_busy(void) BANKED {return mx.pending<5&&mx.pending!=mx.slot&&(launchslot!=mx.pending||!launchready);}
+void sparse_prepare_invalidate(void) BANKED {launchslot=255;launchbytes=0;launchready=0;launchequal=0;}
 void sparse_name(uint8_t slot,char *name) BANKED {resident_read(slot,16,(uint8_t *)name,16);name[16]=0;}
 void sparse_library_name(uint8_t slot,char *name) BANKED {sparse_name(slot,name);} void sparse_get_song_name(uint8_t song,char *name) BANKED {(void)song;memcpy(name,"STRIPPED",9);}
 uint8_t sparse_save_song(uint8_t song) BANKED {(void)song;return sparse_snapshot(mx.slot);}uint8_t sparse_load_song(uint8_t song) BANKED {(void)song;return 1;}uint8_t sparse_delete_song(uint8_t song) BANKED {(void)song;return 0;}uint16_t sparse_song_size(void) BANKED {return 5;}
@@ -210,7 +256,7 @@ void seq_native_reset(void) BANKED {}
 void seq_native_launch(void) BANKED {}
 void seq_native_launch_clear(void) BANKED {}
 void seq_native_launch_request_clear(void) BANKED {}
-void seq_native_touch(void) NONBANKED {}
+void seq_native_touch(void) NONBANKED {resident_tone_generation++;}
 void seq_native_prime(void) BANKED {}
 uint8_t seq_native_fire(uint8_t expired) BANKED {(void)expired;return 0;}
 void seq_native_pcm_tick(void) NONBANKED {}
