@@ -53,8 +53,8 @@ four expected pulse periods, with a minimum 30 video frames. Stopped timeout
 is 120 frames. Master connection display expires after 120 frames without A5.
 New HELLO and current transport reestablish playback; old notes are not replayed.
 
-Serial IRQ work remains bounded. Event frames use the existing 32-byte master
-queue; clocks have the existing interrupt-driven deadline and can interleave.
+Serial IRQ work remains bounded. Event frames use a dedicated 32-byte WRAM master
+queue, separate from native HRAM/retired sequencer flags; clocks have the existing interrupt-driven deadline and can interleave.
 Queue overflow panics/stops rather than dropping a release silently. Immediate
 events incur cable and service latency. No lookahead, parameter locks, remote
 patch loading, dotted/triplet divisions or multi-synth addressing in v1.
@@ -66,3 +66,33 @@ Receiver: python tools/test_twink_input.py in MONOSIMP.
 Cable: node tools/test_twink_link.cjs [SameBoy cable core path] [MONOSIMP ROM].
 The cable test requires tools/build_sync_link.py's local SameBoy test core.
 Physical two-DMG latency/audio-load testing is still required before release.
+
+2026-10-22 stability update
+---------------------------
+TWINK owns its transmit buffer: the native HRAM buffer overlaps standalone
+sequencer flags that may change during playback and editing. Those writes must
+never change queued TWINK bytes. The ROM memory audit enforces this separation.
+Allow 7..8 DIV ticks (about 427..488 microseconds) after a transfer completes
+before starting the next transfer, including a pending clock. Receiver rearm
+must survive VBlank/input interrupts as well as normal synthesis service.
+
+MONOSIMP captures button transitions in a VBlank queue so short taps survive
+rendering. Its retained tilemap now uploads only changed row spans. Idle and
+unchanged HELLO/tempo/heartbeat traffic do not rebuild the screen; gate, table
+position, transport, tempo and UI edits still mark their visible state dirty.
+
+Sustain regression: TWINK_PRESET=3 selects Velvet Keys; TWINK_FRAMES sets the
+run length. Run tools/test_twink_sustain.cjs with the same core/ROM arguments
+as test_twink_link.cjs. It uses a 16-step pulse-kick pattern with a 32-step MS
+pattern containing four contiguous ascending half notes at 120 BPM, while
+sending 50 ms page-navigation taps. Assert no silent middle-of-note samples,
+CRC damage, lost packets, unarmed receiver edges or aborted transfers.
+MONOSIMP tools/test_ui_changes.py checks idle/heartbeat redraw suppression and
+two single-cell uploads for a voice cursor move.
+
+Measured emulator results: Velvet Keys, 34 loops, 355 transmitted/received
+packets, zero CRC failures, zero missing sustain samples and all 33 short
+navigation taps captured. Prism Chorus also passed 20 loops. Physical DMG
+verification remains outstanding. DSP-heavy preset 006 still has delayed
+pitch changes under this workload even with all packets delivered intact;
+that synthesis scheduling limit is not covered by the native-preset pass.

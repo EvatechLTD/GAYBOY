@@ -1,4 +1,5 @@
 #include "api.h"
+extern volatile uint8_t twink_guard,twink_ended_div;
 /* Fixed-ROM, interrupt-only clock. Phase uses CPU cycles / 64 times BPM.
    Reloads are selected outside the IRQ; there is no division or bank switch.
    Limits are 0x028000 (24 PPQN), 0x0f0000 (4), or 0x1e0000 (2). */
@@ -53,6 +54,23 @@ sync_clock_due$:
  ld a,(hl)
  sbc a,b
  ld (hl),a
+ ; TWINK grants the receiver 7..8 DIV ticks (427..488 us) to rearm,
+ ; including VBlank/input service. Use DIV so stopped polling also works.
+ ldh a,(_syncmode)
+ cp #6
+ jr nz,sync_clock_guard_done$
+ ld a,(_twink_guard)
+ or a
+ jr z,sync_clock_guard_done$
+ ld a,(_twink_ended_div)
+ ld b,a
+ ldh a,(#0x04)
+ sub a,b
+ cp #8
+ jr c,sync_clock_pending$
+ xor a
+ ld (_twink_guard),a
+sync_clock_guard_done$:
  ldh a,(#0x0f)
  and #8
  jr nz,sync_clock_pending$

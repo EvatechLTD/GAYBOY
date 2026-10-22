@@ -11,6 +11,7 @@
 volatile uint8_t rx[256],wr,rd,overflow;
 extern volatile uint8_t link_rx_ready,link_peer_capable;
 extern volatile uint8_t linkbitqueued;
+extern volatile uint8_t twink_guard,twink_ended_div;
 void link_wire_service(void) BANKED;
 uint8_t param[4][26],program[4],held[4],velocity[4],active[4],sustain[4];
 extern uint8_t edited[4],lastcc,lastvalue,midiage,livepitch[4],liveduty[4];
@@ -38,7 +39,7 @@ uint8_t master=0x77,route=0xff,power=1,vin=0;
 const uint8_t limits[26]={3,15,1,7,7,1,7,63,1,1,7,1,7,1,31,3,255,1,15,1,7,3,1,1,1,24};
 #include "engine_state.h"
 #include "mono_state.h"
-void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){if(syncstart&&synctxbyte==0xFA)syncstart=0;if(n!=rd){rx[wr]=b;wr=n;}else overflow=1;if(syncdue){syncdue=0;SB_REG=0x80|synctick;SC_REG=0x81;}return;} if(syncmode&&!syncslave){
+void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){twink_ended_div=DIV_REG;twink_guard=1;if(syncstart&&synctxbyte==0xFA)syncstart=0;if(n!=rd){rx[wr]=b;wr=n;}else overflow=1;return;} if(syncmode&&!syncslave){
  if(syncstart&&synctxbyte==0xFA)syncstart=0;synctxwait=3;if(waveengine==3&&syncdivider==1)synctxwait=1;
  if(syncdue){syncdue=0;SB_REG=syncmode==1?(0x80|synctick):0;SC_REG=0x81;}return;
  } SB_REG=0; SC_REG=0x80; if(n==rd) overflow=1; else {rx[wr]=b;wr=n;} }

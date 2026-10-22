@@ -11,6 +11,7 @@ __at (0xFFDB) uint8_t syncslave;
 __at (0xFFDC) uint8_t syncpending;
 __at (0xFFDD) uint8_t syncbusy;
 __at (0xFF98) volatile uint8_t synctx[32];
+extern volatile uint8_t twinktx[32],twink_guard,twink_ended_div;
 __at (0xFFD8) volatile uint8_t syncr;
 __at (0xFFD9) volatile uint8_t syncw;
 extern __at (0xAC6A) uint16_t seqcachedbpm;
@@ -57,11 +58,18 @@ void link_clock_abort(void) NONBANKED;
 void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED;
 void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=0;syncmode=1;syncslave=1;}
 void sync_control_service(void) BANKED {
- __critical {if(syncr!=syncw&&!synctxwait&&!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)){
-  if(syncmode==1)link_clock_abort();
-  synctxbyte=synctx[syncr];SB_REG=synctxbyte;syncr=(syncr+1)&31;SC_REG=0x81;
- }}
+ __critical {
+  if(syncmode==SYNC_TWINK&&twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
+  if(!synctxwait&&!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)&&(syncmode!=SYNC_TWINK||!twink_guard)){
+   if(syncmode==SYNC_TWINK&&syncdue){syncdue=0;SB_REG=0x80|synctick;SC_REG=0x81;}
+   else if(syncr!=syncw){if(syncmode==1)link_clock_abort();
+    if(syncmode==SYNC_TWINK){synctxbyte=twinktx[syncr];}else synctxbyte=synctx[syncr];
+    SB_REG=synctxbyte;syncr=(syncr+1)&31;SC_REG=0x81;
+   }
+  }
+ }
 }
+
 static void send(uint8_t b){uint8_t next=(syncw+1)&31;
  __critical {if(next==syncr)overflow=1;else {synctx[syncw]=b;syncw=next;}}
  sync_control_service();

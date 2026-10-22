@@ -2,6 +2,7 @@ from pathlib import Path
 from check_memory import audit
 s={l.split()[1]:int(l.split()[2],16) for l in Path('build/GAYBOY.noi').read_text().splitlines() if l.startswith('DEF ')}
 assert s['s__HRAM']+s['l__HRAM']<=0xFF98,'Library HRAM overlaps serial sync state'
+assert 0xC000<=s['_twinktx'] and s['_twinktx']+32<=0xD800,'TWINK queue must not alias native HRAM flags'
 assert s['_synctx']==0xFF98 and s['_syncbusy']==0xFFDD,'Unexpected sync HRAM layout'
 assert s['_sync_clock_isr']<0x4000,'Clock IRQ must stay in fixed ROM'
 assert s['_syncirqphase']==0xFFB8 and s['_syncdue']==0xFFC4,'Clock state overlaps reserved HRAM'
