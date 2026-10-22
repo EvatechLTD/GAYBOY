@@ -67,7 +67,18 @@ try:
     assert bytes(v('pool_root',i) for i in range(4))==b'GSR1'
     menu(2);assert 'MOD' in line(0)
     row(1,5);adjust('up');assert v('globalmod',5)==1
-    menu(11);row(0,5);put('eval_col',1);put('dirty',1);p.tick(40)
+    # All tempo divisions use Up/Right = faster and Down/Left = slower.
+    row(1,6)
+    for key,expected in [('up',7),('right',6),('down',7),('left',8)]:
+        adjust(key);assert v('globalmod',6)==expected,(key,v('globalmod',6))
+    for initial,key,expected in [(0,'up',0),(0,'right',0),(16,'down',16),(16,'left',16)]:
+        put('globalmod',initial,6);adjust(key);assert v('globalmod',6)==expected
+    menu(11);row(3,1);put('evalpatch',0,1);put('evalpatch',8,2)
+    for key,expected in [('up',7),('right',6),('down',7),('left',8)]:
+        adjust(key);assert v('evalpatch',2)==expected,(key,v('evalpatch',2))
+    for initial,key,expected in [(0,'up',0),(0,'right',0),(16,'down',16),(16,'left',16)]:
+        put('evalpatch',initial,2);adjust(key);assert v('evalpatch',2)==expected
+    row(0,5);put('eval_col',1);put('dirty',1);p.tick(40)
     adjust('down');assert v('evalpatch',9)==255
     assert 'FINE' in text(40) and 'LFO WAVE' not in text(40)
     p.screen.image.save('build/stripped-tone.png')

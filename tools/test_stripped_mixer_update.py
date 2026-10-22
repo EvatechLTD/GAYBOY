@@ -2,6 +2,21 @@
 from pathlib import Path
 import json
 exec(Path('tools/test_stripped_ui.py').read_text().split('\ntry:')[0])
+def tap_value(key):
+ # Release after acknowledgement, before Mixer auto-repeat adds another edit.
+ mask={'down':8,'left':2}[key]
+ p.button_press(key)
+ for _ in range(180):
+  p.tick(1)
+  if v('lastpad')&mask:break
+ assert v('lastpad')&mask
+ p.button_release(key)
+ for _ in range(180):
+  p.tick(1)
+  if not v('lastpad')&mask:break
+ assert not v('lastpad')&mask
+ p.tick(5)
+
 try:
  enter_app(p,S);menu(18);p.tick(120)
  assert line(0)[8:12]=='PLAY' and line(1).startswith('BPM') and line(1).rstrip().endswith('LAUNCH 1/1'),(line(0),line(1))
@@ -15,9 +30,9 @@ try:
  # Independent gain editing leaves Tone hardware level/ADSR selection intact.
  put('mx',65,4);put('dirty',1);p.tick(20)
  original=v('noisepatch');mode=v('evalpatch',5*16+10)
- p.button_press('b');p.tick(3);press('down');p.button_release('b');p.tick(30)
+ p.button_press('b');p.tick(3);tap_value('down');p.button_release('b');p.tick(30)
  assert v('evalpatch',4*16)==126 and v('noisepatch')==original and v('evalpatch',5*16+10)==mode
- p.button_press('a');p.tick(3);press('left');p.button_release('a');p.tick(30);assert v('evalpatch',4*16)==116
+ p.button_press('a');p.tick(3);tap_value('left');p.button_release('a');p.tick(30);assert v('evalpatch',4*16)==116
  p.screen.image.save('build/stripped-mixer-tall.png')
  # The destination pattern has different P1 mixer volume.
  p.memory[0x4000]=1;p.memory[0xa800+32+56]=32;p.memory[0x4000]=0

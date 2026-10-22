@@ -33,6 +33,7 @@ void mixer_link_render(void) BANKED {uint8_t c,n=0,col=0,selected=mx.focus>=38&&
  text(0,17,syncmode!=1?"SELECT GAYBOY SYNC":syncslave?(seqplaying?"USE MASTER MIXER":"PLAY TO LINK"):linkstate==2?(link_pending()?"LINK COMMAND PENDING":"A PICK / HOLD A EDIT"):"CONNECTING...",0);
 }
 void mixer_link_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
+ if(mx.focus==1&&(p&(J_A|J_B))&&(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT))){uint8_t q=(edge&(J_UP|J_RIGHT))?MIXER_QUANT_DOWN(linkmirror.quant):MIXER_QUANT_UP(linkmirror.quant);link_command(0,5,q?q:7);dirty=1;return;}
  if(mx.focus<2){if(edge&(J_LEFT|J_RIGHT))mx.focus=mx.focus?0:1;if(edge&J_DOWN)mx.focus=first_strip();if(edge&J_UP)mx.focus=pad();
   if(edge&(J_A|J_B)){if(!mx.focus)seq_transport();else if(mx.focus==1)link_command(0,5,linkmirror.quant==5?7:MIXER_QUANT_UP(linkmirror.quant));}dirty=1;return;}
  if(mx.focus>=30&&mx.focus<38){if((p&J_A)&&(edge&(J_UP|J_DOWN))){uint8_t q=(edge&J_UP)?MIXER_QUANT_DOWN(linkmirror.quant):MIXER_QUANT_UP(linkmirror.quant);link_command(0,5,q?q:7);dirty=1;return;}if(edge&(J_LEFT|J_RIGHT))mixer_pads_move(edge&J_LEFT?-1:1);

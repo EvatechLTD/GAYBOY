@@ -72,7 +72,7 @@ def main():
         html = read('player.html').decode('utf-8')
         assert 'id="live-demo"' in html
         html, matches = re.subn(r'emulator/player\.js(?:\?v=[^"\s]*)?',
-                               'emulator/player.js?v=stable-1.0-20261022', html)
+                               'emulator/player.js?v=stable-' + release_version + '-' + current['sha256'][:12], html)
         assert matches == 1
         html, matches = re.subn(r'(<p class="demo-intro">).*?(</p>)',
                                lambda m: m[1] + 'GAYBOY ' + release_version + ' — stable release.' + m[2], html, count=1)

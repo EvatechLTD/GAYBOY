@@ -141,10 +141,11 @@ extern uint8_t seqnativeearly,seqnativelaunchfired,lastpad;
 void seq_native_launch_installed(uint8_t slot) BANKED;
 uint8_t seq_native_launch_boundary(void) BANKED;uint8_t seq_native_live_commit(void) BANKED;
 static uint8_t retrigger(uint8_t quantized){uint8_t busy=seqservicing;seqservicing=1;
- mx.pending=255;mx.presaved=mx.openempty=0;if((!syncmode||!syncslave)&&!MIXER_KEEP_SYNC_GRID)mx.boundary=0;mx.padcache=0;
+ mx.pending=255;mx.presaved=mx.openempty=0;if((!syncmode||!syncslave)&&!MIXER_KEEP_SYNC_GRID)mx.boundary=0;
+ /* Same-pad repeats keep the pad image; queued/playing changes are diffed. */
  if(seqplaying){if(seqnativelaunchfired==mx.slot+1){seqnativeearly=1;seqnativelaunchfired=0;seq_native_launch_installed(mx.slot);}else seq_native_live_commit();seqrecordtrack=255;seqrecordlength=0;if(!quantized&&(!syncmode||!syncslave)){__critical {seqclock=seqticks=seqfraction=0;}}seq_pattern_handoff();}
  else {memset(seqposition,0,7);seqclock=seqticks=seqfraction=0;seqdeadline=1;}
- seqservicing=busy;dirty=1;return 1;
+ seqservicing=busy;if(page!=18||!mx.padcache||pad_image_playing!=mx.slot||pad_image_queued!=255)dirty=1;return 1;
 }
 static uint8_t switchslot(uint8_t s){return sparse_activate(s);}
 
@@ -160,8 +161,9 @@ static uint8_t longest_boundary(void){uint8_t c,track=255;uint16_t longest=0;
 static void held_rearm(void){
  /* Re-arm the live pad before testing this boundary. Holding A repeats at
     every eligible interval, including one-step LONG patterns. Retriggers use
-    live data directly; switches and paired launches retain preparation. */
- if((padsampled&~(J_UP|J_DOWN))==J_A&&(lastpad&J_A)&&!*(uint8_t *)0xA427&&page==18&&!navopen&&!MIXER_LINK_VIEW&&mx.quant&&mx.pending==255&&mx.focus==30+mx.slot&&!(linkpair&&MIXER_LINK_AVAILABLE)){mx.pending=mx.slot;mx.openempty=0;}
+    live data directly; switches and paired launches retain preparation.
+    This only queues a request; an input action must not suppress its boundary. */
+ if((padsampled&~(J_UP|J_DOWN|J_LEFT|J_RIGHT))==J_A&&(lastpad&J_A)&&page==18&&!navopen&&!MIXER_LINK_VIEW&&mx.quant&&mx.pending==255&&mx.focus==30+mx.slot&&!(linkpair&&MIXER_LINK_AVAILABLE)){mx.pending=mx.slot;mx.openempty=0;}
  }
 static uint8_t launch_pending(void){if(link_pair_phase==2){link_pair_phase=5;sync_pattern();}return mx.pending==mx.slot?retrigger(1):switchslot(mx.pending);}
 uint8_t mixer_half_boundary(void) BANKED {if(mx.magic!=0xD3||mx.quant!=7)return 0;held_rearm();if(mx.pending==255||mixer_prepare_busy()||link_pair_hold)return 0;return launch_pending();}
@@ -310,11 +312,14 @@ void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
  /* Remote/paired launches re-arm only after the preceding request drains.
     This is foreground input, never a clock/serial interrupt or frame timer.
     NOW remains one-shot: an unquantized hold must not hammer the transport. */
- if(!edge&&page==18&&(p&~(J_UP|J_DOWN))==J_A&&seqplaying&&mx.focus>=30&&mx.focus<38){
+ if(!edge&&page==18&&(p&~(J_UP|J_DOWN|J_LEFT|J_RIGHT))==J_A&&seqplaying&&mx.focus>=30&&mx.focus<38){
   if(MIXER_LINK_VIEW){if(linkmirror.quant&&linkmirror.quant<=7&&linkmirror.pending==255&&!link_pending())edge=J_A;}
   else if(linkpair&&MIXER_LINK_AVAILABLE&&mx.quant&&mx.pending==255&&!mx.error&&!mixer_prepare_busy()&&!link_pair_phase)edge=J_A;
  }
  if(!edge)return;mixer_init();if(page==18&&padflash_off&&(edge&(J_A|J_B)))mixer_pad_restore();
+ /* Move first, then dispatch a launch to the destination device. Keep A held
+    through preparation and subsequent musical retrigger boundaries. */
+ if((edge&(J_LEFT|J_RIGHT))&&page==18&&(p&J_A)&&!(p&J_B)&&mx.focus>=30&&mx.focus<38){mixer_pads_move(edge&J_LEFT?-1:1);edge=J_A;}
  if(page==18&&MIXER_LINK_VIEW){mixer_link_input(p,edge);return;}
  if(page==18&&(p&J_A)&&mx.focus>=30&&mx.focus<38&&(edge&(J_UP|J_DOWN))){mx.quant=(edge&J_UP)?MIXER_QUANT_DOWN(mx.quant):MIXER_QUANT_UP(mx.quant);if(syncmode&&syncslave&&!mx.quant)mx.quant=7;seqdeadline=1;mixer_image.valid=0;dirty=1;return;}
  if((page==20||page==25)&&mx.naming){nameinput(edge);dirty=1;return;}
@@ -352,7 +357,7 @@ void mixer_input(uint8_t p,uint8_t edge) BANKED {uint8_t c,f;
  else if(!(p&(J_A|J_B))) {if(edge&J_LEFT)mx.focus=mx.focus?0:1;if(edge&J_RIGHT)mx.focus=mx.focus?0:1;if(edge&J_UP)mx.focus=firstpad();if(edge&J_DOWN)mx.focus=64;}
  if(mx.focus>=2&&mx.focus<30&&(mx.focus-2)%4<2)mx.edit=0;
  if(mx.focus==0){if(edge&(J_A|J_B)){seq_transport();mx.boundary=0;}}
- else if(mx.focus==1){if((p&(J_A|J_B))&&(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)))mx.quant=(edge&J_RIGHT)?5:(edge&J_LEFT)?0:edge&J_UP?MIXER_QUANT_UP(mx.quant):MIXER_QUANT_DOWN(mx.quant);if(syncmode&&syncslave&&!mx.quant)mx.quant=7;}
+ else if(mx.focus==1){if((p&(J_A|J_B))&&(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT)))mx.quant=(edge&(J_UP|J_RIGHT))?MIXER_QUANT_DOWN(mx.quant):MIXER_QUANT_UP(mx.quant);if(syncmode&&syncslave&&!mx.quant)mx.quant=7;}
  warmfocus();dirty=1;
 }
 
