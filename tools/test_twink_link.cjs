@@ -2,7 +2,9 @@
 const fs=require('fs'),path=require('path'),assert=require('assert');
 (async()=>{
  const core=await require(path.resolve(process.argv[2]||'build/sync_link_core.cjs'))();
- const roms=['build/GAYBOY.gb',process.argv[3]||'../MONOSIMP/build/MONOSIMP.gb'];
+ const companion=process.argv[3]||['../../../MONOSIMP/build/MONOSIMP.gb','../../MONOSIMP/build/MONOSIMP.gb'].map(p=>path.resolve(__dirname,p)).find(p=>fs.existsSync(p));
+ assert(companion,'MONOSIMP companion ROM not found; pass its path as the second argument');
+ const roms=['build/GAYBOY.gb',companion];
  const symbols=roms.map(p=>Object.fromEntries(fs.readFileSync(p.replace(/\.gb$/,'.noi'),'utf8').split(/\r?\n/).filter(l=>l.startsWith('DEF ')).map(l=>{let a=l.split(/\s+/);return[a[1],parseInt(a[2],16)];})));
  roms.forEach((p,i)=>{const rom=fs.readFileSync(p),ptr=core._malloc(rom.length);core.HEAPU8.set(rom,ptr);if(!i)core._link_init(ptr,rom.length);else core._link_load_rom(i,ptr,rom.length);core._free(ptr);});
  const at=(i,n,o=0)=>symbols[i]['_'+n]+o;

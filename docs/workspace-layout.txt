@@ -1,0 +1,22 @@
+GAYBOY workspace layout
+=======================
+MAIN is the current main checkout. Open MAIN for coding. Build from MAIN with
+powershell -File build.ps1; launch with powershell -File launch-emulator.ps1.
+Current ROM: MAIN/build/GAYBOY.gb (stored in DATA/BUILDS/main).
+BRANCHES/ARCHIVE holds retired worktrees. Create future worktrees under BRANCHES.
+ASSETS holds PROJECT assets, DRUMSAMPLES, BREAKS, DEMO SONG, RECORDINGS,
+SCREENSHOTS and REFERENCE. Source-folder links preserve paths used by generators.
+DATA holds experiments, build/test output, saves, briefs, the shared toolchain,
+research and historical archives. Maintained test source stays in MAIN/tools
+because it is versioned with the code it verifies.
+
+Original uncommitted workspace: DATA/EXPERIMENTS/legacy-midi-workspace.
+All 178 modified/untracked file hashes matched after relocation. It retains
+the shared .git repository used by every worktree: DO NOT delete that workspace.
+DATA/REORGANIZATION records prior states, hashes, path mappings and the original
+binary working-copy patch. No source edits were discarded or auto-committed.
+MAIN code changes for layout only adjust the two TWINK tests to locate the
+sibling MONOSIMP project from either the original or container layout.
+The main ROM hash remains:
+787b2bc11d17c6bac10119441a1be39d3d6d9d57df3d3059ca42b3f4df6ab3d8
+
