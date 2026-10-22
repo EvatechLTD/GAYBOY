@@ -14,7 +14,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  function until(fn,max=2000){for(let n=0;n<max;n++){if(fn())return;run(1);}throw Error('timeout '+JSON.stringify({page:v(0,'page'),sync:v(0,'syncmode'),ready:v(0,'twink_ready'),remote:v(1,'twink_link'),input:v(1,'twink_input'),playing:v(0,'seqplaying'),armed:v(0,'syncarmed'),pc:[0,1].map(i=>core._link_pc(i).toString(16))}));}
  const keys={right:0,left:1,up:2,down:3,a:4,b:5,select:6,start:7};
  function press(i,k){let bit=1<<keys[k];core._link_key(i,keys[k],1);until(()=>v(i,'lastpad')&bit,300);core._link_key(i,keys[k],0);until(()=>!(v(i,'lastpad')&bit),300);run(8);}
- function choose(n){core._link_key(0,7,1);until(()=>v(0,'navopen'));put(0,'navchoice',n);press(0,'a');core._link_key(0,7,0);until(()=>!(v(0,'lastpad')&128));run(35);}
+ function choose(n){core._link_key(0,7,1);until(()=>v(0,'navopen'));run(35);put(0,'navchoice',n);press(0,'a');core._link_key(0,7,0);until(()=>!(v(0,'lastpad')&128));run(35);assert.equal(v(0,'page'),n,'Finder opens requested page');}
 
  until(()=>v(0,'introready'));core._link_key(0,7,1);until(()=>!v(0,'introactive')&&v(0,'page')===8);core._link_key(0,7,0);run(60);
  // Choose MONOSIMP's sixth page and use its real INPUT toggle.
@@ -25,6 +25,17 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  const stopped=word(1,'twink_pulses');run(180);assert(v(1,'twink_link'));assert.equal(word(1,'twink_pulses'),stopped,'Stopped heartbeat must not advance phase');
  // MS title navigation is reachable from the DRUM sequencer.
  choose(8);core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'left');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));run(20);assert.equal(v(0,'seqtrack'),5);
+ // Plot/erase through real buttons: playback fixtures alone cannot test admission.
+ assert.equal(word(0,'seqeventcounts',10),0);
+ core._link_set_connected(0);run(150);assert.equal(v(0,'twink_ready'),0);
+ const plottedPitch=v(0,'seqpitch',5),plottedVelocity=v(0,'eval_plotvel',5);
+ press(0,'b');assert.equal(word(0,'seqeventcounts',10),1,'MS must admit a plotted note');
+ press(0,'b');assert.equal(word(0,'seqeventcounts',10),0,'MS must erase a plotted note');
+ press(0,'b');assert.equal(word(0,'seqeventcounts',10),1,'MS must reinsert a plotted note');
+ core._link_set_connected(1);until(()=>v(0,'twink_ready')&&v(1,'twink_link'));
+ core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));
+ until(()=>v(1,'monocount')>0,200);assert.equal(v(1,'held'),plottedPitch,'Plotted MS note reaches MONOSIMP');assert.equal(v(1,'monovel'),plottedVelocity);
+ core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));run(20);
  // Seed a sustained MS event into the real resident pattern storage.
  const slot=v(0,'mx',1),bank=1+(slot>>2),base=0xa000+(slot&3)*2048;
  const tracks=[[[0,49,100,16]],[],[],[],[],[[0,61,111,16]],[[0,1,100,4]]];let offset=0;
@@ -40,7 +51,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  choose(27);if(v(0,'seqplaying')){core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));}
  // Tempo changes while stopped and reconnect need no transport restart.
  writeword(0,'seqbpm',30);writeword(0,'seqglobalbpm',30);until(()=>word(1,'twink_bpm')===30);
- for(const bpm of [30,300]){writeword(0,'seqbpm',bpm);writeword(0,'seqglobalbpm',bpm);until(()=>word(1,'twink_bpm')===bpm);core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));run(180);assert.equal(v(1,'twink_link'),1,'Link remains live at '+bpm);assert.equal(v(1,'twink_running'),1);assert.equal(v(0,'overflow'),0,'TX overflow at '+bpm);core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));run(15);assert.equal(v(1,'monocount'),0);}
+ for(const bpm of [30,300]){writeword(0,'seqbpm',bpm);writeword(0,'seqglobalbpm',bpm);until(()=>word(1,'twink_bpm')===bpm);core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));run(180);assert.equal(v(1,'twink_link'),1,'Link remains live at '+bpm);assert.equal(v(1,'twink_running'),1);assert.equal(v(0,'overflow'),0,'TX overflow at '+bpm);core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));assert.equal(v(0,'seqplaying'),0,'Master stops at '+bpm);until(()=>v(1,'monocount')===0&&!v(1,'twink_running'),120);}
  core._link_set_connected(0);run(150);assert.equal(v(1,'twink_link'),0);assert.equal(v(1,'monocount'),0);assert.equal(v(0,'twink_ready'),0);
  core._link_set_connected(1);until(()=>v(0,'twink_ready')&&v(1,'twink_link'));
  // Toggle back to MIDI: parser/session clear and MIDI mode survives clocks.

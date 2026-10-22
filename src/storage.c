@@ -109,6 +109,6 @@ static uint16_t find(uint8_t c,uint8_t step,uint8_t note){uint16_t cursor=0;uint
 uint8_t seq_note_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[1]:0;}
 uint8_t seq_velocity_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[2]:0;}
 uint16_t seq_duration_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[3]?e[3]:256U:0;}
-uint8_t seq_note_set(uint8_t c,uint8_t step,uint8_t note,uint8_t velocity,uint16_t duration) BANKED {uint16_t i;uint8_t e[4];if(c>=4||duration>256)return 0;i=find(c,step,note?note:seqpitch[c]+1);if(!note){if(i!=65535U)seq_event_erase(c,i);return 1;}e[0]=step;e[1]=note;e[2]=velocity;e[3]=duration;return seq_event_put(c,i,e);}
+uint8_t seq_note_set(uint8_t c,uint8_t step,uint8_t note,uint8_t velocity,uint16_t duration) BANKED {uint16_t i;uint8_t e[4];if((c>=4&&!(c==TWINK_TRACK&&syncmode==SYNC_TWINK))||duration>256)return 0;i=find(c,step,note?note:seqpitch[c]+1);if(!note){if(i!=65535U)seq_event_erase(c,i);return 1;}e[0]=step;e[1]=note;e[2]=velocity;e[3]=duration;return seq_event_put(c,i,e);}
 void storage_sorted_dirty(void) BANKED {indexvalid=0;} void storage_sorted_install(uint8_t mask) BANKED {(void)mask;}
 void storage_sorted_prepare(void) BANKED {prepare_index();} void storage_cursor_reset(void) BANKED {}
