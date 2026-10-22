@@ -241,4 +241,4 @@ keys remain unchanged so this release retains existing resident-format saves.
 Held-pad slide update: A+Left/Right launches the adjacent pattern while A stays
 held, retaining the current launch interval. Arp/LFO tempo divisions and the
 launch header use Up/Right for faster and Down/Left for slower. Same-pad repeats
-reuse unchanged pad graphics. See briefspatternlaunch.md for the launch design.
+reuse unchanged pad graphics. See briefs/patternlaunch.md for the launch design.
