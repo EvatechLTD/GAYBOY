@@ -233,3 +233,7 @@ Normal-play browser ROM and both main downloads have SHA256:
 5b95a518f0c6be289389ae95dd5209cdef50e7474398766fe9c1af8942fdc3d9
 Tutorial lessons retain the separate compatible practice cartridge. Existing
 shared-beat cartridges remain pinned to their original symbol maps.
+
+The same cartridge is designated stable 1.0 (Git tag v1.0). VERSION controls
+package labels; GAYBOY-1.0.gb is the versioned stable download. Browser save
+keys remain unchanged so this release retains existing resident-format saves.

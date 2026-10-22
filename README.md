@@ -2,6 +2,8 @@
 
 Your Game Boy has a music problem. Good. Let's make it worse.
 
+**Stable release: [GAYBOY 1.0](https://github.com/EvatechLTD/GAYBOY/releases/tag/v1.0)**
+
 **GAYBOY** is a Game Boy music workstation: a synthesizer, piano-roll sequencer, sample drum machine and performance mixer in a `.gb` ROM. Make chiptune melodies, program beats and play the handheld as a MIDI synth through Arduinoboy.
 
 **[Play in your browser](https://y2kcrisis.com/gayboy)** · **[Download the ROM](https://y2kcrisis.com/apps/gayboy/downloads/GAYBOY.gb)** · **[GAYBOY on Y2KCRISIS](https://y2kcrisis.com/~GAYBOY)** · **[Report a bug](https://github.com/EvatechLTD/GAYBOY/issues)**
@@ -27,7 +29,7 @@ Five logical tracks (P1, P2, Wave, Noise and Drums) share four physical sound ch
 3. In the sequencer, move with the D-pad and plot/delete notes with **B**. **Select + A** starts/stops playback.
 4. Try **Play tutorial** in the browser for guided practice. Export saves to keep a backup.
 
-The current development cartridge is **1 MiB, MBC5 with battery-backed 32 KiB RAM**, targeting DMG and Game Boy Color. Physical hardware/audio validation is still in progress. Back up saves and expect changes. See the [development notes and controls](docs/development-notes.md) for current limitations, including timing measurements.
+The stable 1.0 cartridge is **1 MiB, MBC5 with battery-backed 32 KiB RAM**, targeting DMG and Game Boy Color. Pattern-launch playback has been tested on physical hardware. Back up saves before updates. See the [development notes and controls](docs/development-notes.md) for current limitations, including timing measurements.
 
 ## User guides (draft)
 

@@ -3,8 +3,11 @@ from pathlib import Path
 import hashlib
 import json
 import shutil
+import re
 
 ROOT=Path(__file__).resolve().parents[1]
+release_version=(ROOT/'VERSION').read_text().strip()
+assert re.fullmatch(r'\d+\.\d+(?:\.\d+)?',release_version)
 rom=(ROOT/'build/GAYBOY.gb').read_bytes()
 symbols={line.split()[1][1:]:int(line.split()[2],16)
          for line in (ROOT/'build/GAYBOY.noi').read_text().splitlines() if line.startswith('DEF _')}
@@ -14,7 +17,7 @@ assert (sum(rom)-rom[0x14e]-rom[0x14f])&65535==int.from_bytes(rom[0x14e:0x150],'
 names=('page navopen navchoice seqplaying seqtrack seqcursor seqpitch seqhead seqfocus '
        'seqedit seqapending seqposition seqeventcounts '
        'seqeventoffsets seqmuted seqsolo seqlength lastpad').split()
-metadata={'rom':'emulator/roms/GAYBOY.gb','sha256':digest,
+metadata={'rom':'emulator/roms/GAYBOY.gb','sha256':digest,'version':release_version,'channel':'stable',
           'symbols':{name:symbols[name] for name in names},'mixer':symbols['mx']}
 for name in ('seqevents_lo','seqevents_hi'):
     if name in symbols:metadata['symbols'][name]=symbols[name]
@@ -55,7 +58,7 @@ for folder in [ROOT/'website',ROOT/'network/apps/gayboy']:
     registry['current']=digest
     registry['versions'][digest]=metadata
     registry_path.write_text(json.dumps(registry,indent=2)+'\n')
-    for name in ['GAYBOY.gb','GAYBOY-0.3.gb']:
+    for name in ['GAYBOY.gb','GAYBOY-0.3.gb','GAYBOY-'+release_version+'.gb']:
         (folder/'downloads'/name).write_bytes(rom)
     (folder/'downloads/GAYBOY-tutorial.gb').write_bytes((folder/practice['rom']).read_bytes())
     practice_path.write_text(json.dumps(practice,indent=2)+'\n')

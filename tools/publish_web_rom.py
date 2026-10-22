@@ -36,7 +36,9 @@ def main():
         payloads[name] = data
     assert digest(payloads[practice['rom']]) == practice['sha256']
     assert 'seqevents_lo' in practice['symbols']
-    for name in ('downloads/GAYBOY.gb', 'downloads/GAYBOY-0.3.gb'):
+    release_version = (ROOT / 'VERSION').read_text().strip()
+    assert current['version'] == release_version and current['channel'] == 'stable'
+    for name in ('downloads/GAYBOY.gb', 'downloads/GAYBOY-0.3.gb', 'downloads/GAYBOY-' + release_version + '.gb'):
         payloads[name] = (SOURCE / name).read_bytes()
         assert payloads[name] == rom
     payloads['downloads/GAYBOY-tutorial.gb'] = (SOURCE / 'downloads/GAYBOY-tutorial.gb').read_bytes()
@@ -70,7 +72,10 @@ def main():
         html = read('player.html').decode('utf-8')
         assert 'id="live-demo"' in html
         html, matches = re.subn(r'emulator/player\.js(?:\?v=[^"\s]*)?',
-                               'emulator/player.js?v=smooth-launch-dj-20261022', html)
+                               'emulator/player.js?v=stable-1.0-20261022', html)
+        assert matches == 1
+        html, matches = re.subn(r'(<p class="demo-intro">).*?(</p>)',
+                               lambda m: m[1] + 'GAYBOY ' + release_version + ' — stable release.' + m[2], html, count=1)
         assert matches == 1
         payloads['player.html'] = html.encode('utf-8')
         def normalized_player(data):
