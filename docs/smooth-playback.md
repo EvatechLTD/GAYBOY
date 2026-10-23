@@ -1,3 +1,5 @@
+Current launcher controls and build: see [Smooth Playback launcher](smooth-playback-launcher.md). The following records the earlier blank-screen experiment.
+
 # Smooth Playback experiment - 2026-10-23
 
 Branch: live-note. Settings has SMOOTH PLAYBACK (default OFF). The preference
