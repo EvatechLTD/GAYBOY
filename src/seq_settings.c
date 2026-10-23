@@ -42,13 +42,12 @@ void seq_meter_edit(uint8_t field,int16_t delta) BANKED {
 }
 static uint8_t *feedback_header_number(uint8_t *dst,uint16_t value,uint8_t base){uint8_t digit,hundreds=value>=100;if(hundreds){digit=value/100;*dst++='0'+digit-32+base;value-=digit*100;}if(hundreds||value>=10){digit=value/10;*dst++='0'+digit-32+base;value-=digit*10;}*dst++='0'+value-32+base;return dst;}
 void roll_header_range(void) BANKED {
- uint8_t base=seqhead!=4?96:0,*dst;uint16_t bar=(uint16_t)seqbeats*(16/seqdenom),count=seqlength[seqtrack]/bar;
- memset(canvas+13,base,7);
- if(seqlength[seqtrack]%bar){gen_text(13,0,"CUSTOM",base!=0);return;}
- dst=feedback_header_number(canvas+13,count,base);
- if(count<100)*dst++=base;
- *dst++='B'-32+base;*dst++='A'-32+base;*dst++='R'-32+base;
- if(count!=1)*dst='S'-32+base;
+ uint8_t base=seqhead!=4?96:0,text[8],*dst,n;uint16_t bar=(uint16_t)seqbeats*(16/seqdenom),count=(seqlength[seqtrack]+bar-1)/bar,current=seqcursor[seqtrack]/bar+1;
+ memset(canvas+12,base,8);if(current>count)current=count;
+ dst=feedback_header_number(text,current,base);*dst++='/'-32+base;dst=feedback_header_number(dst,count,base);n=dst-text;
+ if(n<=4)*dst++=base;
+ *dst++='B'-32+base;if(n<=5){*dst++='A'-32+base;*dst++='R'-32+base;}
+ n=dst-text;memcpy(canvas+20-n,text,n);
 }
 
 extern uint8_t seqpopupchoice,seqpopupstep,seqpopuppitch,seqpopuperror,seqselectused;

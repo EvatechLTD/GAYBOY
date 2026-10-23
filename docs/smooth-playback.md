@@ -57,3 +57,9 @@ matches this image. ROM layout:270 bytes spare WRAM,512 bytes reserved stack.
 SHA256: fa16d924568bd3ea213312c8305a09c249c1d775859a68dbb1c16d938414c05a
 
 Not merged or published. Prior emulator ROMs/saves remain untouched.
+
+Follow-up: sequencer header now shows current bar / total bars at the cursor,
+including a partially filled final bar (for example 1/2 BAR and 2/2 BAR).
+The existing header width uses compact BAR/B suffixes for large values.
+Validated28 cases across P1/P2/Wave/drums, odd meters, partial bars and256 bars.
+Latest display build: build/GAYBOY-bar-position-test.gb; SHA256 a37bf43493180c07f44e7a1b17602117d03ba284ac19d72bc1e139691abf9a7a.
