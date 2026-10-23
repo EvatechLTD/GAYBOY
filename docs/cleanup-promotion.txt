@@ -1,0 +1,29 @@
+Cleanup branch promotion ? 2026-10-22
+
+Promotes the user-tested cleanup work into main: retired-state cleanup,
+prepared ARP/LFO timing, bounded edit rendering and snapshot preparation,
+16-step edit publication with selective continuity-preserving cache refresh,
+meter/bar grid controls and X2//2 editing, load cancellation, and global
+MOD ENABLE bypass. Session saves and generated test outputs stay under DATA.
+Stable web/download version remains1.0; build identity is its SHA256.
+
+Final ROM SHA256:
+4d7ff1a7f48a456657bd699a053c796d533456cd649ab76add9565bae500bcdc
+
+Validation evidence: mod-bypass-audit.txt and earlier feature audit files.
+Promotion checks passed: modulation UI/bypass/settings/ARP continuity,
+meter/grid scaling, load cancellation, tempo limits, drag/resize and deferred
+paint pixels. Saved P2 mode switching passes six actual UI toggles.
+Known limitation: strict test_seq_header_feedback.py still detects full grid
+redraws on some mode changes. It fails on the earlier user-approved continuity
+build too; functional mode switching and grid-scaling tests pass. No claim
+that all mode switches always avoid a full redraw. No new hardware qualification.
+
+Archive: DATA/ARCHIVES/cleanup-20261022 holds the pre-merge working diff,
+local palette preference, tested ROM/symbols/map, captured save and test traces.
+The completed branch will be retained by tag archive/cleanup-2026-10-22 and
+removed as an active branch. MAIN remains the main checkout.
+
+Web packaging retains existing tutorial/shared-beat cartridges and symbol
+maps. New player cache keys select the same ROM as current public downloads.
+Remote publisher backs up changed files and verifies public file hashes.

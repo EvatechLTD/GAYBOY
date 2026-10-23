@@ -1,0 +1,35 @@
+P2 live-session buffer latency reproduction, 2026-10-22
+
+Source: read-only capture of open SameBoy process22100, running frozen
+GAYBOY-paint-batch-test.gb. Cartridge RAM captured to build/live-session.sav.
+User pattern:120BPM,3/4, P2 and Wave24 steps, drum12 steps.
+Events [0,3,12,0,0,0,16], P2 fine LFO depth105. One loop=3000ms.
+Replayed captured cartridge RAM in PyBoy with matching frozen ROM/symbols.
+Original live keyboard attempts did not produce a note edit; the verified
+measurement below is from the captured copy. Source note data remains intact.
+
+Real UI gesture: A+Up on P2 step0, MIDI60 ->61. Observed actual event record,
+preparation counters, active generation, and real NR24 attack writes. The
+prepared pitch kernel's note input and hardware frequency are captured at the
+attack; basepitch alone is updated after that store and would mislabel notes.
+
+Relative to first A press:
+  Note data changed: 1088.278ms
+  Buffer ready: 8354.610ms
+  Buffer published: 8371.354ms
+  First changed MIDI61 hardware attack: 11350.655ms, frequency1470
+
+From actual note edit to audible changed attack:
+  10262.377ms = 3.421 loops.
+
+Cause1: editbuffer_service prepares only one event per main-loop call. On this
+session,31 records take~6.8s after preparation begins. Improved drawing yields
+back to input/audio, but snapshot preparation has no independent work budget.
+Cause2: the old step0 IRQ attack occurs at8350.651ms, before the foreground
+publishes at8371.4ms. Publication therefore misses the new loop's first note,
+adding another full3000ms loop before the changed step0 is audible.
+
+Required follow-up: bounded preparation budget that cannot be starved by UI,
+and publication ordering that precedes boundary note attacks. Do not remove
+1/32 LFO improvements or weaken immutable playback protection. No production
+code changed in this diagnostic turn.

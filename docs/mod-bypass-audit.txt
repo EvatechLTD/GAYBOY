@@ -1,0 +1,45 @@
+GLOBAL MODULATION BYPASS ? 2026-10-22
+
+Session-only MOD ENABLE row on MOD page (last row). A/B toggles;
+A/B+arrows selects ON/OFF. Defaults ON; not written into pattern data.
+OFF bypasses shared ADSR and LFO pitch/level processing, retains direct
+fine/coarse pitch settings and hardware instrument envelopes. ARP remains on.
+Stored globalmod, evalpatch and coarsepitch settings are preserved byte-for-byte.
+Toggle reconciles currently sounding pitch/levels and prepares ownership again.
+
+Comparison: frozen main365891f build/cleanup-baseline.gb (see cleanup-audit.txt).
+Main ROM SHA256: 787b2bc11d17c6bac10119441a1be39d3d6d9d57df3d3059ca42b3f4df6ab3d8
+Candidate ROM SHA256: 4d7ff1a7f48a456657bd699a053c796d533456cd649ab76add9565bae500bcdc
+Same headless PyBoy DMG fixture:120BPM,81events,64steps. Main has no
+configured modulation; candidate has fine/coarse LFO on3voices, bypassed
+through actual MOD page input. No ARP in timing fixture; separate toggle
+test keeps a3-note ARP playing while LFO/ADSR are disabled and restored.
+
+Phase: main median ack ms -> bypass median ack ms; full gesture ms
+idle: 0.000 -> 0.000; 2544.891 -> 2544.890
+navigation: 33.485 -> 33.485; 2863.001 -> 2762.546
+cells: 226.025 -> 159.055; 9175.003 -> 7467.247
+paint: 100.455 -> 100.454; 17127.789 -> 5206.981
+multiselect: 33.486 -> 33.486; 5407.892 -> 4353.103
+group_move: 267.881 -> 326.483; 21547.863 -> 11853.837
+
+Results are comparable or faster overall, not identical in every metric.
+Group-move median acknowledgement is326ms vs268ms on main, although total
+gesture runtime is11.85s vs21.55s and worst acknowledgement352ms vs703ms.
+Maximum timing error across phases: main0.113ms; bypass0.710ms (group move).
+No IRQ underruns. Navigation and multiselect median responses match33.5ms.
+Painting preserves all29expected new notes, and multiselect is exercised.
+Compared separately with this candidate with modulation unconfigured, bypass
+is close but has video-frame-scale differences (paint5.21s vs4.92s).
+
+Validation passed:
+- test_mod_bypass.py: UI toggles, settings retained, LFO phase/update work
+  stops, nominal pitch returns, ADSR work and Wave level restore, ARP continues,
+  and modulation resumes without transport restart.
+- test_lfo_irq.py: existing1/32 fine/coarse/both, navigation, rates/shapes/fallback.
+- test_arp_native.py: orders0..10, pages, retained FREE stop/resume.
+- test_buffer_all_pages.py: playback, instrument changes, Wave, audition, transport.
+- ROM layout:569bytes free WRAM plus512reserved stack; fixed ROM end0x3C89.
+
+No hardware test performed. No commit, merge, or publication.
+Frozen candidate: build/GAYBOY-mod-bypass-test.gb (+.noi, copied session .sav).

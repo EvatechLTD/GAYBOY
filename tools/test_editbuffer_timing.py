@@ -6,7 +6,7 @@ from pyboy import PyBoy
 from boot_helpers import enter_app
 import test_pcm_timing as probes
 
-ap=argparse.ArgumentParser();ap.add_argument('--rom',default='build/GAYBOY.gb');ap.add_argument('--output',default='build/editbuffer-timing.json');ap.add_argument('--bpm',type=int,default=180);ap.add_argument('--drums',action='store_true');ap.add_argument('--profile-irq',action='store_true');ap.add_argument('--phases',default='idle,navigation,cells,paint,multiselect,group_move');args=ap.parse_args()
+ap=argparse.ArgumentParser();ap.add_argument('--rom',default='build/GAYBOY.gb');ap.add_argument('--output',default='build/editbuffer-timing.json');ap.add_argument('--bpm',type=int,default=180);ap.add_argument('--drums',action='store_true');ap.add_argument('--lfo',action='store_true');ap.add_argument('--mod-bypass',action='store_true');ap.add_argument('--lfo-voices',type=int,default=3,choices=(0,1,2,3));ap.add_argument('--profile-irq',action='store_true');ap.add_argument('--phases',default='idle,navigation,cells,paint,multiselect,group_move');args=ap.parse_args()
 rom=Path(args.rom);S={l.split()[1]:int(l.split()[2],16) for l in rom.with_suffix('.noi').read_text().splitlines() if l.startswith('DEF ')}
 p=PyBoy(str(rom),window='null',sound_emulated=True,cgb=False,ram_file=BytesIO(bytes(32768)));p.set_emulation_speed(0)
 def get(n,i=0):
@@ -49,13 +49,35 @@ try:
  word('seqglobalbpm',args.bpm);word('seqbpm',args.bpm);put('pattern_dirty',1)
  word('seqdefaultdur',1,12)
  put('page',8);put('seqtrack',editor);put('selected',1);put('seqhead',0);put('seqfocus',0);put('seqcursor',4,editor);put('seqpitch',64,1);put('seqtop',71,1);put('drumrow',5);put('seqviewinitialized',127);put('seqdrawvalid',0);put('dirty',1)
+ if args.lfo:
+  for c in range(args.lfo_voices):
+   put('evalpatch',1,c*16+8);put('evalpatch',64,c*16+9)
+   put('coarsepitch',0,c*3);put('coarsepitch',12,c*3+1);put('coarsepitch',1,c*3+2)
+  for i,v in [(4,0),(6,3),(7,1),(8,0),(9,1)]:put('globalmod',v,i)
+  word('pattern_generation',1);put('seqirqdirty',1)
+ if args.mod_bypass:
+  put('page',2);put('eval_row',10);put('dirty',1);p.tick(30);press('a')
+  assert get('mod_bypass')==1
+  put('page',8);put('dirty',1)
  p.tick(30);p.button_press('select');press('a');p.button_release('select');p.tick(800)
  assert get('seqplaying')
+ if args.mod_bypass:assert not get('lfo_irq_mask') and not get('eval_lfousers') and not get('eval_envusers')
+ if args.lfo:
+  # Long tracks publish their first snapshot on a loop boundary. Compare
+  # steady playback, not different first-publication phases between builds.
+  for _ in range(2400):
+   if get('editbuffer_valid'):break
+   p.tick(1)
+  assert get('editbuffer_valid'),'Initial LFO playback snapshot never published'
 
  hits=[];probes.ROM=rom
- for pc,op,extra,cost in probes.pulse_write_sites(S):
-  if '_editirq_commit' in S and pc>=S['_editirq_commit'] and not (op==0xe0 and extra==0x14):continue
-  p.hook_register(0,pc,attacks,(op,extra,cost))
+ if args.lfo:
+  from arp_probe_helpers import hook_attacks
+  hook_attacks(p,rom,S,0,hits.append,include_editbuffer=True)
+ else:
+  for pc,op,extra,cost in probes.pulse_write_sites(S):
+   if '_editirq_commit' in S and pc>=S['_editirq_commit'] and not (op==0xe0 and extra==0x14):continue
+   p.hook_register(0,pc,attacks,(op,extra,cost))
  irq_times=[];irq_state=[None];irq_returns=set()
  def irq_return(_):
   if irq_state[0] and p.register_file.SP==irq_state[0][1]+2:
@@ -92,6 +114,14 @@ try:
   reports[phase]={'attacks':len(hits),'max_error_ms':max(abs(t-nominal) for t in intervals),'p95_error_ms':sorted(abs(t-nominal) for t in intervals)[int(.95*(len(intervals)-1))],
    'intervals_ms':intervals,'input_ack_max_ms':max(acks,default=0),'input_ack_median_ms':statistics.median(acks) if acks else 0,'elapsed_ms':(p._cycles()-start)*1000/4194304,'events_before':start_count,'events_after':event_total(),'selection_seen':group_seen}
   if phase=='paint':assert event_total()!=start_count,'Paint did not mutate cells'
+  if phase=='paint' and args.lfo and not args.drums:
+   begin=get('seqeventoffsets',2)|(get('seqeventoffsets',3)<<8);count=get('seqeventcounts',2)|(get('seqeventcounts',3)<<8)
+   painted=[]
+   for i in range(count):
+    e=list(p.memory[1,0xa300+(begin+i)*4:0xa304+(begin+i)*4])
+    if e[1]==65:painted.append(e[0])
+   assert sorted(painted)==list(range(4,33)),('Paint skipped or duplicated cells',painted)
+
   if phase=='multiselect':assert group_seen,'Selection gesture was not exercised'
   if '_editirq_underruns' in S:reports[phase]['irq_underruns']=get('editirq_underruns')|(get('editirq_underruns',1)<<8)
   if '_editbuffer_valid' in S:reports[phase]['snapshot_active']=get('editbuffer_valid')

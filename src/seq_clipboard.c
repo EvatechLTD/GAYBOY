@@ -63,10 +63,10 @@ void seq_meterbuild(void) BANKED{uint8_t i,beat=0,within=0,steps;if(seqmeterbeat
 /* The track and region clipboards share SRAM, with explicit menu actions. */
 uint8_t seq_clip_kind(void) BANKED {uint8_t meta[16];clip_part(0,meta,16,0);return meta[0]==0xC8&&meta[11]==0x73?1:meta[0]==0xC9&&meta[11]==0x74?2:0;}
 void seq_copy_track(void) BANKED {uint8_t group=seqgrouptrack;seqgrouptrack=255;seq_copy();seqgrouptrack=group;}
-void seq_select_visible(void) BANKED {uint16_t end;uint8_t c=seqtrack;
- seq_dimensions();end=(uint16_t)seqbase+seqcols;if(end>seqlength[c])end=seqlength[c];
- seqgrouptrack=c;seqgroupx0=seqbase;seqgroupx1=end-1;seqgroupy1=c==6?12:seqtop[c];seqgroupy0=c==6?0:seqtop[c]+1-seqrows;
- seqcursor[c]=seqbase;if(c==6)drumrow=0;else seqpitch[c]=seqgroupy1;seqapending=seqamoved=seqhead=seqfocus=0;if(seqdrawvalid)seqdrawvalid=2;dirty=1;
+void seq_select_visible(void) BANKED {uint16_t i,end=seqlength[seqtrack];uint8_t c=seqtrack,e[4];
+ for(i=0;i<seq_event_count(c);i++){seq_event_get(c,i,e);if(e[1]&&(uint16_t)e[0]+1>end)end=(uint16_t)e[0]+1;mixfill();}
+ seqgrouptrack=c;seqgroupx0=0;seqgroupx1=end-1;seqgroupy1=c==6?12:127;seqgroupy0=0;
+ seqcursor[c]=0;if(c==6)drumrow=0;seqapending=seqamoved=seqhead=seqfocus=0;seqdrawvalid=0;dirty=1;
 }
 void seq_clear_release(uint8_t track) BANKED;
 void seq_delete_selection(void) BANKED {uint8_t e[4],c=seqtrack;uint16_t i;
@@ -84,4 +84,41 @@ uint8_t seq_region_duplicate(void) BANKED {
  if(!count)return 0;if(seq_event_total()+count>256){seqeventfull=1;return 0;}
  for(i=0;i<n;i++){seq_event_get(c,i,e);if(!region_selected(e))continue;e[0]+=width;seq_event_put(c,65535U,e);mixfill();}
  seqgroupx0+=width;seqgroupx1+=width;seqcursor[c]=seqgroupx0;seqdrawvalid=0;mixer_pattern_changed();dirty=1;return 1;
+}
+
+/* X2 stretches selected notes and doubles the track loop. /2 compresses
+   the phrase and repeats it inside its original span, preserving loop length.
+   Validate the complete operation before changing any events. */
+uint8_t seq_region_scale(uint8_t twice) BANKED {
+ uint8_t c=seqtrack,e[4],other[4],busy,pass,all=seqgrouptrack!=seqtrack;uint16_t i,j,n=seq_event_count(c),count=0,anchor=all?0:seqgroupx0,span=all?seqlength[c]:(uint16_t)seqgroupx1-seqgroupx0+1,half,x,duration,end,length=seqlength[c];
+ if(!n)return 2;
+ for(i=0;i<n;i++){seq_event_get(c,i,e);if((e[1]&&(all||region_selected(e)))){count++;end=(uint16_t)e[0]-anchor+(e[3]?e[3]:256U);if(end>span)span=end;}mixfill();}
+ if(!count)return 2;
+ if(twice){length*=2;if(length>256)return 4;}
+ else {if(span&1)return 3;if(seq_event_total()+count>256)return 6;}
+ half=span/2;
+ if((uint16_t)anchor+(twice?span*2:span)>256)return 4;
+ for(i=0;i<n;i++){
+  seq_event_get(c,i,e);if(!(e[1]&&(all||region_selected(e))))continue;
+  x=e[0]-anchor;duration=e[3]?e[3]:256;
+  if(!twice&&(x&1))return 3;
+  x=anchor+(twice?x*2:x/2);duration=twice?duration*2:(duration+1)/2;
+  if(x+duration+(twice?0:half)>256||duration>256)return 4;
+  for(pass=0;pass<(twice?1:2);pass++)for(j=0;j<n;j++){
+   seq_event_get(c,j,other);end=x+(pass?half:0);
+   if(!(other[1]&&(all||region_selected(other)))&&(other[1]==e[1]||(c<3&&!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY]))&&end<(uint16_t)other[0]+(other[3]?other[3]:256U)&&other[0]<end+duration)return 5;mixfill();
+  }
+ }
+ sparse_journal_edit_barrier();sparse_finish_install();busy=seqservicing;seqservicing=1;
+ for(i=0;i<n;i++){
+  seq_event_get(c,i,e);if(!(e[1]&&(all||region_selected(e))))continue;
+  x=e[0]-anchor;duration=e[3]?e[3]:256;
+  e[0]=anchor+(twice?x*2:x/2);e[3]=twice?duration*2:(duration+1)/2;
+  seq_event_put(c,i,e);
+  if(!twice){e[0]+=half;seq_event_put(c,65535U,e);}mixfill();
+ }
+ seqlength[c]=length;if(seqposition[c]>=length)seqposition[c]%=length;
+ if(!all)seqgroupx1=anchor+(twice?span*2:span)-1;seqcursor[c]=anchor;
+ seq_clear_release(c);seqservicing=busy;seqirqdirty=1;seqdeadline=1;
+ mixer_pattern_changed();seqdrawvalid=0;dirty=1;return 1;
 }

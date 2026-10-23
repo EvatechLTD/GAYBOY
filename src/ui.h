@@ -105,7 +105,7 @@ void ui_flush(void) BANKED {
   for(tile=0;tile<12;tile++){ui_upload_tile(192+tile,wavepixels+368+(uint16_t)tile*16,0);mixfill();}
   ui_font_upload_pending=0;
  }
- if(page>=7||selected==4||ui_transition_hidden){
+ if(page>=7||page==1||page==2||navopen||selected==4||ui_transition_hidden){
   ui_flush_spans();
   if(ui_transition_hidden){ui_transition_hidden=0;SHOW_BKG;}
   if(page==8&&!navopen)seq_playhead();
@@ -153,7 +153,7 @@ void ui_action(uint8_t p,uint8_t edge) BANKED {if((p&J_SELECT)&&(edge&J_START)){
 
  if(page==28){mixer_settings_input(p,edge);return;}if(page==27){sync_ui_input(p,edge);return;}if(page==23){kits_input(p,edge);return;}if(page>=18){mixer_input(p,edge);return;}if(page==17){eval_input(p,edge);return;}if(page==16){global_input(p,edge);return;}if(page==8||page==10){seq_input(p,edge);return;}
  if(page==2||selected<4&&(page==1||page==6)){eval_input(p,edge);return;}if((!experimental_mode||(selected<2&&page==1))&&(page==0||page==1||page==4)){native_input(p,edge);return;}if(edge&J_SELECT){if(auditionvoice!=255)auditionstop();selected=polymode?(selected+1)%3:(selected+1)%3;choice=selected<4?program[selected]:0;cursor[1]=0;dirty=1;}
- if(selected==4){w2_input(p,edge);return;}
+ if(selected==4)return;
  if(page==0||page==3){if(p&(J_A|J_B)){if(edge&J_UP)browse(1);if(edge&J_DOWN)browse(-1);if(edge&J_LEFT)browse(-10);if(edge&J_RIGHT)browse(10);}if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))){page=page==0?3:0;dirty=1;}}
  else if(page==4){if(edge&J_UP)cursor[4]=cursor[4]?cursor[4]-1:78;if(edge&J_DOWN)cursor[4]=(cursor[4]+1)%79;if(edge&J_LEFT)cursor[4]=cursor[4]>=7?cursor[4]-7:0;if(edge&J_RIGHT)cursor[4]=cursor[4]<72?cursor[4]+7:78;dirty=1;}
 

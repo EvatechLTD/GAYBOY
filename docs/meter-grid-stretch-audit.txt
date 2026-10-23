@@ -1,0 +1,55 @@
+Final meter,grid and selection-time controls (cleanup,unmerged)
+
+Meter affects grouping and Generate,never existing note positions or loop length.
+Meter edits select one-bar zoom so3/4 immediately shows3beats/12sixteenth steps.
+Zoom options:half,one,two bars,with existing32column renderer limit for wide
+meters. Tail pages stay bar-aligned. BARS explicitly resizes the selected track;
+EXACT STEPS allows partial-bar lengths. TIME SIG is one ratio field.
+Duration removed from settings and all settings navigation skips it. Drag still
+sets note length;internal default duration behavior for drawing is retained.
+
+Selection EDIT menu and popup actions:
+X2 doubles selected note offsets/durations and doubles the track loop length.
+/2 halves selected note offsets/durations,then appends a second compressed
+copy within the original phrase span. Track loop length is unchanged.
+Phrase span includes selected note tails,not just the onset bounding box.
+The selection start is the fixed anchor. Pitch and velocity are preserved.
+Sub-sixteenth onsets are rejected;odd durations round up to the nearest step.
+Preflight checks every edit before mutation:256step bounds,shared256event
+capacity,and collisions with unselected same-pitch notes. Failure leaves all
+notes and track lengths unchanged and explains the specific reason in menus.
+No automatic truncation or dropped notes.
+
+Validation:
+test_meter_grid_scale passed actual Edit-menu and popup actions onP1/P2/Wave/
+drums;X2 loop doubling,/2 repeated compressed notes,partial-group isolation,
+odd onset-box widths,256step gates,capacity/overlap/grid rejection messages.
+Live attack timing500ms ->250ms (/2) ->500ms (X2),transport stays running.
+Actual meter edit from4/4 two-bar zoom to3/4 selects12column one-bar view.
+Settings screenshot checked and navigation skips Duration in all directions.
+test_seq_meter,test_seq_gen,test_buffer_all_pages passed.
+ROM bank/memory validation passed:1118bytes WRAM headroom,512byte stack.
+
+Trial ROM:build/GAYBOY-meter-bars.gb
+SHA256:aa8a0be8e556a37e0c77756848664ab46378665d64cdc63704f9981c8d95919c
+
+Whole-sequence/selection follow-up:
+X2 and /2 are available without a selection; they apply to current track.
+SELECT ALL now includes the whole track across pages and pitches,including
+notes whose onset is outside the current loop. X2 scales those stored notes
+too,so an old hidden boundary note does not reappear inside the expanded loop
+and interrupt stretched notes. Existing off-loop notes remain off-loop after
+X2;time values are bounded by256steps even when outside playback length.
+Partial mono selections reject overlap with unselected notes of ANY pitch.
+
+Actual running emulator read-only inspection found Wave events after oldX2:
+[0,37,127,6],[8,40,127,8],[16,43,127,8],[12,44,127,4].
+The last unscaled boundary event interrupts the rendered/played mono tails.
+Test reproducer starts from the exact pre-X2 save events:
+[0,37,127,3],[4,40,127,4],[8,43,127,4],[12,44,127,4],loop12.
+No-selection and SELECT ALL X2 both now produce:
+[0,37,127,6],[8,40,127,8],[16,43,127,8],[24,44,127,8],loop24.
+Separate test verifies a true3-quarter-beat note12steps ->24steps,6beats.
+Grid/stretch,popup,Generate,all-page buffering,and16drag regression cases pass.
+Fresh trial:GAYBOY-meter-stretch-fix.gb with separate pre-operation save.
+Final SHA256:83ec510d6af18ebe68aa47b3c369fd27ff308f86d1ba33d54ce853869b4a49b3

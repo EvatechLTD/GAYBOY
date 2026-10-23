@@ -63,6 +63,12 @@ for folder in [ROOT/'website',ROOT/'network/apps/gayboy']:
     (folder/'downloads/GAYBOY-tutorial.gb').write_bytes((folder/practice['rom']).read_bytes())
     practice_path.write_text(json.dumps(practice,indent=2)+'\n')
     (folder/'emulator/tutorial-rom.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    player_path=folder/'emulator/player.js'
+    player=player_path.read_text(encoding='utf-8')
+    player=re.sub(r'emulator/(tutorial-rom|rom-versions)\.json\?v=[A-Za-z0-9._-]+',
+                  lambda m:'emulator/'+m[1]+'.json?v=stable-'+release_version+'-'+digest[:12],player)
+    player_path.write_text(player,encoding='utf-8')
+
     checksums=''.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name+'\n'
                       for f in sorted((folder/'downloads').glob('*.gb')))
     (folder/'downloads/SHA256SUMS.txt').write_text(checksums)

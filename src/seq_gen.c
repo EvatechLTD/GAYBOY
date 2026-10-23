@@ -35,7 +35,7 @@ static void gen_number(uint8_t x,uint8_t y,uint16_t n,uint8_t digits,uint8_t inv
 void gen_cancel(void) BANKED {if(!genopen)return;if(genpreview)seq_paste();genopen=genpreview=0;seq_dimensions();seq_track_view();seqdrawvalid=0;dirty=1;}
 static uint8_t gen_selected(const uint8_t *e){return e[0]<seqlength[seqtrack]&&(seqtrack!=6||e[1]==genvoice);}
 static uint8_t candidate(uint16_t step,uint8_t voice,uint8_t *e){
- uint8_t bar=gen_bar_steps(seqbeats,seqdenom),phase=step%bar,notes[3];
+ uint16_t bar=gen_bar_steps(seqbeats,seqdenom),phase=step%bar;uint8_t notes[3];
  if(!gen_rhythm_onset(step,bar,genrhythm,genhits,genrotation,genchange))return 0;
  e[0]=step;e[2]=seqdefaultvel[seqtrack];if(!e[2])e[2]=100;
  if(seqtrack==6){
@@ -78,7 +78,7 @@ void gen_input(uint8_t p,uint8_t edge) BANKED {
  row=genrow;
  if(seqtrack==6){switch(row){
  case 0:cell=&genrhythm;max=6;break;case 1:cell=&genlength;max=5;break;
- case 2:cell=&genhits;min=0;max=gen_bar_steps(seqbeats,seqdenom);break;
+ case 2:cell=&genhits;min=0;max=gen_bar_steps(seqbeats,seqdenom)>255?255:gen_bar_steps(seqbeats,seqdenom);break;
  case 3:cell=&genrotation;max=gen_bar_steps(seqbeats,seqdenom)-1;break;
  case 4:cell=&genaccent;max=3;break;case 5:cell=&genvariation;max=3;break;
  }}else {switch(row){
@@ -87,7 +87,7 @@ void gen_input(uint8_t p,uint8_t edge) BANKED {
  case 4:cell=&genchange;max=4;break;case 5:cell=&genrhythm;max=7;break;
  case 6:cell=&genlength;max=5;break;case 7:cell=&gencontour;max=gentype==3?2:4;break;
  case 8:cell=&genvariation;max=3;break;case 9:cell=&genregister;max=7;break;
- case 10:cell=&genhits;max=gen_bar_steps(seqbeats,seqdenom);break;
+ case 10:cell=&genhits;max=gen_bar_steps(seqbeats,seqdenom)>255?255:gen_bar_steps(seqbeats,seqdenom);break;
  }}
  /* Disabled fields explain their dependency instead of editing an unseen value. */
  if(cell==&genhits&&genrhythm!=6)cell=0;
@@ -180,16 +180,4 @@ void gen_render(void) BANKED {
   if(s)field_text(11,i+2,9,s,genrow==i,0);
  }
  gen_help();seqflushpending=1;HIDE_SPRITES;
-}
-
-extern uint8_t seqgate[7],seqbeats,seqdenom;
-void seq_settings_render(void) BANKED {
- const char *channels[]={"PULSE1","PULSE2","WAVE","NOISE","MONO5","WAVE2","DRUM"};
- uint8_t c=seqtrack,i;const char *labels[]={"BPM","LENGTH","GATE %","VELOCITY","DURATION","MUTE","BEATS","BEAT UNIT","VELOCITY VIEW","ZOOM STEPS","SWING %"};
- uint16_t values[11];
- if(genopen){gen_render();return;}
- mixfill();memset(canvas,0,sizeof(canvas));memset(canvas,96,20);gen_text(0,0,"SEQ SETTINGS",1);gen_text(0,2,c==TWINK_TRACK?"MS":channels[c],0);
- gen_text(0,16,seqfocus==1?"QUARTER NOTES / MIN":seqfocus==2?"PATTERN STEP COUNT":seqfocus==5?"NEW NOTE DURATION":seqfocus==6?"MUTE THIS TRACK":seqfocus==7?"BEATS IN EACH BAR":seqfocus==8?"BAR BEAT UNIT":seqfocus==9?"SHOW VELOCITY SLIDERS":seqfocus==10?"VISIBLE STEPS IN ROLL":"LONG/SHORT STEP RATIO",0);gen_text(0,17,"A/B+ARROWS TO EDIT",0);
- values[0]=seqbpm;values[1]=seqlength[c];values[2]=seqgate[c];values[3]=seqdefaultvel[c];values[4]=seqdefaultdur[c];values[5]=!!(seqmuted&(1<<c));values[6]=seqbeats;values[7]=seqdenom;values[8]=!seqvelocityhidden;values[9]=seqcols;values[10]=seqswing;
- for(i=0;i<11;i++){if(i==2||i==3)continue;mixfill();gen_text(1,4+i,labels[i],seqfocus==i+1&&(seqedit||(lastpad&(J_A|J_B))));if(i==5||i==8)gen_text(16,4+i,values[i]?"ON ":"OFF",seqfocus==i+1);else if(i==4&&c==6&&!values[i])gen_text(16,4+i,"AUTO",seqfocus==i+1);else gen_number(16,4+i,values[i],3,seqfocus==i+1);}
 }

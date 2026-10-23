@@ -39,10 +39,16 @@ void ui_upload_tile(uint8_t tile,const uint8_t *data,uint8_t sprite) BANKED {
 void ui_upload_map(uint16_t address,const uint8_t *data,uint8_t count) BANKED {ui_vram_copy((uint8_t *)address,data,count);}
 /* Upload only the changed contiguous span of each row. Keep the visible map
    synchronized after each successful transfer, including ordinary font pages. */
+extern __at (0xACF8) uint8_t ui_transition_hidden;
+extern volatile uint8_t padread,padwrite;
 void ui_flush_spans(void) BANKED {
  uint8_t r,left,right,count,*a=canvas,*b=visible,*ap,*bp;
  for(r=0;r<18;r++,a+=20,b+=20){
-  mixfill();if(!memcmp(a,b,20))continue;
+  mixfill();
+  /* Return to input between rows. A page transition must finish before the
+     background is shown; ordinary updates resume from the visible-map diff. */
+  if(r&&padread!=padwrite&&!ui_transition_hidden){seqflushpending=1;return;}
+  if(!memcmp(a,b,20))continue;
   left=0;ap=a;bp=b;while(*ap++==*bp++)left++;
   right=20;ap=a+20;bp=b+20;while(*--ap==*--bp)right--;
   count=right-left;ui_vram_copy((uint8_t *)(0x9800U+(uint16_t)r*32+left),a+left,count);memcpy(b+left,a+left,count);
@@ -98,10 +104,10 @@ const uint8_t rollqy[20]={0,0,0,0,0,8,8,8,8,8,16,16,16,16,16,24,24,24,24,24};
 void roll_clear_transition(void) BANKED;
 extern volatile uint8_t padsampled;
 uint8_t rollcancelled;
-/* A new page request must not wait behind a full roll repaint. Leave the
-   captured input queued for normal UI handling; discard only unuploaded work. */
+/* New input must not wait behind an obsolete full roll repaint. Leave all
+   captured edges queued for normal handling; discard only unuploaded work. */
 uint8_t roll_navigation_abort(void) BANKED {
- if(!(padsampled&J_START)||(lastpad&J_START))return 0;
+ if(padread==padwrite&&(!(padsampled&J_START)||(lastpad&J_START)))return 0;
  rollcancelled=1;seqdrawvalid=0;rollcache[0]=0;rollbuilding=rollreplace=0;memset(rollpending,0,15);HIDE_SPRITES;return 1;
 }
 void roll_render_begin(void) BANKED {
@@ -109,13 +115,16 @@ void roll_render_begin(void) BANKED {
 }
 void roll_audio(void){mixfill();if(monomode&&expconfig[0])exp_fill();}
 void seq_dimensions(void) BANKED {
- seqcols=(seqzoom+1)*8;
+ uint16_t bar=(uint16_t)seqbeats*(16/seqdenom),width;
+ if(seqzoom>2)seqzoom=2;
+ width=seqzoom==0?(bar+1)/2:seqzoom==1?bar:bar*2;
+ seqcols=width>32?32:width;
  seqheight=seqzoom==0?16:8;
- seqgridheight=seqzoom==1&&!seqvelocityhidden?112:128;
+ seqgridheight=seqcols==16&&!seqvelocityhidden?112:128;
  seqrows=seqgridheight/seqheight;
  if(seqtrack==6){seqheight=8;seqgridheight=!seqvelocityhidden?112:128;seqrows=13;}
  seqbase=(seqcursor[seqtrack]/seqcols)*seqcols;
- if(seqlength[seqtrack]>seqcols&&seqbase+seqcols>seqlength[seqtrack])seqbase=seqlength[seqtrack]-seqcols;
+ /* Keep the last page bar-aligned; unused tail columns stay shaded. */
 }
 /* The font uses 0..63 and 96..159; M/S retain 244..251. */
 uint8_t roll_id(uint8_t n){return n<32?64+n:n<116?128+n:136+n;}

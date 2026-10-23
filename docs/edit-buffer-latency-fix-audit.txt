@@ -1,0 +1,48 @@
+Edit buffer latency fix ? 2026-10-22
+
+Captured user's open session, 120 BPM, 3/4, P2 and Wave 24-step loops,
+31 resident events; P2 fine LFO depth105. Test copies cartridge RAM and
+performs a real A+Up drag of P2 step0 MIDI60 to61 through UI input.
+Original save/session is preserved; no live emulator is closed or replaced.
+
+Changes:
+- Prepare up to16 snapshot events per main-loop pass instead of one.
+  Service audio between records and yield for queued input. Abandon work
+  if an audio-service pattern launch changes resident slot/generation.
+- Publish a ready snapshot in the native IRQ before step0 when the longest
+  populated track is owned by that dispatcher. Foreground publication
+  remains for other tracks/modes; chord/drum invalidation stays foreground.
+  Do not swap during foreground sequencer servicing.
+- Refresh native LFO pitch atomically at foreground pulse/Wave attacks.
+  A stale precomputed pitch could otherwise overwrite a newer IRQ phase;
+  changed scheduling exposed this preexisting race in the LFO regression.
+
+Measured on the same captured pattern/gesture:
+Before: edit-to-ready7266ms, edit-to-audible10262ms (3.42 loops).
+After:  edit-to-ready1038ms, edit-to-audible1275ms (next loop).
+Ready snapshot was present before the next native loop boundary and its
+first attack used the edited note, verified through pitch-kernel input and
+actual P2 hardware trigger writes. Snapshot activation adds about0.5ms
+at that boundary. Publication remains quantized; this does not promise
+instant edit audition or one-loop latency for every possible workload.
+
+Validation:
+- trace_live_p2_buffer.py asserts preparation<1500ms and sound<3000ms,
+  and first eligible step0 uses edited note on this captured fixture.
+- All16 drag/resize/group cases pass, including D-pad release while A/Bheld.
+- All-pages playback, sound changes, stop/restart, audition/fallback pass.
+- Paint/multiselect timing fixture: 81events, 3LFO voices, 120BPM:
+  navigation median50ms, cells318ms, paint167ms, multiselect59ms;
+  paint worst352ms, no lost painted notes, max onset error0.833ms,
+  no native IRQ underruns. Earlier paint-batch build had paint median151ms,
+  worst335ms: modest extra rebuild work rather than an across-board UI win.
+- Deferred paint/overlap pixels and viewport cancellation pass.
+- Stripped group operations and full-redraw pixel comparisons pass.
+- LFO: fine/coarse/both1/32@120BPM, navigation, shapes, 240BPM,
+  triplet/dotted/free and unsupported-mode fallback pass existing limits.
+- ARP orders0..10, page navigation and retained FREE stop/resume pass.
+- ROM layout passes;571bytes WRAM free in addition to reserved512-byte stack.
+
+Build: build/GAYBOY-edit-latency-test.gb (+.noi and copied session .sav).
+Trace: build/p2-live-session-trace.json; baseline trace preserved separately.
+Tested headlessly in PyBoy; hardware confirmation is still pending.

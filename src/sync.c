@@ -184,7 +184,7 @@ static uint8_t receive(uint8_t b) {uint16_t bpm,elapsed;uint8_t ppqn;
    if(tempo_state==3){markerbase=b;tempo_state=4;return 1;}
    if(tempo_state==1||tempo_state==4){tempo_hi=b;tempo_state=tempo_state+1;return 1;}
    bpm=((uint16_t)tempo_hi<<7)|b;
-   if(tempo_state==2){if(bpm>=30&&bpm<=300){seqglobalbpm=seqbpm=bpm;seqcachedbpm=0;dirty=1;}}
+   if(tempo_state==2){if(bpm>=30&&bpm<=240){seqglobalbpm=seqbpm=bpm;seqcachedbpm=0;dirty=1;}}
    else if(seqplaying&&bpm<2560U){uint8_t clocks=(beatcount-markerbase)&63,busy=seqservicing;uint16_t ticks;seqservicing=1;syncpending=clocks;remainder=seqbpm-1;syncalign=bpm;ticks=sync_advance(0);__critical {seqclock=0;seqticks=ticks;}if(!(markerbase&64)||!link_pair_hold||!link_pair_marker()){seq_pattern_release();seq_pattern_start();}seqservicing=busy;}
    tempo_state=0;return 1;
   }
@@ -198,7 +198,7 @@ static uint8_t receive(uint8_t b) {uint16_t bpm,elapsed;uint8_t ppqn;
  /* Measure a whole quarter note, rather than quantizing each clock to video. */
  if(syncmode!=1){ppqn=syncmode==4?2:syncmode==5?4:24;
   beatcount=beatcount+1;if(beatcount>=ppqn){elapsed=frames()-beatframe;beatframe=frames();beatcount=0;
-   if(elapsed){bpm=3584U/elapsed;if(bpm>=30&&bpm<=300){
+   if(elapsed){bpm=3584U/elapsed;if(bpm>=30&&bpm<=240){
     /* Pending ticks were converted using the previous estimate. Consume
        them at that tempo before installing the newly measured value. */
     if(bpm!=seqbpm&&seqplaying&&!seqservicing)seq_frame();

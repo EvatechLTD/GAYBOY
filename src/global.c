@@ -1,13 +1,13 @@
 #pragma bank 15
 #include "api.h"
+#include "mod_bypass.h"
+#include "lfo_irq.h"
 extern uint8_t globalmod[10];
 extern uint32_t noiseleft[2];
-extern uint8_t seqnativelaunchfired;
 void seq_native_touch(void) NONBANKED;
 #include "tones.h"
 #include "mixer_shared.h"
 extern uint8_t link_ui_hold;
-void seq_native_cancel_voice(uint8_t c) BANKED;
 /* Musical release keeps the pulse DAC bias steady. NRx2 writes alone do not
    latch zero volume on DMG (and may invoke zombie mode): trigger immediately
    after writing zero volume, increasing direction, disabled envelope pace.
@@ -15,12 +15,12 @@ void seq_native_cancel_voice(uint8_t c) BANKED;
    explicit shutdown. Bank this control path to leave the fixed bank room. */
 uint8_t editirq_owned(uint8_t c) NONBANKED;
 void stop(uint8_t c) BANKED {
- seq_native_cancel_voice(c);if(seqplaying&&seqservicing&&editirq_owned(c))return;
+ if(seqplaying&&seqservicing&&editirq_owned(c))return;
  /* A newly committed IRQ attack already replaced this sequencer release. */
  if(!syncmode&&c<2&&seqplaying&&seqservicing&&(seqirqfired&(1<<c)))return;
  if(c==0&&pulsekickleft){if(!eval_audio_release(c))active[c]=0;return;}
- if(experimental_mode&&c<3&&(mono_owned&(1<<c))){if(c==2){wave_track_down=0;eval_note(2,0);if(evalpatch[2][EV_LEVEL_MODE]!=128||!globalmod[3])active[2]=0;}else if(!eval_audio_release(c))active[c]=0;return;}
- if(c==2&&waveengine==3){if(experimental_mode){wave_track_down=0;eval_note(2,0);if(evalpatch[2][EV_LEVEL_MODE]!=128||!globalmod[3])active[2]=0;}return;}
+ if(experimental_mode&&c<3&&(mono_owned&(1<<c))){if(c==2){wave_track_down=0;eval_note(2,0);if(!MOD_LEVEL(2)||!globalmod[3])active[2]=0;}else if(!eval_audio_release(c))active[c]=0;return;}
+ if(c==2&&waveengine==3){if(experimental_mode){wave_track_down=0;eval_note(2,0);if(!MOD_LEVEL(2)||!globalmod[3])active[2]=0;}return;}
  if(experimental_mode&&c==3&&drumnoiseowned){if(!eval_audio_release(c))active[c]=0;return;}
  if(!monomode&&c==2&&evalwaveactive){wave_track_down=0;eval_note(2,0);if(exp_off()&4)return;}
  if(eval_audio_release(c))return;
@@ -33,7 +33,7 @@ void stop(uint8_t c) BANKED {
  else if(c==2){if(waveengine)enginestop();NR30_REG=0;}
  else NR42_REG=0;
 }
-void panic_audio(void) BANKED{twink_panic();uint8_t c;seqapending=seqamoved=0;seqplaying=0;seqticks=0;drum_stop();exp_reset();monocount=monodown=0;modreset();memset(keycount,0,4);voice_reset();polysustain=0;for(c=0;c<4;c++){active[c]=0;stop(c);held[c]=255;sustain[c]=0;}NR12_REG=NR22_REG=0;}
+void panic_audio(void) BANKED{twink_panic();uint8_t c;seqapending=seqamoved=0;seqplaying=0;seqticks=0;drum_stop();exp_reset();monocount=monodown=0;modreset();memset(keycount,0,4);voice_reset();for(c=0;c<4;c++){active[c]=0;stop(c);held[c]=255;sustain[c]=0;}NR12_REG=NR22_REG=0;}
 extern uint8_t seqgate[7];
 extern uint16_t seqcachedbpm,seqdeadline;
 uint8_t experimental_mode=1;
@@ -53,7 +53,7 @@ void native_edit(int8_t delta,uint8_t reset){uint8_t id=native_ids[selected][cur
 void global_set(uint8_t enabled) BANKED {
  uint8_t c;enabled=!!enabled;if(enabled==experimental_mode)return;
  eval_wave_leave();panic();enginestop();experimental_mode=enabled;
- monomode=polymode=0;if(!enabled)expactive=0;else exp_changed();waveengine=w2enabled=0;TAC_REG=0;IF_REG&=~TIM_IFLAG;
+ monomode=polymode=0;waveengine=0;TAC_REG=0;IF_REG&=~TIM_IFLAG;
  seqmode=0;seqsolo&=79;if(selected>3)selected=0;if(seqtrack>3&&seqtrack!=6)seqtrack=0;
  route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}globals();
  cursor[1]=0;seqdrawvalid=0;dirty=1;
@@ -90,7 +90,6 @@ uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==7||item==9||item==14||ite
 void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint16_t magnitude=wheel<0?-wheel:wheel,result;uint8_t range=param[c][25];result=(magnitude>>6)*range+(((magnitude&63)*range)>>6);bend[c]=wheel<0?-(int16_t)result:result;updatepitch(c);if(!syncmode)seq_irq_refresh(c);}
 
 /* Keep frame-rate FX work out of the scarce fixed-ROM interrupt bank. */
-uint8_t seq_native_fx_idle(void) BANKED;
 extern uint16_t pattern_generation;
 void service_frame(void) BANKED {uint16_t now,delta;uint8_t users=0,needed=0;__critical {now=sys_time;delta=seqticks;}
  if(lastframe!=now){
@@ -98,8 +97,8 @@ void service_frame(void) BANKED {uint16_t now,delta;uint8_t users=0,needed=0;__c
      lastframe stays unchanged so the deferred update catches up afterward. */
   if(seqplaying&&!syncmode&&!seqservicing&&delta<seqdeadline&&seqdeadline-delta<=8)return;
   delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;
-  if(!seqnativelaunchfired){
-   if(eval_moddirty||eval_modgeneration!=pattern_generation)eval_mod_configure();
+  {
+   if(eval_moddirty||eval_modgeneration!=pattern_generation)eval_mod_configure();if((eval_lfousers&7)||lfo_irq_mask)lfo_irq_prepare(seqirqdirty);
    if(eval_lfousers||eval_envusers){
     if(active[0]&&!pulsekickleft)users|=1;if(active[1])users|=2;
     if(active[2]&&waveengine!=3)users|=4;if(active[3]&&!drumnoiseowned)users|=8;

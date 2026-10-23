@@ -1,0 +1,82 @@
+CLEANUP PASS 1 - 2026-10-22
+Branch: cleanup; baseline: main 365891f
+
+Changes
+- Removed 32 retired sequencer no-op/constant-return entry points, their banked
+  calls, unreachable native-launch branches, write-only launch flags/counters
+  and the redundant input interrupt wrapper.
+- Removed unused Wave2 settings, modulation tables, UI label pointers, preset
+  field, empty wrappers and its unreferenced 4096-byte gain lookup header.
+- Removed write-only poly ownership/sustain fields and unused retired DSP
+  envelope, release, amplitude-map and diagnostic state.
+- Preserved live tone invalidation, buffered IRQ cancellation/PCM accounting,
+  active MS sequencing, shared serial HRAM, pulse suppression and drum envelopes.
+- Cable tests accept a baseline ROM argument and drive the current MONOSIMP
+  held-Start page menu while retaining support for the earlier receiver UI.
+
+Memory and ROM
+WRAM headroom below fixed audio tables: 1607 -> 1736 bytes (+129).
+Stack reserve remains 512 bytes. Banked code/data: 491660 -> 486797 (-4863).
+Fixed ROM end: 0x2dc4 -> 0x2d90 (52 bytes recovered). ROM stays 1 MiB.
+
+Matched forced-DMG benchmarks at 180 BPM
+Fixture,phase,elapsed baseline ms,elapsed cleanup ms,max interval error baseline ms,max interval error cleanup ms
+edit,idle,2544.891,2544.891,0.665,0.975
+edit,navigation,3582.94,3482.482,0.665,0.988
+edit,cells,10129.337,10012.139,0.73,0.866
+edit,paint,20677.243,20241.932,0.736,0.96
+edit,multiselect,6579.884,6395.713,0.732,0.866
+edit,group_move,24745.72,25197.773,0.786,0.867
+drums,idle,2544.892,2544.892,0.361,0.953
+drums,navigation,4386.589,4487.046,1.391,0.776
+drums,cells,5592.065,5491.61,1.098,1.403
+drums,paint,11217.613,8840.149,0.871,1.507
+drums,multiselect,7149.137,6881.254,1.142,1.159
+drums,group_move,14582.897,14566.155,1.256,1.162
+
+Timing remains tight, with slightly higher maxima in some phases. This is
+a code/memory cleanup, not a demonstrated reduction in audio jitter. Input
+response changes are mixed; no uniform editing-speed improvement is claimed.
+Native paint duration improves about 2%; the PCM paint fixture avoids its
+baseline input-latency outlier. Native selected-note movement takes about 2%
+longer overall despite a lower median acknowledgement delay.
+
+Passed validation
+- Build and ROM/WRAM/banked-layout checks.
+- Native and PCM fixtures: navigation, cells, paint, multiselect, group movement.
+- Deferred deletion, next-loop publication, kit/clipboard preservation,
+  stop/restart and ARP fallback.
+- Held-A launches through 1/16, quantize shortcuts and NOW one-shot.
+- Duplicate pulse/wave patterns, PCM continuity, changed patches/tempo and rests.
+- MIDI faders, mutes, held launches, release and coexistence with edit snapshots.
+- Standalone noise-lane removal and all 48 PCM gate/restart cases.
+- All 29 audible drum-synth factory presets; user/pattern preset round trips.
+- P1/P2/Wave chord velocity, resize and local drawing feedback.
+- Wave recovery after PCM takeover: sustaining, expired gates, later onsets.
+- TWINK initial link, notes/velocity, tempo, stop, heartbeat, reconnect and MIDI
+  toggle pass on BOTH baseline and cleanup with the frozen companion below.
+- TWINK local buffered P1 + PCM + remote Velvet Keys sustain: BOTH pass 23 loops
+  with 156/156 intact packets, no CRC failures, unarmed edges or wire aborts.
+  Cleanup samples: 2008 checked, zero bad; baseline: 2015, zero bad.
+
+Build identification
+Baseline GAYBOY: 787b2bc11d17c6bac10119441a1be39d3d6d9d57df3d3059ca42b3f4df6ab3d8
+Cleanup GAYBOY: b303968a8d97c5bdbdd556afcea36c7d45d315d6db9726b3928579505ed55c0d
+Frozen MONOSIMP: 03de532fee337cebabcecbd8937e792d590953786928792861c3f6609845be20
+Baseline/candidate .gb/.noi files and detailed benchmark JSON live in build/
+(physically GAYBOY/DATA/BUILDS/main). No battery saves used by tests.
+
+Remaining audit areas
+- Remaining legacy mono/poly mode gates and experimental exp_* wrappers need
+  a separate reachability review; shared waveform and ownership code still
+  has real callers. Do not remove solely on old names.
+- Fixed-address pulse IRQ flags overlap native serial storage. This pass does
+  not reclaim or reinterpret those addresses.
+- Historical DSP/Mono tests target retired features; active regressions still
+  reuse some fixture helpers. Do not delete all historical tools blindly.
+- Track-number compaction and pattern-format changes were not part of this pass.
+
+Limits
+Emulator verification only. No hardware claim. No main merge, push or deployment.
+The current companion passes reconnect even with baseline GAYBOY; that result
+is not attributed to this cleanup. The prior bug report records another ROM.

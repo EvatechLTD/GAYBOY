@@ -4,7 +4,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  const core=await require(path.resolve(process.argv[2]||'build/sync_link_core.cjs'))();
  const companion=process.argv[3]||['../../../MONOSIMP/build/MONOSIMP.gb','../../MONOSIMP/build/MONOSIMP.gb'].map(p=>path.resolve(__dirname,p)).find(p=>fs.existsSync(p));
  assert(companion,'MONOSIMP companion ROM not found; pass its path as the second argument');
- const roms=['build/GAYBOY.gb',companion];
+ const roms=[process.argv[4]||'build/GAYBOY.gb',companion];
  const symbols=roms.map(p=>Object.fromEntries(fs.readFileSync(p.replace(/\.gb$/,'.noi'),'utf8').split(/\r?\n/).filter(l=>l.startsWith('DEF ')).map(l=>{let a=l.split(/\s+/);return[a[1],parseInt(a[2],16)];})));
  roms.forEach((p,i)=>{const rom=fs.readFileSync(p),ptr=core._malloc(rom.length);core.HEAPU8.set(rom,ptr);if(!i)core._link_init(ptr,rom.length);else core._link_load_rom(i,ptr,rom.length);core._free(ptr);});
  const at=(i,n,o=0)=>symbols[i]['_'+n]+o;
@@ -18,9 +18,18 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  function press(i,k){let bit=1<<keys[k];core._link_key(i,keys[k],1);until(()=>v(i,'lastpad')&bit,300);core._link_key(i,keys[k],0);until(()=>!(v(i,'lastpad')&bit),300);run(8);}
  function choose(n){core._link_key(0,7,1);until(()=>v(0,'navopen'));run(35);put(0,'navchoice',n);press(0,'a');core._link_key(0,7,0);until(()=>!(v(0,'lastpad')&128));run(35);assert.equal(v(0,'page'),n,'Finder opens requested page');}
 
+ const receiverMenu=('_navigation_input' in symbols[1]);
+ function chooseReceiver(item){
+  core._link_key(1,7,1);until(()=>v(1,'navopen'),120);
+  for(let n=0;n<13&&v(1,'navchoice')!==item;n++)press(1,'down');
+  assert.equal(v(1,'navchoice'),item,'Receiver page menu reaches requested item');
+  core._link_key(1,7,0);until(()=>!v(1,'navopen'),120);run(16);
+ }
+
  until(()=>v(0,'introready'));core._link_key(0,7,1);until(()=>!v(0,'introactive')&&v(0,'page')===8);core._link_key(0,7,0);run(60);
  // Choose MONOSIMP's sixth page and use its real INPUT toggle.
- for(let n=0;n<5;n++)press(1,'select');assert.equal(v(1,'synthview'),5);press(1,'a');assert.equal(v(1,'twink_input'),1);
+ if(receiverMenu)chooseReceiver(12);else for(let n=0;n<5;n++)press(1,'select');
+ assert.equal(v(1,'synthview'),5);press(1,'a');assert.equal(v(1,'twink_input'),1);
  // Select TWINK through GAYBOY's real sync settings.
  choose(27);core._link_key(0,5,1);until(()=>v(0,'lastpad')&32);for(let n=0;n<5;n++)press(0,'up');core._link_key(0,5,0);until(()=>!(v(0,'lastpad')&32));assert.equal(v(0,'syncmode'),6);assert.equal(v(0,'syncslave'),0);
  until(()=>v(0,'twink_ready')&&v(1,'twink_link'));assert.equal(word(1,'twink_bpm'),120);
@@ -46,10 +55,11 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  choose(27);core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));until(()=>v(1,'monocount')>0,200);assert.equal(v(1,'held'),60);assert.equal(v(1,'monovel'),111);assert(v(1,'twink_running'));
  assert(v(0,'seqowned')>0,'Local P1 remains independently sequenced');const pulses=word(1,'twink_pulses');run(60);assert.notEqual(word(1,'twink_pulses'),pulses);assert.equal(v(1,'twink_link'),1);
  core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));run(20);assert.equal(v(1,'monocount'),0);assert.equal(v(1,'twink_running'),0);
- // Round-trip MS through the normal pattern archive UI.
+ // Round-trip MS through the normal pattern archive UI. Slot assignment
+ // precedes metadata restore; wait for the complete handoff before reading.
  choose(20);put(0,'mx',0,6);press(0,'b');run(60);if(v(0,'page')===26){press(0,'up');press(0,'a');run(40);}
- choose(18);put(0,'mx',31,4);press(0,'a');until(()=>v(0,'mx',1)===1);assert.equal(word(0,'seqeventcounts',10),0,'Other pattern has independent MS notes');
- put(0,'mx',30,4);press(0,'a');until(()=>v(0,'mx',1)===0);assert.equal(word(0,'seqeventcounts',10),1,'MS pattern save/restore');
+ choose(18);put(0,'mx',31,4);press(0,'a');until(()=>v(0,'mx',1)===1&&!v(0,'seqservicing'));assert.equal(word(0,'seqeventcounts',10),0,'Other pattern has independent MS notes');
+ put(0,'mx',30,4);press(0,'a');until(()=>v(0,'mx',1)===0&&!v(0,'seqservicing'));assert.equal(word(0,'seqeventcounts',10),1,'MS pattern save/restore');
  choose(27);if(v(0,'seqplaying')){core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));}
  // Tempo changes while stopped and reconnect need no transport restart.
  writeword(0,'seqbpm',30);writeword(0,'seqglobalbpm',30);until(()=>word(1,'twink_bpm')===30);

@@ -1,0 +1,19 @@
+Meter/bar controls: final corrected behavior
+
+TIME SIG is a single ratio field. Numerator1..32, denominator2/4/8/16.
+BARS is the primary length control; EXACT STEPS is secondary.
+Resolution remains1/16, BPM remains quarter notes per minute.
+Meter changes preserve ALL track lengths, events and playback positions.
+Only explicit BARS / EXACT STEPS edits resize a loop.
+32steps =2bars in4/4,4bars in4/8. Nonintegral bar lengths show CUSTOM.
+Generate follows meter;256-step bars use widened counters.
+
+Verified actual-ROM test_seq_meter: meter bounds, bar editing, custom lengths,
+odd meters, Generate including32/2, fixed sixteenth cadence, header bar controls.
+Live32-step phrase retains notes in BOTH halves through4/4 ->4/8 with no
+transport restart and no loop truncation. Playback gaps remain2000ms.
+Generate and all-page buffer regressions pass; bank/memory validation passes.
+WRAM headroom1118bytes; stack512bytes reserved.
+
+Trial ROM:build/GAYBOY-meter-bars.gb
+SHA256:952615d7ebe8df05afddca99a45e07df70de2789ee6ee0fec59603f809842040
