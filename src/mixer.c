@@ -1,6 +1,7 @@
 #pragma bank 18
 #pragma opt_code_speed
 #include "api.h"
+#include "midi_input.h"
 #include "ui_fields.h"
 void roll_clear_transition(void) BANKED;
 void eval_chord_dirty(uint8_t c) BANKED;
@@ -157,10 +158,15 @@ static uint8_t longest_boundary(void){uint8_t c,track=255;uint16_t longest=0;
 }
 /* Per-channel ownership prevents one controller's release clearing another. */
 static uint8_t midi_pad_keys[16];
+uint8_t midi_launch_enabled;
 static uint8_t midi_pad_target=255;
+void mixer_midi_launch_set(uint8_t enabled) BANKED {
+ if(!enabled&&mx.magic==0xD3&&midi_pad_target<5&&mx.pending==midi_pad_target)mixer_prepare_cancel();
+ midi_launch_enabled=!!enabled;memset(midi_pad_keys,0,sizeof(midi_pad_keys));midi_pad_target=255;
+}
 static uint8_t midi_pad_held(void){uint8_t c;if(midi_pad_target>=5)return 0;for(c=0;c<16;c++)if(midi_pad_keys[c]&(1<<midi_pad_target))return 1;return 0;}
 static void held_rearm(void){
- if(midi_pad_target==mx.slot&&midi_pad_held()&&mx.quant&&mx.pending==255&&!mx.error&&!(linkpair&&MIXER_LINK_AVAILABLE)){mx.pending=mx.slot;mx.openempty=0;}
+ if(midi_launch_enabled&&midi_pad_target==mx.slot&&midi_pad_held()&&mx.quant&&mx.pending==255&&!mx.error&&!(linkpair&&MIXER_LINK_AVAILABLE)){mx.pending=mx.slot;mx.openempty=0;}
  /* Re-arm the live pad before testing this boundary. Holding A repeats at
     every eligible interval, including one-step LONG patterns. Retriggers use
     live data directly; switches and paired launches retain preparation.
@@ -308,11 +314,11 @@ void mixer_remote_apply(uint8_t c,uint8_t field,uint8_t value) BANKED {
  dirty=1;
 }
 
-/* Performance mappings take precedence over instrument MIDI on every channel.
+/* External performance mappings take precedence over instrument MIDI.
    C1 is MIDI 24, matching the sequencer's octave labels. */
 uint8_t mixer_midi(uint8_t status,uint8_t note,uint8_t value) BANKED {
  uint8_t type=status&0xf0,c=status&15,slot,bit;
- if((type==0x90||type==0x80)&&note>=24&&note<29){
+ if(midi_launch_enabled&&(type==0x90||type==0x80)&&note>=24&&note<29){
   slot=note-24;bit=1<<slot;
   if(type==0x80||!value){midi_pad_keys[c]&=~bit;return 1;}
   midi_pad_keys[c]|=bit;midi_pad_target=slot;mixer_init();

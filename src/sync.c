@@ -1,5 +1,6 @@
 #pragma bank 59
 #include "api.h"
+#include "midi_input.h"
 #include "mixer_shared.h"
 #include "link_control.h"
 /* Native serial: F1/BPM, FA/FC transport, 80..BF numbered 24-PPQN clocks.
@@ -56,7 +57,7 @@ static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE","
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
 void link_clock_abort(void) NONBANKED;
 void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED;
-void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=0;syncmode=1;syncslave=1;}
+void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=midi_launch_enabled=0;syncmode=1;syncslave=1;}
 void sync_control_service(void) BANKED {
  __critical {
   if(syncmode==SYNC_TWINK&&twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
@@ -217,8 +218,9 @@ void sync_render(void) BANKED {memset(canvas,0,360);memset(canvas,96,20);drawtex
  drawtext(1,3,"TYPE",focus==0);drawtext(1,4,modes[syncmode],focus==0);
  drawtext(1,6,"ROLE",focus==1);drawtext(8,6,syncmode==1&&!syncrole?"AUTO":syncslave?"SLAVE":"MASTER",focus==1);
  if(syncmode==1&&!syncrole&&seqplaying)drawtext(8,7,syncslave?"> SLAVE":"> MASTER",0);
- drawtext(1,8,"GLOBAL BPM",0);drawnumber(13,8,seqglobalbpm?seqglobalbpm:seqbpm);
- drawtext(0,11,"A/B+ARROWS TO EDIT",0);drawtext(0,13,"SELECT+A PLAY / STOP",0);
+ drawtext(1,8,"MIDI LAUNCH",focus==2);drawtext(15,8,midi_launch_enabled?"ON":"OFF",focus==2);
+ drawtext(1,10,"GLOBAL BPM",0);drawnumber(13,10,seqglobalbpm?seqglobalbpm:seqbpm);
+ drawtext(0,12,"A/B+ARROWS TO EDIT",0);drawtext(0,13,"SELECT+A PLAY / STOP",0);
  if(linkstate==4)drawtext(0,16,"START CLASH - RETRY",0);
  if(syncmode==SYNC_TWINK)drawtext(0,15,twink_ready?"MONOSIMP CONNECTED":"CONNECT MONOSIMP",0);
  else if(syncmode>=4)drawtext(0,15,"PULSE ADAPTER NEEDED",0);
@@ -226,7 +228,8 @@ void sync_render(void) BANKED {memset(canvas,0,360);memset(canvas,96,20);drawtex
  else drawtext(0,15,"GAME BOY LINK CABLE",0);
 }
 void sync_input(uint8_t edge) BANKED {int8_t delta;
- if(edge&(J_UP|J_DOWN)){focus^=1;dirty=1;}
+ if(edge&(J_UP|J_DOWN)){focus=(focus+(edge&J_UP?2:1))%3;dirty=1;}
+ if(focus==2){if(edge&(J_A|J_B|J_LEFT|J_RIGHT)){mixer_midi_launch_set(!midi_launch_enabled);dirty=1;}return;}
  if(edge&J_A){seq_transport();dirty=1;}
  if(!(edge&(J_LEFT|J_RIGHT)))return;
  if(seqplaying)seq_transport();if(syncmode==SYNC_TWINK){twink_panic();while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}delta=edge&J_LEFT?-1:1;
@@ -254,8 +257,14 @@ uint8_t sync_local_stop_allowed(void) BANKED {
 
 void sync_ui_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;int8_t d=0,target,current;
  if((p&J_SELECT)&&(edge&(J_A|J_B))){seq_transport();dirty=1;return;}
+ if(focus==2){
+  if(!(p&(J_A|J_B))){if(edge&(J_UP|J_DOWN))focus=(focus+(edge&J_UP?2:1))%3;}
+  else if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT))mixer_midi_launch_set(!!(edge&(J_UP|J_RIGHT)));
+  else if(edge&(J_A|J_B))mixer_midi_launch_set(!midi_launch_enabled);
+  dirty=1;return;
+ }
  if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))&&focus&&syncmode!=1){sync_input(J_RIGHT);return;}
- if(!(p&(J_A|J_B))){if(edge&(J_UP|J_DOWN))focus^=1;}
+ if(!(p&(J_A|J_B))){if(edge&(J_UP|J_DOWN))focus=(focus+(edge&J_UP?2:1))%3;}
  else{d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;if(d){current=!focus?syncmode:syncmode==1?syncrole:syncslave;target=current+d;if(target<0)target=0;if(target>(!focus?6:syncmode==1?2:1))target=!focus?6:syncmode==1?2:1;while(current!=target){sync_input(current<target?J_RIGHT:J_LEFT);current+=current<target?1:-1;}}}
  dirty=1;
 }

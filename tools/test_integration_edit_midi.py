@@ -12,6 +12,7 @@ checks=r'''
   return p.memory[2,base+6]
  assert get('editbuffer_valid') and get('editirq_enabled')&1
  put('syncmode',0)
+ put('midi_launch_enabled',1)
  send(0xb0,71,0);p.tick(600)
  assert get('mx',12)==0 and amplitude()==0, ('zero',get('mx',12),amplitude(),get('editbuffer_valid'),get('page'))
  send(0xbf,71,127);p.tick(600)
