@@ -8,6 +8,7 @@
 #include "link_control.h"
 #include "mixer_shared.h"
 #include "midi_input.h"
+#include "smooth_playback.h"
 #include "notes.h"
 #include "lfo_irq.h"
 #define REG(a) (*(volatile uint8_t *)(a))
@@ -117,7 +118,7 @@ extern uint8_t mixer_layout_dirty;
 void mixer_layout_service(void) BANKED;
 void mixer_poll_input(void) BANKED;
 void eval_audio_resume_wave(void) BANKED;
-void mixfill(void){if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode!=SYNC_TWINK&&rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
+void mixfill(void){if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(!smooth_playback_active&&page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode!=SYNC_TWINK&&rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */
@@ -141,12 +142,15 @@ void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_
  if(syncmode>1&&syncslave&&seqplaying)sync_advance(0);
  if(syncmode==1)link_service();
  if(mixer_layout_dirty&&!seqplaying)mixer_layout_service();
- if(padread==end){if(!link_ui_hold){ui_input(p,0);if(p&&page!=18)seq_native_touch();}lastpad=p;}
- else while(padread!=padwrite){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;if(!link_ui_hold||((p&J_SELECT)&&(edge&J_START))){ui_input(p,edge);if(page!=18)seq_native_touch();}lastpad=p;service();}
+ if(padread==end){if(!link_ui_hold){ui_input(p,0);if(p&&page!=18&&!smooth_playback_active)seq_native_touch();}lastpad=p;}
+ else while(padread!=padwrite){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;if(!link_ui_hold||((p&J_SELECT)&&(edge&J_START))){ui_input(p,edge);if(page!=18&&!smooth_playback_active)seq_native_touch();}lastpad=p;service();}
  if(!syncmode&&seqplaying&&!seqservicing&&seqirqdirty&&!seqirqready&&!seqirqfired){seqservicing=1;seq_irq_prepare();seqservicing=0;}
  /* Release/edit edges above may have made a playback snapshot eligible.
     Give its bounded prep batch priority before starting foreground drawing. */
  editbuffer_priority_service();
+ if((smooth_playback_active&&(!smooth_playback_enabled||!seqplaying))||
+    (!smooth_playback_active&&smooth_playback_enabled&&seqplaying))smooth_playback_update();
+ if(smooth_playback_active)continue;
  /* Settings pages change on input. Periodic refresh is only for live views. */
  if(!link_ui_hold){if(!(page==18&&seqplaying&&sparse_enabled&&mx.pending<8)&&(dirty||(!navopen&&(page==0||page==9)&&!(++frame&3)))){dirty=0;ui_render();}ui_flush();if(page==8)roll_feedback_service();else if(page==18)mixer_fader_service();}}
  }

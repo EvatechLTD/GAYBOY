@@ -1,5 +1,6 @@
 #pragma bank 38
 #include "api.h"
+#include "smooth_playback.h"
 #include "ui_fields.h"
 #include "mixer_shared.h"
 #include "mixer_drum_names.h"
@@ -7,7 +8,7 @@
 #include "link_control.h"
 extern uint8_t mixer_hidden[8],layout_cursor,mixer_device;
 extern uint8_t mixer_layout_dirty,sticky_start;
-void mixer_layout_load(void) BANKED {memset(mixer_hidden,0,8);linkpair=mixer_device=0;if(pool_root[118]=='M'){memcpy(mixer_hidden,pool_root+110,8);linkpair=pool_root[120]==1;mixer_device=pool_root[121]==1;}eval_hidden=pool_root[122]=='V'?pool_root[123]:128;sticky_start=pool_root[124]==1;mixer_layout_dirty=0;}
+void mixer_layout_load(void) BANKED {memset(mixer_hidden,0,8);linkpair=mixer_device=0;if(pool_root[118]=='M'){memcpy(mixer_hidden,pool_root+110,8);linkpair=pool_root[120]==1;mixer_device=pool_root[121]==1;}eval_hidden=pool_root[122]=='V'?pool_root[123]:128;sticky_start=pool_root[124]==1;smooth_playback_enabled=pool_root[125]=='S'&&pool_root[126]==1;mixer_layout_dirty=0;}
 void mixer_layout_service(void) BANKED {memcpy(pool_root+110,mixer_hidden,8);pool_root[118]='M';pool_root[119]=1;pool_root[120]=linkpair;pool_root[121]=mixer_device;if(pool_commit())mixer_layout_dirty=0;}
 static const char * const linked_tracks[7]={"P3","P4","W3","N2","M2","W4","D2"};
 static const char * const tracks[7]={"P1","P2","WV","N","","","DR"};

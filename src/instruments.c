@@ -2,6 +2,7 @@
 #include "api.h"
 #include "mixer_shared.h"
 #include "midi_input.h"
+#include "smooth_playback.h"
 void seq_native_touch(void) NONBANKED;
 #include "tones.h"
 void mixer_pattern_changed(void) BANKED;
@@ -55,7 +56,7 @@ uint8_t seqgestureblocked,seqgesturepressed;
 static uint8_t seqgesturepage;
 uint8_t roll_preview_finish(void) BANKED;
 /* A427 is dedicated input state; B4E3 overlaps the retained grid tiles. */
-void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i,head=seqhead,gesture,tracking,c=seqtrack,oldcursor,oldpitch,oldtop,oldbase,stop;int16_t top;*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();
+void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i,head=seqhead,gesture,tracking,c=seqtrack,oldcursor,oldpitch,oldtop,oldbase,stop;int16_t top;if(smooth_playback_active){if((p&J_SELECT)&&(edge&J_A))seq_transport();else if((p&J_SELECT)&&(edge&J_START))panic();return;}*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();
  seqgesturepressed=edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN);
  gesture=page==8&&!navopen&&!seqhead&&!seqfocus&&seqapending&&
   !(p&(J_START|J_SELECT))&&((p&(J_A|J_B))==J_A||(p&(J_A|J_B))==J_B);
