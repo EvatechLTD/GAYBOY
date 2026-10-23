@@ -42,4 +42,3 @@ try:
    waitkey(button,False)
    print('PASS',c,kind,flush=True)
 finally:p.stop(save=False)
-

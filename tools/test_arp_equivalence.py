@@ -31,4 +31,3 @@ try:
   cases+=1
  print('PASS',cases,'orders/clock/velocity/retain configurations match baseline')
 finally:before.p.stop(save=False);after.p.stop(save=False)
-

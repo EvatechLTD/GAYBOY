@@ -51,4 +51,3 @@ Validation follow-up: MIDI direct-RX fixture now stops hardware serial after
 switching syncmode off by memory. Otherwise an in-flight open-cable transfer
 can overwrite injected bytes with 0xff. MIDI launch and edit/MIDI integration
 checks pass. No MIDI parser/runtime change was made.
-

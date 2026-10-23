@@ -72,4 +72,3 @@ try:
     row['retrigger']=not args.retain
     reports.append(row);Path(args.output).write_text(json.dumps({'save':str(args.save),'save_sha256':save_digest,'rom':str(rom),'rom_sha256':rom_digest,'probe':'APU hardware trigger writes','cases':reports},indent=2));print(row,flush=True)
 finally:p.stop(save=False)
-

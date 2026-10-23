@@ -91,4 +91,3 @@ try:
  assert word('seqlength',1)==40 and '5 BARS' in line(0),(word('seqlength',1),line(0))
  print('PASS sequencer header displays/edits bars',flush=True)
 finally:p.stop(save=False)
-
