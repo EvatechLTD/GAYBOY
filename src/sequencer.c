@@ -1,6 +1,10 @@
 #pragma bank 10
 #include "api.h"
 uint8_t native_edit_flush(void) BANKED;
+uint8_t native_edit_service(void) BANKED;
+extern uint8_t seqeditpreview,seqpreviewpinned;
+uint8_t native_edit_feedback(void) BANKED;
+uint8_t roll_preview_service(void) BANKED;
 extern uint8_t editbuffer_reading;
 void arp_irq_reset(void) NONBANKED;
 uint8_t editirq_owned(uint8_t c) NONBANKED;
@@ -66,8 +70,6 @@ __at (0xAC7C) uint8_t seqpopupchoice;
 __at (0xAC7D) uint8_t seqpopupstep;
 __at (0xAC7E) uint8_t seqpopuppitch;
 __at (0xAC7F) uint8_t seqpopuperror;
-static uint8_t seqlengthpause;
-static uint16_t seqlengthpausestart;
 uint16_t seqaanchor;
 uint8_t seqgrouptrack=255,seqgroupx0,seqgroupx1,seqgroupy0,seqgroupy1;
 uint8_t seqrecordtrack=255,seqrecordstart,seqrecordvelocity;
@@ -260,18 +262,18 @@ void seq_edit_value(uint8_t field,int16_t delta){uint8_t c=seqtrack,bars=field==
  if((field==2&&value!=current&&(current<(uint16_t)seqbase+seqcols||value<(uint16_t)seqbase+seqcols))||field==5||(field==4&&seqcols==16))seqdrawvalid=0;
  if(field==2){if(seqposition[c]>=value)seqposition[c]%=value;if(seqowned[c]&&seqsource[c]>=value)seq_off(c);seq_clamp_cursor();}dirty=1;
 }
-/* Stop repeat catch-up at the visible edge, then wait for its completed
-   redraw before starting a short hold delay. Audio and input keep running. */
-uint8_t seq_length_step(uint16_t end,uint16_t next) BANKED {uint16_t edge=(uint16_t)seqbase+seqcols-1,now;
- if(next<=end)return 1;
- if(end==edge&&next>edge){
-  repeatsteps=1;
-  if(!seqlengthpause){seqlengthpause=1;dirty=1;return 0;}
-  if(seqlengthpause==1)return 0;
-  __critical {now=sys_time;}
-  if((uint16_t)(now-seqlengthpausestart)<15)return 0;
-  seqlengthpause=0;
- }else if(next==edge){seqlengthpause=1;repeatsteps=1;}
+/* Resizing shares the real Dpad release latch with move/selection gestures.
+   Reaching a tail on another page first positions the cursor there without
+   changing its length. Crossing an edge then requires a fresh press. */
+extern uint8_t seqgestureblocked,seqgesturepressed;
+uint8_t seq_length_step(uint16_t end,uint16_t next) BANKED {uint8_t c=seqtrack,dir=next>end?J_RIGHT:J_LEFT;
+ if(next==end||next>=seqlength[c])return 1;
+ if(seqgestureblocked&dir)return 0;
+ if(end<seqbase||end>=(uint16_t)seqbase+seqcols||
+    ((next<seqbase||next>=(uint16_t)seqbase+seqcols)&&(!(seqgesturepressed&dir)||seqcursor[c]!=end))){
+  seqcursor[c]=end;seqgestureblocked|=dir;repeatsteps=1;dirty=1;return 0;
+ }
+ if(next==seqbase||next==(uint16_t)seqbase+seqcols-1){seqgestureblocked|=dir;repeatsteps=1;}
  return 1;
 }
 uint8_t roll_replace_feedback(uint8_t c,const uint8_t *old,const uint8_t *next,uint16_t index) BANKED;
@@ -317,7 +319,6 @@ uint8_t seq_top_entry(void) BANKED {uint8_t col=seqcursor[seqtrack]-seqbase;uint
 void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DOWN|J_LEFT|J_RIGHT;
  if(eval_confirm){eval_input(p,edge);return;}if(genopen){gen_input(p,edge);return;}
  if(seqpopup){seq_popup_input(edge);return;}
- if(!(p&J_B)||!(p&J_RIGHT)||(p&(J_A|J_SELECT|J_START))||page!=8||seqhead||seqfocus)seqlengthpause=0;
  if(seqrecordtrack!=255&&(!(p&J_B)||(p&(J_START|J_SELECT))))seq_record_finish();
  if(edge&J_SELECT){seqselectused=0;seqpopupstep=seqcursor[c];seqpopuppitch=c==6?drumrow:seqpitch[c];}if(edge&J_B){seqbused=0;seqdrag=0;}if(!(p&J_B))seqdrag=0;
  if(p&J_SELECT){seqapending=0;seqdrag=0;if(edge&J_A){seqselectused=1;seq_transport();}if(edge&J_B){seqselectused=seqbused=1;seq_mute();}
@@ -334,7 +335,7 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   if(edge&J_UP){if(seqpitch[c]<127)seqpitch[c]++;seq_clamp_cursor();dirty=1;}
   if(edge&J_DOWN){if(seqpitch[c])seqpitch[c]--;seq_clamp_cursor();dirty=1;}
   if(edge&J_RIGHT){seq_audition_stop();seqhead=0;dirty=1;}
-  if(edge&J_LEFT&&seqbase){seqcursor[c]=seqbase>seqcols?seqbase-seqcols:0;dirty=1;}
+  if(edge&J_LEFT&&seqbase){seqcursor[c]=seqbase-1;seqhead=0;dirty=1;}
   if(edge&J_A){seq_audition_stop();if(c==4&&!monomode)monoenable();seqauditionnote=seqpitch[c]+1;seqauditiontrack=c;if(c==TWINK_TRACK)twink_note(1,seqpitch[c],127);else event(0x90|c,seqpitch[c],mixer_velocity(c,127));}
   if(edge&J_B)seq_record_start();
   return;
@@ -381,7 +382,7 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   }
   if(!seqamoved&&seqapending==2)seq_erase(c,seqaanchor);seqapending=0;if(!(edge&mask))return;
  }
- if(edge&J_LEFT){if(seqcursor[c]==seqbase){seqhead=6;seqedit=0;}else seqcursor[c]--;dirty=1;}if(edge&J_RIGHT){if((uint16_t)seqcursor[c]+1<seqlength[c])seqcursor[c]++;dirty=1;}
+ if(edge&J_LEFT){if(!seqcursor[c]){seqhead=6;seqedit=0;}else seqcursor[c]--;dirty=1;}if(edge&J_RIGHT){if((uint16_t)seqcursor[c]+1<seqlength[c])seqcursor[c]++;dirty=1;}
  if(edge&J_UP){if(seqpitch[c]>=seqtop[c]){seqhead=seq_top_entry();seqedit=0;}else if(seqpitch[c]<127)seqpitch[c]++;dirty=1;}if(edge&J_DOWN){if(seqcols==16&&!seqvelocityhidden&&seqpitch[c]+seqrows-1==seqtop[c]){seqhead=5;seqedit=0;}else if(seqpitch[c])seqpitch[c]--;dirty=1;}seq_clamp_cursor();
 }
 /* Three grid families fit the preview slots; +6 still selects the playhead tile. */
@@ -397,26 +398,55 @@ void seq_tiles(void){uint8_t tile,y,lo,hi,buf[16];
   buf[y*2]=lo;buf[y*2+1]=hi;}ui_upload_tile(244+tile,buf,0);seq_audio();}
  seqtilesready=1;previewshape=255;
 }
-void seq_open(void) BANKED {seqpopup=0;seqlengthpause=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;if(selected==3)selected=0;if(seqtrack==3)seqtrack=0;seqtrack=seqtrack==TWINK_TRACK&&syncmode==SYNC_TWINK?TWINK_TRACK:seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_track_view();seq_clamp_cursor();dirty=1;}
+void seq_open(void) BANKED {seqpopup=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;if(selected==3)selected=0;if(seqtrack==3)seqtrack=0;seqtrack=seqtrack==TWINK_TRACK&&syncmode==SYNC_TWINK?TWINK_TRACK:seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_track_view();seq_clamp_cursor();dirty=1;}
 uint8_t roll_selection_update(void) BANKED;
 extern uint8_t rollcancelled;
 extern uint8_t lastseqtrack;
 void roll_header_range(void) BANKED;
+/* The header is independent of the grid's dynamic tiles. Publish its focus
+   and mode before a pending page/scroll repaint, so controls stay visible
+   while that repaint is interrupted and retried for incoming input. */
+static void seq_header(uint8_t c){
+ memset(canvas,96,20);seq_text(0,0,seqshort[c],1);if(c!=6)seq_text(4,0,c==TWINK_TRACK?(twink_ready?"LINK":"WAIT"):eval_mode(c)==1?"ARP":"MONO",seqhead!=1);
+ canvas[9]=244+((seqmuted>>c)&1)+(seqhead==2?2:0);canvas[11]=248+((seqsolo>>c)&1)+(seqhead==3?2:0);roll_header_range();
+}
+static void seq_header_publish(uint8_t c){
+ seq_header(c);
+ if(memcmp(visible,canvas,20)){
+  ui_upload_map(0x9800U,canvas,20);memcpy(visible,canvas,20);
+ }
+ memcpy(seqscreen,canvas,20);
+}
+void seq_feedback_cursor(void) BANKED;
+void seq_resize_status(void) BANKED;
 void seq_render(void) BANKED {
- uint8_t c=seqtrack,navigation=seqdrawvalid&&seqrecordtrack!=seqtrack;if(!navopen)lastseqtrack=c;if(!navopen)seq_tiles();if(genopen&&!navopen){gen_render();return;}if(seqpopup&&!navopen){seq_popup_render();return;}seq_dimensions();
+ uint8_t c=seqtrack,backing=0,navigation=seqdrawvalid&&seqrecordtrack!=seqtrack;if(!navopen)lastseqtrack=c;if(!navopen)seq_tiles();if(genopen&&!navopen){gen_render();return;}if(seqpopup&&!navopen){seq_popup_render();return;}seq_dimensions();
+ if(seqpreviewpinned&&seqfontdirty&&seqviewtrack==c&&seqviewcols==seqcols)seqbase=seqviewbase;
  /* Choose the first viewport once; subsequent visits retain track-local scroll and cursor state. */
  if(c!=6&&!(seqviewinitialized&(1<<c))){seqviewinitialized|=1<<c;seq_track_view();seqdrawvalid=navigation=0;}seq_clamp_cursor();
  if((c!=6&&seqviewtop!=seqtop[c])||seqviewbase!=seqbase||seqviewcols!=seqcols||seqviewtrack!=c)seqdrawvalid=0;
  if(navopen){seqdrawvalid=0;memcpy(canvas,seqscreen,360);seqflushpending=1;HIDE_SPRITES;return;}
- if(c<4&&native_edit_flush()){seqflushpending=dirty=1;seq_playhead();return;}
+ seq_header_publish(c);
+ if(c<4&&!seqdrawvalid)backing=native_edit_feedback();
+ seq_resize_status();
+ /* A viewport rebuild is deferred during a drag. A retained viewport can
+    still update its selection mask without reading or redrawing notes. */
+ if(seqeditpreview){
+  if(!seqdrawvalid&&!backing){HIDE_SPRITES;return;}
+  if(seqdrawvalid==2){if(!roll_selection_update()){seqdrawvalid=0;HIDE_SPRITES;return;}seqdrawvalid=1;seqflushpending=1;}
+  seq_feedback_cursor();return;
+ }
+ if(roll_preview_service()){dirty=1;seq_feedback_cursor();return;}
+ if(c<4&&native_edit_service()){seqflushpending=dirty=1;seq_feedback_cursor();return;}
  if(seqdrawvalid==2){if(roll_selection_update()){seqflushpending=1;seqdrawvalid=1;}else seqdrawvalid=0;}
  if(seqdrawvalid){seq_audio();}
  else{roll_feedback_cancel();seqflushpending=1;seq_meterbuild();if(c==6)drum_render();else seq_pixels(navigation);if(rollcancelled){seqflushpending=0;seqdrawvalid=0;dirty=1;return;}seq_audio();memcpy(seqscreen,canvas,360);seqdrawvalid=1;}
- memset(canvas,96,20);seq_text(0,0,seqshort[c],1);if(c!=6)seq_text(4,0,c==TWINK_TRACK?(twink_ready?"LINK":"WAIT"):eval_mode(c)==1?"ARP":"MONO",seqhead!=1);
- canvas[9]=244+((seqmuted>>c)&1)+(seqhead==2?2:0);canvas[11]=248+((seqsolo>>c)&1)+(seqhead==3?2:0);roll_header_range();
+ seq_header(c);
  eval_status();if(c==6&&!seqvelocityhidden)drum_velocity_status();
- if(eval_confirm){seq_text(0,7,"DISABLE OTHER MODE?",0);seq_text(0,9,"A CONTINUE B CANCEL",0);}if(seqeventfull)canvas[8]='!'-32+96;roll_selection_prepare(memcmp(seqscreen,canvas,20)!=0);if(memcmp(seqscreen,canvas,20)){seqflushpending=1;memcpy(seqscreen,canvas,20);}seq_audio();seq_playhead();
- if(seqlengthpause==1){__critical {seqlengthpausestart=sys_time;}seqlengthpause=2;}
+ if(eval_confirm){seq_text(0,7,"DISABLE OTHER MODE?",0);seq_text(0,9,"A CONTINUE B CANCEL",0);}if(seqeventfull)canvas[8]='!'-32+96;/* Header glyphs are static font/M/S tiles, never dynamic grid tiles.
+    A header focus change cannot invalidate the grid reference counts. Full
+    grid renders still request a recount through rollcache state167. */
+ roll_selection_prepare(0);if(memcmp(seqscreen,canvas,20)){seqflushpending=1;memcpy(seqscreen,canvas,20);}seq_audio();seq_resize_status();seq_feedback_cursor();
 }
 
 

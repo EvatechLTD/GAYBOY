@@ -1,0 +1,50 @@
+Fast tap release prototype (2026-10-23), branch black-notes, unmerged.
+Baseline: frozen GAYBOY-selection-gesture-test.gb.
+Candidate: GAYBOY-fast-taps-test.gb, separate copied save, no deployment.
+
+Input no longer runs the single-note release replacement. It queues release
+and foreground rendering services it after queued edges drain. Several taps
+can coalesce before service. A new queued input after erase interrupts before
+insert; native dirty-span composition repairs any partial replacement.
+Drum single-note replacement also moves outside the input handler.
+Multi-note native redraw retains the existing bounded compositor, reduced
+from eight to four events per scanning batch; tile upload batches remain two.
+Small completed stages fall through so painting retains its fast feedback.
+
+Group membership uses a 32-byte bitset. Cache count once, use local selection
+comparisons, and read/write selected events only after validation. Reuse
+membership for repeated group moves when slot,track,count,generation and
+selection box still match. Bounds and horizontal collision checks remain.
+Resize invalidates this cache before using its bitmap workspace. Added 48
+bytes of state across the changes; spare WRAM now285 bytes plus512 stack.
+The source-data edits still happen during input; offset-only transactions
+are not implemented. First scans and horizontal collision scans can be slow.
+
+Matched DMG120BPM, three-LFO81-event fixture,28 alternating group taps:
+Median input ACK585.996 ->368.337ms (-37.1%).
+Max686.456 ->485.538ms. Elapsed19605.709 ->12607.257ms (-35.7%).
+Profile event reads3905 ->492; selection membership banked calls3612 ->28.
+Final note max error0.138ms; no IRQ underruns across group/selection/paint.
+Single drag ACK medians~50ms; ARP visible median~494ms versus prior511ms.
+These are emulator fixture measurements, not universal hardware guarantees.
+
+Passed: group membership invalidation (box/count/generation/compaction),
+collision rejection,note127,duration256,event255; all16 drag-release and
+16extended diagonal operations; queued eight-tap group AND single-note bursts
+(2frames down,2frames released), source reversibility and exact final pixels;
+overlap/admission/playback tests; paint deferred velocity/pixel catch-up;
+header reference counts; real plotting/ARP/top-bar regression; modded timing.
+
+Investigations preserved: build/probe_group_tap_full_render.py compares forced
+full repaint after a dense selected/modulated fixture. That oracle differed
+from the incremental image in BOTH the baseline and candidate. Rapid tap
+pixel tests instead use the independently captured unchanged initial grid
+plus the exact expected selection XOR mask, which passes. The full selected
+repaint discrepancy remains a separate unresolved issue, not claimed fixed.
+The previously observed extended-hold snapshot publication delay and earlier
+LFO modulation precision tradeoffs also remain unchanged.
+
+Reports: build/group-tap-before-profile.json,group-tap-after-profile.json,
+group-tap-final-timing.json,group-tap-coalescing.json,single-tap-coalescing.json,
+group-tap-membership.log,group-tap-gestures.log,group-tap-final-pixels.log,
+group-tap-final-overlap.log,group-tap-single-drag.log,group-tap-topbar.log.

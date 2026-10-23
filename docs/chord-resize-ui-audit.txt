@@ -1,0 +1,51 @@
+Chord group resize hardware-report reproduction, 2026-10-23.
+ROM: build/GAYBOY-fast-taps-test.gb (EE83755C...); production sources unchanged.
+
+Fixture120BPM32steps: hat synth each16th across32steps, snare4/12/20/28,
+pulse kick0/8/16/24, four Wave bass notes covering two bars. P2 chord C/E/G
+plotted with actual B/arrows, ARP enabled from header, box drawn with A+Dpad
+from empty cell1,pitch68 to cell0,pitch60. Group resize uses B+Left/Right.
+Same fixture compared ARP ON/OFF (the native mode switch is MONO/ARP).
+
+Confirmed fault1: held resize stops all three notes at16steps. After120frames
+and another300frames with Right held, durations remain16 and cursor15.
+seqeditpreview=1; pending native redraw remains1. Zero tile overflows.
+Cause: seq_length_step sets seqlengthpause=1 at visible edge and waits for
+seq_render bottom to acknowledge the redraw/set pause2. seq_render's preview
+branch returns before that acknowledgment and before native_edit_flush.
+Neither side can progress while Dpad remains held. Exists both modes.
+
+Confirmed fault2: after release native dirty-span work takes seconds to drain:
+ARP ON3968ms (236frames); OFF3382ms (201frames), measured with B held.
+Dirty columns accumulate5..20 across three note rows (bitmask2192).
+The compositor scans/paints small batches and repeats setup/map/cache work.
+New source edits reset composephase while retaining the old dirty-span union,
+so rapid adjustments keep it invalid/pending and expand redraw work. ARP
+reduces foreground headroom and makes the backlog more apparent.
+
+Tapping resize24times produced individual gesture elapsed times up to402ms
+ARP ON vs352ms OFF. After idle catch-up, cell navigation was50-117ms ON,
+33-50ms OFF; page round-trip navigation33-84ms. No permanent global navigation
+lockup reproduced in that particular completed-tap test. Pixel oracle uses
+captured empty P2 grid + exact note rectangles + exact selection inversion;
+initial,post-resize,and after page return all matched, both modes.
+Do not claim every reported persistent hardware visual anomaly reproduced.
+
+Proposed fixes (not implemented in this diagnostic turn):
+1 Decouple page-edge gesture timing from full note redraw completion. Advance
+from published lightweight preview; define viewport-crossing behavior while
+notes remain deferred (clipped edge preview/virtual endpoint or bounded
+viewport transition). Merely starting the timer earlier would expose a new
+blank/hidden preview on the next page; handle that explicitly.
+2 Separate valid published grid/selection/cursor state from pending note
+composition. In-progress notes must not invalidate all navigation feedback.
+3 Version the dirty note render work; retain only final resize targets,
+coalesce tail changes, avoid reconstructing every accumulated intermediate
+span repeatedly. Preserve exact overlap rendering and playback boundaries.
+4 Regression: hold past16steps; shrink/extend overlapping selected chord;
+retap/navigate/change page while composition is pending; verify all source,
+pixels and playback timing with ARP on/off.
+
+Repro tools: tools/repro_chord_resize_ui.py, tools/repro_chord_resize_hold.py,
+tools/repro_chord_resize_pixels.py, tools/repro_chord_resize_settle.py.
+Reports/logs under build/chord-resize*. No original saves modified.

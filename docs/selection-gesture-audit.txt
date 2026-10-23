@@ -1,0 +1,40 @@
+Selection gesture prototype, 2026-10-23, branch black-notes (unmerged)
+
+Selection itself changes visual masks only. Added reciprocal inverted tile
+variant cache: 240 bytes WRAM, invalidated whenever either tile is reused.
+Retains existing selection appearance, shared tile reference accounting,
+and playback servicing. Verified against full render and tile-cache reuse.
+
+Move/resize prototype retains existing source-data edits and collision
+checks during the gesture. It DOES NOT yet implement offset-only source
+transactions. Defers note pixel reconstruction and native compositor while
+D-pad plus A/B is held. Selection mask and cursor remain live on the retained
+viewport. A viewport change waits until release. On final D-pad release,
+redraw occurs even with A/B held. Single-note replacement coalesces original
+and latest event into one existing incremental feedback operation. Multi-note
+or unsafe replacements use the compositor/full-render fallback.
+
+Matched 120BPM, modulation-on, 81-event benchmark:
+Selection elapsed 8069.986 -> 7450.505ms (7.7% less).
+Selection ACK median remains 50.23ms; max 150.69 -> 133.94ms.
+Short tap-and-release group move median remains ~586ms (no meaningful gain).
+Worst measured note error final suite 0.140ms; no IRQ underruns.
+Single note visible drag medians: MONO477ms, ARP511ms, after-OFF393ms.
+Original trial forced full release redraws of 2-3s; final single-note
+coalescing removes that regression.
+
+Extended diagonal holds: no note rebuilds while held; releasing RIGHT
+while UP remains held does not publish. Final release prepares a snapshot.
+Some extended-hold snapshots take >250 frames to publish. Baseline header
+focus build also fails that 250-frame publication bound (Wave group move).
+The diagonal regression explicitly checks preparation separately and allows
+an additional publication wait; it does not assert a tight audible latency.
+This pre-existing snapshot boundary issue remains unresolved.
+
+Passed: test_selection_gesture_deferred (16 operations),
+test_selection_gesture_diagonal (16 operations), test_selection_variant_cache,
+test_header_refcounts, test_paint_deferred_feedback, test_black_note_drag,
+test_black_note_overlap, test_arp_topbar_user_flow, and modded timing phases
+multiselect/group_move/paint. ROM layout: 333 bytes spare WRAM, 512 stack.
+Build: build/GAYBOY-selection-gesture-test.gb, separate copied save.
+Known LFO modulation-edge precision tradeoffs from earlier prototype remain.

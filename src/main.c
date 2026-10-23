@@ -131,6 +131,7 @@ void intro_audio_tick(void);
 void intro_timer(void){uint8_t saved=CURRENT_BANK;SWITCH_ROM(21);intro_audio_tick();SWITCH_ROM(saved);}
 void mixer_fader_service(void) BANKED;
 void editbuffer_service(void) BANKED;
+void editbuffer_priority_service(void) BANKED;
 void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_REG=0x80;globals();drum_init();startup();eval_defaults();ui_loading_begin();mixer_boot();navblocked=1;navchoice=8;lastpad=J_START;ui_init();DISPLAY_ON;
  disable_interrupts();padsampled=lastpad;add_VBL(input_vblank);add_SIO(link_serial_isr);add_TIM(engine_timer);SB_REG=0;SC_REG=0x80;set_interrupts(VBL_IFLAG|SIO_IFLAG|TIM_IFLAG);enable_interrupts();
  /* Preparation runs on Mixer; its private journal commit (phase18 atACB4)
@@ -142,6 +143,9 @@ void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_
  if(padread==end){if(!link_ui_hold){ui_input(p,0);if(p&&page!=18)seq_native_touch();}lastpad=p;}
  else while(padread!=padwrite){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;if(!link_ui_hold||((p&J_SELECT)&&(edge&J_START))){ui_input(p,edge);if(page!=18)seq_native_touch();}lastpad=p;service();}
  if(!syncmode&&seqplaying&&!seqservicing&&seqirqdirty&&!seqirqready&&!seqirqfired){seqservicing=1;seq_irq_prepare();seqservicing=0;}
+ /* Release/edit edges above may have made a playback snapshot eligible.
+    Give its bounded prep batch priority before starting foreground drawing. */
+ editbuffer_priority_service();
  /* Settings pages change on input. Periodic refresh is only for live views. */
  if(!link_ui_hold){if(!(page==18&&seqplaying&&sparse_enabled&&mx.pending<8)&&(dirty||(!navopen&&(page==0||page==9)&&!(++frame&3)))){dirty=0;ui_render();}ui_flush();if(page==8)roll_feedback_service();else if(page==18)mixer_fader_service();}}
  }

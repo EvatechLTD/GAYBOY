@@ -12,7 +12,9 @@ static uint8_t previousnote[3],previouscontrol[3],previouswave[3],waves[64];
 volatile uint8_t lfo_irq_mask;
 static uint8_t keys[3][5],shape=255,frame,playing=255,clockkey=255,ratekey,divkey,timingkey;
 static uint16_t bpmkey,phasefraction,stepfraction,lastpitch[3];
-static uint8_t stepwhole,tickfraction,preparing;
+static uint8_t stepwhole,tickfraction,preparing,prepared_state=255,prepared_blocked;
+static uint16_t prepared_generation;
+extern uint16_t pattern_generation;
 uint16_t lfo_irq_updates;
 uint8_t lfo_irq_owned(uint8_t c) NONBANKED {return c<3&&seqplaying&&(lfo_irq_mask&(1<<c));}
 uint8_t lfo_irq_active(void) NONBANKED {return seqplaying&&lfo_irq_mask;}
@@ -103,10 +105,16 @@ uint16_t lfo_irq_pitch(uint8_t c,uint16_t note) NONBANKED __naked {
  __endasm;
 }
 void lfo_irq_tick(uint8_t elapsed) NONBANKED {
- uint8_t n;uint16_t before,f;uint8_t wave;
+ uint8_t n;int16_t accrued;uint16_t before,f;uint8_t wave;
  if(!lfo_irq_mask||!power||!seqplaying){tickfraction=0;return;}
  /* Elapsed is1024Hz. Bound register work to128Hz; phase arithmetic stays256Hz. */
- n=tickfraction+elapsed;tickfraction=n&7;n>>=3;if(!n)return;n<<=1;
+ /* Round a 1024Hz elapsed sample to the nearest 128Hz quantum. A
+    one-unit signed residual avoids alternating 3/1 timer periods when DIV
+    sampling straddles an integer boundary during drawing. No clock drift:
+    the early unit is repaid by the following elapsed sample. */
+ accrued=(int8_t)tickfraction+elapsed;
+ if(accrued<7){tickfraction=accrued;return;}
+ n=(accrued+1)>>3;tickfraction=accrued-(n<<3);n<<=1;
  while(n--){before=phasefraction;phasefraction+=stepfraction;lphase+=stepwhole+(phasefraction<before);}
  wave=waves[lphase>>2];
 #define LFO_VOICE(C,BIT,LOW,HIGH,BUSY) do { \
@@ -161,4 +169,19 @@ static void prepare(uint8_t force){
  shape=globalmod[4];__critical{lfo_irq_mask=want;}
 }
 
-void lfo_irq_prepare(uint8_t force) BANKED {if(preparing)return;preparing=1;prepare(force);preparing=0;}
+/* Note painting changes the event generation; unchanged playback does not
+   need three fresh modulation keys every video frame. Ownership predicates
+   use direct fixed-lane reads and still react without a settings generation. */
+void lfo_irq_prepare(uint8_t force) BANKED {
+ uint8_t state,blocked;uint16_t generation;
+ if(preparing)return;
+ state=(seqplaying?1:0)|(power?2:0)|((monomode||polymode)?4:0)|((syncmode&&syncslave)?8:0)|(mod_bypass?16:0);
+ blocked=mono_owned;
+ if(finepitch[0]||bend[0]||tablemode[0])blocked|=1;
+ if(finepitch[1]||bend[1]||tablemode[1])blocked|=2;
+ if(finepitch[2]||bend[2]||tablemode[2])blocked|=4;
+ generation=pattern_generation;
+ if(!force&&prepared_state==state&&prepared_blocked==blocked&&prepared_generation==generation)return;
+ preparing=1;prepare(1);preparing=0;
+ prepared_state=state;prepared_blocked=blocked;prepared_generation=generation;
+}

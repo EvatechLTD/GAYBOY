@@ -163,7 +163,6 @@ void drum_velocity_render(void) BANKED;
 extern uint8_t seqbeats,seqdenom;
 void roll_clear_transition(void) BANKED;
 __at (0xAFD8) uint8_t drumselectcache[24];
-static uint8_t drumdim[24];
 uint8_t roll_navigation_abort(void) BANKED;
 void roll_render_begin(void) BANKED;
 void drum_render(void) BANKED {
@@ -171,7 +170,7 @@ void drum_render(void) BANKED {
  uint16_t a,b,event,visible=0,k,s,count,viewend;uint32_t cellbits;
  roll_render_begin();if(roll_navigation_abort())return;
  redraw:
- visible=0;memset(fastcells,0,sizeof(fastcells));memset(fastrowbits,0,sizeof(fastrowbits));fastoverlap=fastghostrows=0;viewend=(uint16_t)seqbase+seqcols;count=seq_event_count(6);memset(drumselectcache,0,24);memset(drumdim,0,24);HIDE_SPRITES;drum_init();if(seqfontdirty)roll_retain();else roll_begin();mixfill();if(roll_navigation_abort())return;memset(rollbackground,0,320);mixfill();if(roll_navigation_abort())return;memset(rollrow,0,320);mixfill();if(roll_navigation_abort())return;
+ visible=0;memset(fastcells,0,sizeof(fastcells));memset(fastrowbits,0,sizeof(fastrowbits));fastoverlap=fastghostrows=0;viewend=(uint16_t)seqbase+seqcols;count=seq_event_count(6);memset(drumselectcache,0,24);HIDE_SPRITES;drum_init();if(seqfontdirty)roll_retain();else roll_begin();mixfill();if(roll_navigation_abort())return;memset(rollbackground,0,320);mixfill();if(roll_navigation_abort())return;memset(rollrow,0,320);mixfill();if(roll_navigation_abort())return;
  for(i=0;i<=seqcols;i++){rollx[i]=24+((uint16_t)i*136)/seqcols;mixfill();if(roll_navigation_abort())return;}
  boundary=seqlength[6]<=seqbase?24:seqlength[6]>=viewend?160:rollx[seqlength[6]-seqbase];if(boundary<160)drum_span(0,boundary,160,1);
  for(i=0;i<seqcols;i++){s=seqbase+i;left=rollx[i];color=s>=seqlength[6]?2:(s%(16/seqdenom))?1:((s/(16/seqdenom))%seqbeats)?2:3;drum_span(0,left,left+1,color);mixfill();if(roll_navigation_abort())return;}
@@ -180,7 +179,7 @@ void drum_render(void) BANKED {
  for(event=0;event<count;event++){if(!(event&7))mixfill();if(roll_navigation_abort())return;if(!seq_event_get(6,event,e)||!e[1]||e[1]>13)continue;row=DRUM_VIEW_ROW(e[1]-1);a=e[0];b=a+grid_duration(e);
   if(b<=seqbase||a>=viewend)continue;left=a>seqbase?a-seqbase:0;last=b<viewend?b-seqbase:seqcols;cellbits=(0xffffffffUL<<left)&(0xffffffffUL>>(32-last));if(fastrowbits[row]&cellbits)fastoverlap|=1U<<row;for(i=left;i<last;i++)if(!(fastrowbits[row]&(1UL<<i)))fastcoverorigin[row][i]=a;fastrowbits[row]|=cellbits;if(a>=seqbase&&!fastcells[row][a-seqbase])fastcells[row][a-seqbase]=event+1;if(visible>=192)continue;
   if(grid_selected(e))drumselectcache[visible>>3]|=1<<(visible&7);
-  drumleft[visible]=rollx[a>seqbase?a-seqbase:0]+1;if(!eval_drum_allowed(event)){drumdim[visible>>3]|=1<<(visible&7);fastghostrows|=1U<<row;}drumright[visible]=rollx[b<viewend?b-seqbase:seqcols]-(b<=viewend);drumnext[visible]=drumheads[row];drumheads[row]=visible;visible++;mixfill();if(roll_navigation_abort())return;
+  drumleft[visible]=rollx[a>seqbase?a-seqbase:0]+1;drumright[visible]=rollx[b<viewend?b-seqbase:seqcols]-(b<=viewend);drumnext[visible]=drumheads[row];drumheads[row]=visible;visible++;mixfill();if(roll_navigation_abort())return;
  }
  for(t=0;t<seqgridheight/8;t++){
   target=DRUM_SCREEN_INDEX(t);if(target==255){memset(rollrow,0,320);roll_upload(t);continue;}
@@ -189,8 +188,7 @@ void drum_render(void) BANKED {
      scanline, then copy that finished grid scanline; never redraw each pixel. */
   scan=1;last=6;
   k=target<13?drumheads[target]:255;while(k!=255){
-   if(drumleft[k]<boundary)drum_span(scan,drumleft[k],drumright[k]<boundary?drumright[k]:boundary,drumdim[k>>3]&(1<<(k&7))?2:3);
-   if(drumright[k]>boundary)drum_span(scan,drumleft[k]>boundary?drumleft[k]:boundary,drumright[k],2);
+   drum_span(scan,drumleft[k],drumright[k],3);
    mixfill();if(roll_navigation_abort())return;k=drumnext[k];
   }
   k=target<13?drumheads[target]:255;while(k!=255){if(drumright[k]<160)drum_span(scan,drumright[k],drumright[k]+1,0);k=drumnext[k];}

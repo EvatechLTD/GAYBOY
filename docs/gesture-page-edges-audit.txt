@@ -1,0 +1,52 @@
+Gesture page edge prototype, 2026-10-23, black-notes branch, unmerged.
+Build: GAYBOY-page-edges-test.gb (721956512CFFD1D08CFACDB9D3A4B1FA0F5E043C1D7AECF8518831EDCE2245A1).
+Includes the prior edit-latency and chord-selection fixes.
+
+User requested held drag/resize to stop at screen edges and require Dpad
+release/repress to cross, including top/bottom. Replaces the timed edge pause
+and the prior B-held viewport pinning with an actual directional release
+latch. A fresh press crosses one cell into the neighboring grid. All Dpad
+axes must be released to clear the latch. Reversing away remains possible.
+
+Relevant direction stops at its edge: Right at last column, Left at first,
+Up at top pitch, Down at bottom pitch. Applies to single/group note moves,
+length resizes, and selection box drawing. Drum pitch rows are hard bounds
+(all13voices already visible); horizontal drum page crossings work normally.
+B resizing from a note body first positions an off-page/edge tail before
+length can cross that page, preventing the first resize from skipping an edge.
+
+Explicit crossing permits destination drawing even while A/B remains held.
+Synthetic repeats are suppressed until that page is published. Repeat time
+and acceleration reset on publication, preventing lag from turning into
+queued extra cursor steps. User need not release A/B between gestures.
+The destination cursor is first column after Right / last column after Left.
+Vertical crossing changes the pitch viewport by one page: Up enters bottom,
+Down enters top, constrained by instrument pitch limits.
+
+Ordinary left navigation now goes from global step17 to16 (zero-based16->15)
+and lands at the previous page's right edge. Piano focus remains accessible
+at pattern step1. Its previous-page shortcut also lands at the rightmost
+cell instead of jumping to the previous page's left edge.
+
+79 primary real-input checks passed: P1/P2/Wave/drums; single/group moves and
+resizes; all four melodic directions; selection boxes;8/16/32step views;
+3/4(12step) grids; ARP with hats/bass/kick/snare backing; resize from note
+bodies; drum hard pitch bounds; ordinary left/right page entry. Heavy held
+input verified to remain at the edge before release/repress.
+Updated test_chord_resize_page_edge.py to assert the newly requested release
+behavior (the old automatic held crossing was intentionally superseded).
+
+Additional passes: one-bar Wave edit latency bounds and sustained Wave APU
+trigger preservation; modded81event playback/nav/group/selection/painting;
+exact chord pending-selection pixels; source and overlap/PCM admission;
+paint velocity feedback; all16 Dpad release and16diagonal gestures; actual
+plot/ARP/top-bar regression. New max note interval error0.197ms, no underruns.
+Group ACK median452ms, navigation50ms, paint151ms, selection67ms in the dense
+LFO fixture. No claim that all drawing or navigation is instant.
+ROM bank validation passes;284bytes spare WRAM,512bytes reserved stack.
+No original saves overwritten, no merge, push or website deployment.
+
+Main test: tools/test_gesture_page_edges.py; build/gesture-edges-test.log.
+Other reports: build/gesture-edges-{timing,latency,wave-gate,release,overlap,
+paint,chord,pending-selection,topbar}.*.
+Earlier prototype limitations in edit-latency/chord-resize audit still apply.

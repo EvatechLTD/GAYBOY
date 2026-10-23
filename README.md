@@ -45,6 +45,9 @@ These are review drafts; some features still need a final walkthrough.
 
 `main` is the tested stripped implementation. The previous experimental main is preserved as `experimental/archived-main-2026-10-21` and tag `experimental-main-2026-10-21`. See [promotion and archive notes](docs/main-promotion.md).
 
+The latest stable 1.0 update improves edit responsiveness, octave scrolling,
+and page-edge navigation. See [editor update and validation](docs/editor-navigation-promotion.md).
+
 ## Build from source
 
 Use Windows PowerShell, Python 3 and GBDK 4.5.0 installed under `tools/gbdk/` (toolchain not included). The default build uses committed generated assets to reproduce the tested main baseline. Regenerating assets separately requires the project's local media inputs, which are excluded from Git.

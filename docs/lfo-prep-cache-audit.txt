@@ -1,0 +1,56 @@
+LFO PREPARATION CACHE PROTOTYPE ? 2026-10-23
+
+Branch lfo-prep-cache, based on main a6e9ec6. No rolling-buffer changes.
+Not merged or deployed. Rolling prototype/audit preserved in named Git stash.
+
+Changes:
+- Cache completed LFO configuration validation by pattern generation and
+  explicit force, plus cheap unrolled ownership/transport/power/bypass checks.
+- Reuse prepared tables between actual changes instead of constructing3voice
+  keys every frame. Still detect fine detune,bend,table and mono ownership
+  changes without a generation bump. Capture generation before prepare so
+  any change during a yielded prepare is picked up again afterward.
+- First cache-only prototype exposed a3.7ms1/32LFO scheduling outlier under
+  navigation due to elapsed-unit quantization near the128Hz work boundary.
+  Retain a signed one-unit remainder and round at that boundary; an early
+  unit is repaid by the next elapsed sample. Same average128Hz work/256Hz phase
+  rate. Worst measured3voice worker1.013ms vs0.969ms on main.
+
+Matched DMG fixture:120BPM,64steps,81events,3fine/coarse1/32LFO voices.
+Final standard LFO test passed without threshold changes: strict1/32
+fine/coarse/both idle+navigation<1.5ms error; other rates retain existing
+10ms tolerance. Slower/faster/free rates remain128Hz-quantized: final1/16
+max4.818ms and240BPM3.714ms vs near-zero in this main fixture. Do not claim
+uniformly tighter LFO edges at all rates; hardware comparison remains pending.
+
+Phase,main median ack ms,candidate median ack ms,main full gesture ms,candidate full gesture ms
+idle,0.000,0.000,2544.892,2544.891
+navigation,66.969,50.230,4587.502,4101.961
+cells,318.110,301.369,12456.575,11904.062
+paint,150.684,150.685,7802.103,7048.678
+multiselect,75.341,50.230,9024.319,7601.187
+group_move,619.482,585.994,20074.510,19254.110
+
+CPU attribution on the same frozen main and final candidate, excluding
+tracked nested IRQ work from foreground preparation cost:
+idle: LFO preparation 12.263% -> 1.619% CPU.
+navigation: LFO preparation 11.954% -> 1.174% CPU.
+paint: LFO preparation 10.934% -> 2.497% CPU.
+
+Final modulation-on onset error across editor phases<=0.347ms, no native
+IRQ underruns. All29painted cells retained, multiselect exercised.
+Modulation OFF remains broadly unchanged: median navigation/multiselect33.5ms,
+cells159ms, painting stroke5.16s vs5.21s main.
+
+Regression passes: existing LFO rates/shapes/fallback, global bypass,
+all-pages native playback/sound changes,16drag/resize cases, deferred paint
+pixel equivalence and viewport cancellation, ARP orders0..10/pages/retained
+FREE phase. New ownership test changes fine detune,bend,tables and mono
+ownership without a generation bump and verifies fallback/recovery.
+
+4additional WRAM bytes;565bytes free plus512reserved stack. ROM layout passes.
+Further broad modulation-routing invalidation/frame-only dispatch was not
+changed in this first experiment.
+
+ROM SHA256:669e68c43e1aebbbc5ee69195d6610519c039f2a202848c265e99bc2f55924d5
+Artifact: build/GAYBOY-lfo-prep-cache-test.gb (+.noi/.map, copied session .sav).

@@ -1,0 +1,60 @@
+Chord resize interaction fix prototype, 2026-10-23, unmerged black-notes branch.
+Baseline: GAYBOY-fast-taps-test.gb.
+Candidate: GAYBOY-chord-resize-fix-test.gb, separate copied save.
+
+Fixes:
+- Visible-edge resize pause uses the held preview clock, avoiding its wait
+  for the full note redraw that the same held gesture deliberately defers.
+- A B resize pins the displayed viewport until B release. The real endpoint
+  can pass it; all cursor publication paths clip its sprite to the page edge.
+  Hidden-velocity status row shows LENGTH and an off-page indicator. Dpad
+  release still updates note pixels/playback while B stays held. B release
+  permits the viewport to follow the endpoint.
+- Pending native note composition retains a valid published image for
+  selection/cursor feedback. Selection can XOR the partly updated map between
+  batches; later note batches use the updated selection mask. No note rebuild
+  occurs during held-Dpad gestures.
+- Each compositor tile span publishes its map together with its tile data.
+  Service drains up to four small batches per UI pass, checking queued input
+  and servicing audio between batches. Scanning remains4events and painting
+  remains2tiles per batch. Masked pixel filling uses the existing tested
+  assembly run algorithm in the compositor bank too.
+
+Real UI fixture:120BPM, hat each16th, kicks/snares,2bar Wave bass, three P2
+notes plotted through controls, ARP toggled from header, actual A-box and B
+resize gestures. Compared ARP ON/OFF.
+Baseline held resize stuck16steps even after additional300frames. Candidate
+reaches32steps in both modes, keeps cursor on visible edge, and preserves
+source endpoint31. Final pixel checks also pass after page round trips.
+Baseline release catch-up3968ms ON /3382ms OFF (endpoint stuck16).
+Candidate1942ms ON /1925ms OFF (endpoint32, same first viewport with final
+continuation edge). Not precisely identical endpoints, but candidate paints
+at least as much visible tail. Redraw can still take around2seconds.
+A new selection was accepted/published while pending remained1; exact final
+note/selection pixels matched an independent blank-grid rectangle oracle.
+
+Broader120BPM three-LFO81event test, final max note error0.275ms; no underruns.
+Paint/multi-select/group data, rapid8tap single and group bursts, overlaps,
+lowest MONO/ARP playback, PCM admission, all16 Dpad-release operations and
+16diagonal operations, cache membership invalidation and255th index, dynamic
+tile refcounts, and real ARP/top-bar regression passed.
+Tradeoff: dense group-move ACK median418.6ms versus368.3ms in fast-taps.
+Selection median58.6ms versus50.2ms. Painting median150.7ms versus167.4ms.
+More visible selection feedback while notes are pending has a cost; do not
+claim an improvement for every edit gesture. This remains a hardware-test
+candidate, not main. No merge, push, deployment or original-save changes.
+WRAM spare284bytes; reserved stack512bytes; ROM/bank checks pass.
+
+Still not implemented: offset-only source transactions, removal of all
+intermediate dirty-span union work, or guaranteed immediate note redraw.
+Earlier modulation-edge precision and snapshot-publication tradeoffs remain.
+The prior dense forced-full-render selection discrepancy was not claimed
+resolved; current pixels are checked with independent selection/note oracles.
+
+New tests: tools/test_chord_resize_page_edge.py,
+tools/test_chord_resize_pending_selection.py.
+Reports: build/chord-resize-page-edge-test.log,
+chord-resize-pending-selection.log,chord-resize-fixed-settle.log,
+chord-resize-fixed-timing.json,chord-resize-fixed-gestures.log,
+chord-resize-fixed-rendering.log,chord-resize-fixed-topbar.log,
+chord-resize-fixed-group-burst.json,chord-resize-fixed-single-burst.json.

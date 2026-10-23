@@ -6,7 +6,7 @@ from pyboy import PyBoy
 from boot_helpers import enter_app
 import test_pcm_timing as probes
 
-ap=argparse.ArgumentParser();ap.add_argument('--rom',default='build/GAYBOY.gb');ap.add_argument('--output',default='build/editbuffer-timing.json');ap.add_argument('--bpm',type=int,default=180);ap.add_argument('--drums',action='store_true');ap.add_argument('--lfo',action='store_true');ap.add_argument('--mod-bypass',action='store_true');ap.add_argument('--lfo-voices',type=int,default=3,choices=(0,1,2,3));ap.add_argument('--profile-irq',action='store_true');ap.add_argument('--phases',default='idle,navigation,cells,paint,multiselect,group_move');args=ap.parse_args()
+ap=argparse.ArgumentParser();ap.add_argument('--rom',default='build/GAYBOY.gb');ap.add_argument('--output',default='build/editbuffer-timing.json');ap.add_argument('--bpm',type=int,default=180);ap.add_argument('--drums',action='store_true');ap.add_argument('--lfo',action='store_true');ap.add_argument('--mod-bypass',action='store_true');ap.add_argument('--rolling-probe',action='store_true',help='Record rejected prototype results without accepting timing failures');ap.add_argument('--lfo-voices',type=int,default=3,choices=(0,1,2,3));ap.add_argument('--profile-irq',action='store_true');ap.add_argument('--phases',default='idle,navigation,cells,paint,multiselect,group_move');args=ap.parse_args()
 rom=Path(args.rom);S={l.split()[1]:int(l.split()[2],16) for l in rom.with_suffix('.noi').read_text().splitlines() if l.startswith('DEF ')}
 p=PyBoy(str(rom),window='null',sound_emulated=True,cgb=False,ram_file=BytesIO(bytes(32768)));p.set_emulation_speed(0)
 def get(n,i=0):
@@ -95,6 +95,7 @@ try:
   for key in ('a','b','left','right','up','down'):p.button_release(key)
   p.tick(12);put('seqhead',0);put('seqfocus',0);put('seqcursor',4,editor);put('seqpitch',64,1);put('drumrow',5);put('seqgrouptrack',255);put('seqapending',0);put('dirty',1);p.tick(30)
   start_count=event_total();hits.clear();acks.clear();irq_times.clear();start=p._cycles();group_seen=False
+  rolling_before={n:get(n)|(get(n,1)<<8) for n in ('editbuffer_underruns','editbuffer_refills','editbuffer_scanned','editbuffer_copied','editbuffer_restarts')} if '_editbuffer_underruns' in S else {}
   if phase=='paint':p.button_press('a');p.button_press('b');p.tick(3)
   if phase=='multiselect':p.button_press('a');p.tick(3)
   if phase=='group_move':
@@ -110,9 +111,13 @@ try:
   for key in ('a','b'):p.button_release(key)
   p.tick(12)
   intervals=[(b-a)*1000/4194304 for a,b in zip(hits,hits[1:])];nominal=60000/args.bpm
-  assert len(intervals)>=4,(phase,len(hits))
-  reports[phase]={'attacks':len(hits),'max_error_ms':max(abs(t-nominal) for t in intervals),'p95_error_ms':sorted(abs(t-nominal) for t in intervals)[int(.95*(len(intervals)-1))],
+  if not args.rolling_probe:assert len(intervals)>=4,(phase,len(hits))
+  reports[phase]={'attacks':len(hits),'max_error_ms':max((abs(t-nominal) for t in intervals),default=None),'p95_error_ms':sorted(abs(t-nominal) for t in intervals)[int(.95*(len(intervals)-1))] if intervals else None,
    'intervals_ms':intervals,'input_ack_max_ms':max(acks,default=0),'input_ack_median_ms':statistics.median(acks) if acks else 0,'elapsed_ms':(p._cycles()-start)*1000/4194304,'events_before':start_count,'events_after':event_total(),'selection_seen':group_seen}
+  if rolling_before:
+   reports[phase]['rolling']={n:((get(n)|(get(n,1)<<8))-v)&65535 for n,v in rolling_before.items()}
+   reports[phase]['timing_pass']=len(intervals)>=4 and reports[phase]['rolling']['editbuffer_underruns']==0 and reports[phase]['max_error_ms']<2
+   if not args.rolling_probe:assert reports[phase]['timing_pass'],(phase,reports[phase])
   if phase=='paint':assert event_total()!=start_count,'Paint did not mutate cells'
   if phase=='paint' and args.lfo and not args.drums:
    begin=get('seqeventoffsets',2)|(get('seqeventoffsets',3)<<8);count=get('seqeventcounts',2)|(get('seqeventcounts',3)<<8)

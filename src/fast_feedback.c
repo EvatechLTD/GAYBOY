@@ -1,6 +1,12 @@
 #pragma bank 43
 #pragma opt_code_speed
 #include "api.h"
+extern uint8_t seqeditpreview;
+static uint8_t previewqueued,previewtrack,previewold[4],previewnext[4];
+static uint16_t previewindex;
+static uint8_t previewreleased,previewretained,previewservicing;
+static uint16_t previewgeneration;
+extern uint16_t pattern_generation;
 #include "drum_rows.h"
 extern uint8_t seqdenom,seqbeats,drumvelrow;
 void drum_velocity_set(uint8_t row,uint8_t step,uint8_t value) BANKED;
@@ -121,13 +127,26 @@ static void feedback_region(uint8_t left,uint8_t right,uint8_t top,uint8_t botto
   id=roll_feedback_intern(pixels);if(seqtileoverflow)return;if(old!=id){refs[n]--;refs[feedback_index(id)]++;canvas[at]=seqscreen[at]=id;}mixfill();
  }
 }
+/* Black notes have no cross-pitch coloring dependency. Erasing across a
+   different note on the same pitch still needs the bounded compositor. */
+static uint16_t feedbackskip=65535U;
+static uint8_t native_feedback_safe(uint8_t c,const uint8_t *e,uint8_t erase){
+ uint16_t i,n=seq_event_count(c),end=e[0]+(e[3]?e[3]:256U);uint8_t other[4],skip=erase;
+ if(!n||(n==1&&(erase||feedbackskip!=65535U)))return 1;
+ for(i=0;i<n;i++){
+  if(i==feedbackskip)continue;seq_event_get(c,i,other);
+  if(skip&&!memcmp(other,e,4)){skip=0;continue;}
+  if(other[1]==e[1]&&other[0]<end&&e[0]<(uint16_t)other[0]+(other[3]?other[3]:256U))return 0;
+  /* Shared onset velocity must be resolved from all notes, not the last edit. */
+  if(other[1]&&other[0]==e[0])return 0;
+ }
+ return 1;
+}
 uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED {uint8_t row=0,col,endcol,left,right,top,bottom,x,k,voices,height;uint16_t begin=e[0],end=begin+(e[3]?e[3]:256U),at,id;uint32_t bits=0;int16_t y;
- if(!feedback_ready(c)||c==4||c==5)return 0;if(c!=6&&(eval_mode(c)||evalpatch[c][EV_CHORD_HISTORY]))return 0;if(end<=seqbase||begin>=(uint16_t)seqbase+seqcols)return 0;col=begin<seqbase?0:begin-seqbase;endcol=end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase;
- if(c==6){row=DRUM_VIEW_ROW(e[1]-1);if(row>=13)return 0;bits=(feedback_low[endcol]^feedback_low[col]);if((erase||row>=3)&&(fastoverlap&(1U<<row)))return 0;if(!erase&&(fastrowbits[row]&bits))return 0;
-  /* Edits which can change another PCM hit's admission use the full renderer.
-     The common non-overlapping drum and hat gestures need no admission scan. */
-  if(row>=3)for(k=col;k<endcol;k++){voices=0;x=rollx[k]+2;for(row=3;row<13;row++){height=feedback_pixel(x,DRUM_SCREEN_ROW(row)*8+2);if(erase&&height==2)return 0;if(height==3)voices++;}if(!erase&&voices>=2)return 0;}row=DRUM_VIEW_ROW(e[1]-1);top=DRUM_SCREEN_ROW(row)*8+1;bottom=top+6;
- }else{for(k=col;k<endcol;k++)if(!erase&&rollnotes[k]&&(rollnotes[k]!=e[1]||(k>col&&rollkind[k]==1)))return 0;if(!erase&&endcol<seqcols&&rollnotes[endcol]==e[1]&&rollkind[endcol]==2)return 0;if(erase&&e[3]!=1&&col&&rollnotes[col-1]==e[1])return 0;y=((int16_t)seqtop[c]-(e[1]-1))*seqheight;if(y<0||y+seqheight>seqgridheight)return 0;top=y+1;bottom=y+seqheight-1;}
+ if(!feedback_ready(c)||c==4||c==5)return 0;if(c!=6&&!native_feedback_safe(c,e,erase))return 0;if(end<=seqbase||begin>=(uint16_t)seqbase+seqcols)return 0;col=begin<seqbase?0:begin-seqbase;endcol=end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase;
+ if(c==6){row=DRUM_VIEW_ROW(e[1]-1);if(row>=13)return 0;bits=(feedback_low[endcol]^feedback_low[col]);if(erase&&(fastoverlap&(1U<<row)))return 0;if(!erase&&(fastrowbits[row]&bits))return 0;
+  row=DRUM_VIEW_ROW(e[1]-1);top=DRUM_SCREEN_ROW(row)*8+1;bottom=top+6;
+ }else{y=((int16_t)seqtop[c]-(e[1]-1))*seqheight;if(y<0||y+seqheight>seqgridheight)return 0;top=y+1;bottom=y+seqheight-1;}
  left=rollx[col]+(begin>=seqbase);right=rollx[endcol]-(end<=(uint16_t)seqbase+seqcols);if(right<=left)return 0;
  if(!feedbackbatch||!rollbuilding)roll_feedback_begin();if(c!=6&&!erase&&begin>=seqbase)feedback_region(left-1,left,top,bottom,1,0);feedback_region(left,right,top,bottom,erase,0);
  if(c!=6&&seqcols==16&&!seqvelocityhidden&&begin>=seqbase&&begin<(uint16_t)seqbase+16){col=begin-seqbase;feedback_velocity_queue(c,col,erase?0:e[2]);}
@@ -153,10 +172,6 @@ static uint8_t feedback_drum_resize(const uint8_t *old,const uint8_t *next){
  if(lo>=hi)return 1;
  first=lo-seqbase;last=hi-seqbase;bits=(feedback_low[last]^feedback_low[first]);
  if(!erase&&(fastrowbits[row]&bits))return 0;
- if(row>=3)for(k=first;k<last;k++){
-  voices=0;for(r=3;r<13;r++){pixel=feedback_pixel(rollx[k]+2,DRUM_SCREEN_ROW(r)*8+2);if(pixel==2)return 0;if(r!=row&&pixel==3)voices++;}
-  if(!erase&&voices>=2)return 0;
- }
  left=rollx[first]-((erase?b:a)>seqbase);right=rollx[last]-((erase?a:b)<=(uint16_t)seqbase+seqcols);top=DRUM_SCREEN_ROW(row)*8+1;
  if(!feedbackbatch||!rollbuilding)roll_feedback_begin();feedback_region(left,right,top,top+6,erase,0);
  if(seqtileoverflow){roll_clear_transition();seqfontdirty=seqdrawvalid=0;dirty=1;return 0;}
@@ -171,12 +186,10 @@ static uint8_t feedback_drum_resize(const uint8_t *old,const uint8_t *next){
 static uint8_t feedback_native_resize(uint8_t c,const uint8_t *old,const uint8_t *next){
  uint16_t a=old[0]+(old[3]?old[3]:256U),b=next[0]+(next[3]?next[3]:256U),at;
  uint8_t left,right,top,bottom,k,first,last,width,erase=b<a;int16_t y;
- if(!feedback_ready(c)||c>=4||eval_mode(c)||evalpatch[c][EV_CHORD_HISTORY])return 0;
+ if(!feedback_ready(c)||c>=4||!native_feedback_safe(c,old,1))return 0;
  y=((int16_t)seqtop[c]-(old[1]-1))*seqheight;if(y<0||y+seqheight>seqgridheight)return 0;
  if(a<=seqbase||b<=seqbase||old[0]>=(uint16_t)seqbase+seqcols)return 0;
  first=(erase?b:a)>=(uint16_t)seqbase+seqcols?seqcols:(erase?b:a)-seqbase;last=(erase?a:b)>=(uint16_t)seqbase+seqcols?seqcols:(erase?a:b)-seqbase;
- if(!erase)for(k=first;k<last;k++)if(rollnotes[k])return 0;
- if(!erase&&last<seqcols&&rollnotes[last]==old[1]&&rollkind[last]==2)return 0;
  left=rollx[first]-(first<seqcols);right=rollx[last]-(last<seqcols);if(right<=left)return 1;
  top=y+1;bottom=y+seqheight-1;if(!feedbackbatch||!rollbuilding)roll_feedback_begin();
  feedback_region(left,right,top,bottom,erase,0);
@@ -190,13 +203,38 @@ static uint8_t feedback_native_resize(uint8_t c,const uint8_t *old,const uint8_t
    and insert paths touch only the old/new rectangles; difficult admission
    changes fall back before the next published full render. */
 uint8_t roll_replace_feedback(uint8_t c,const uint8_t *old,const uint8_t *next,uint16_t index) BANKED {
- uint16_t count;uint8_t col;
+ uint16_t count;uint8_t col,ok;
+ if(seqeditpreview){
+  if(!previewqueued){previewqueued=1;previewtrack=c;previewindex=index;memcpy(previewold,old,4);}
+  else if(previewtrack!=c||previewindex!=index)previewqueued=2;
+  memcpy(previewnext,next,4);return 0;
+ }
  if(old[0]==next[0]&&old[1]==next[1]){if(old[3]==next[3])return feedback_ready(c);if(c==6)return feedback_drum_resize(old,next);return feedback_native_resize(c,old,next);}
- if(!roll_note_feedback(c,old,1))return 0;
- if(!roll_note_feedback(c,next,0)){seqdrawvalid=0;return 0;}
+ feedbackskip=index;ok=roll_note_feedback(c,old,1);
+ if(ok&&previewservicing&&padread!=padwrite){feedbackskip=65535U;seqdrawvalid=0;return 0;}
+ if(ok)ok=roll_note_feedback(c,next,0);feedbackskip=65535U;
+ if(!ok){seqdrawvalid=0;return 0;}
  if(c==6){count=seq_event_count(6);rollcache[1]=count;rollcache[3]=count>>8;
   if(next[0]>=seqbase&&(uint16_t)next[0]<seqbase+seqcols){col=next[0]-seqbase;fastcells[DRUM_VIEW_ROW(next[1]-1)][col]=index+1;}}
  return 1;
+}
+/* Single-note drags retain their original published rectangle and latest
+   target, so release can use the existing bounded replacement fast path. */
+uint8_t roll_preview_finish(void) BANKED {
+ previewreleased=1;previewretained=seqdrawvalid==1;previewgeneration=pattern_generation;
+ return 0;
+}
+/* Input only queues release. Native single-note fast feedback runs after
+   queued edges have drained; multi-note work uses the bounded compositor.
+   New taps can coalesce before service, or interrupt between erase/insert. */
+uint8_t roll_preview_service(void) BANKED {uint8_t queued;
+ if(!previewreleased)return 0;
+ if(padread!=padwrite)return 1;
+ queued=previewqueued;previewqueued=previewreleased=0;
+ if(queued!=1||previewtrack!=seqtrack||!previewretained||previewgeneration!=pattern_generation)return 0;
+ seqdrawvalid=1;previewservicing=1;
+ seqdrawvalid=roll_replace_feedback(previewtrack,previewold,previewnext,previewindex);
+ previewservicing=0;return 0;
 }
 /* Keep visible event handles aligned when compacting the last track. */
 void roll_drum_erase_handles(uint16_t deleted) BANKED __naked {__asm
@@ -255,8 +293,7 @@ uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED {
  uint32_t *continued=(uint32_t *)0xBE80,occupied=0,second=0,bits,changedtiles=0;
  uint16_t i,count,begin,end,changed=0,continuing=0,at,*refs=(uint16_t *)rollonsets;
  uint8_t e[4],row,col,last,x,left,right,mask,bit,low,high,color,k,n,id,old,pixels[16],selection,firstrow=seqgroupy0+(dy<0?dy:0),lastrow=seqgroupy1+(dy>0?dy:0);
- if(!feedback_ready(6))return 0;
- if(lastrow>=3&&(fastghostrows&0x1FF8))return 0;
+ if(seqeditpreview||!feedback_ready(6))return 0;
  memset(fastrowbits,0,52);memset(fastcells,0,832);memset(continued,0,52);memset(rollbackground,0,208);fastoverlap=0;count=seq_event_count(6);
  for(i=0;i<count;i++){
   if(!seq_event_get(6,i,e)||!e[1]||e[1]>13)continue;row=DRUM_VIEW_ROW(e[1]-1);begin=e[0];end=begin+(e[3]?e[3]:256U);
@@ -266,7 +303,7 @@ uint8_t roll_drum_group_refresh(int8_t dx,int8_t dy,int8_t resize) BANKED {
    else{changedtiles|=feedback_changed_tiles(begin,end);changedtiles|=feedback_changed_tiles(begin-dx,end-dx);}
   }
   col=begin<seqbase?0:begin-seqbase;last=end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase;bits=(feedback_low[last]^feedback_low[col]);
-  if(row>=3){if(lastrow>=3&&(second&bits))return 0;second|=occupied&bits;occupied|=bits;}else if(row==2&&firstrow<=2&&lastrow>=2&&(fastrowbits[row]&bits))return 0;
+  if(row==2&&firstrow<=2&&lastrow>=2&&(fastrowbits[row]&bits))return 0;
   if(fastrowbits[row]&bits){if(row>=firstrow&&row<=lastrow)return 0;fastoverlap|=1U<<row;}
   if(end>(uint16_t)seqbase+seqcols)continuing|=1U<<row;
   for(k=col;k<last;k++)if(!(fastrowbits[row]&feedback_bit[k]))fastcoverorigin[row][k]=begin;

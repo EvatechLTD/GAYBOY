@@ -60,7 +60,7 @@ void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*
  if(editbuffer_valid&&eb_activegeneration==pattern_generation)return;
  /* Paint and selection wait for A/B release. A moved/resized note or group
     may prepare its next snapshot while A/B stays held and the D-pad rests.
-    Prepared edits publish at the next 16-step boundary or earlier loop wrap. */
+    Prepared edits publish before the next sequencer step. */
  if(editbuffer_valid&&(page==8||page==10&&genopen)&&(padsampled&(J_A|J_B))){
   if((padsampled&(J_A|J_B))==(J_A|J_B)||
      (padsampled&(J_UP|J_DOWN|J_LEFT|J_RIGHT|J_SELECT|J_START))||
@@ -98,6 +98,14 @@ void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*
  }while(--budget);
  if(!eb_left){longest=0;eb_boundarytrack=255;for(hash=0;hash<7;hash++)if((editbuffer_valid?eb_counts[hash]:seqeventcounts[hash])&&seqlength[hash]>longest){longest=seqlength[hash];eb_boundarytrack=hash;}eb_building=0;editbuffer_ready=1;}
 }
+/* A released edit gets a few bounded copy batches before foreground drawing.
+   Stop immediately when input/deadline gating prevents progress; never spin
+   waiting for a musical boundary or build while a gesture is still held. */
+void editbuffer_priority_service(void) BANKED {uint8_t budget=4,building;uint16_t left,generation;
+ do{left=eb_left;generation=eb_generation;building=eb_building;editbuffer_service();
+  if(!eb_building||editbuffer_ready||(building&&generation==eb_generation&&left==eb_left))return;
+ }while(--budget);
+}
 /* Publication is shared with the native timer, which must see the new
    snapshot before triggering a 16-step boundary. Cache invalidation stays foreground. */
 static void eb_publish(void) NONBANKED {
@@ -106,20 +114,17 @@ static void eb_publish(void) NONBANKED {
  editbuffer_ready=0;editbuffer_swaps++;eb_notify|=eb_changedmask;
 }
 void editbuffer_irq_boundary(const uint8_t *position,uint8_t enabled) NONBANKED {
+ (void)position;
  if(!editbuffer_ready||seqservicing||eb_boundarytrack>=3||!(enabled&(1<<eb_boundarytrack))||
-    ((uint16_t)position[eb_boundarytrack]+1<seqlength[eb_boundarytrack]&&
-     ((position[eb_boundarytrack]+1)&15))||
     eb_slot!=mx.slot||eb_generation!=pattern_generation)return;
  eb_publish();
 }
-void editbuffer_boundary(void) BANKED {uint8_t c,track=255;uint16_t longest=0;
+void editbuffer_boundary(void) BANKED {
  eb_notify_foreground();
  if(!editbuffer_ready||eb_slot!=mx.slot||eb_generation!=pattern_generation)return;
- for(c=0;c<7;c++)if((editbuffer_valid?eb_counts[c]:seqeventcounts[c])&&seqlength[c]>longest){longest=seqlength[c];track=c;}
- /* Keep the commitment window bounded even when patterns span many bars.
-    A short/odd-length loop can publish sooner at its wrap. Existing gates
-    are retained: activating edits does not retrigger sustained notes. */
- if(track!=255&&(uint16_t)seqposition[track]+1<seqlength[track]&&((seqposition[track]+1)&15))return;
+ /* A ready immutable snapshot can publish before any step. Waiting for the
+    next bar can skip a note's upcoming occurrence and add a whole loop.
+    Existing gates remain owned; publication itself never retriggers notes. */
  __critical{eb_publish();editbuffer_reading=1;}
  eb_notify_foreground();
 }
