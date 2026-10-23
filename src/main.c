@@ -7,6 +7,7 @@
 #include "mod_bypass.h"
 #include "link_control.h"
 #include "mixer_shared.h"
+#include "midi_input.h"
 #include "notes.h"
 #include "lfo_irq.h"
 #define REG(a) (*(volatile uint8_t *)(a))
@@ -101,7 +102,7 @@ void keyevent(uint8_t c,uint8_t note,uint8_t vel){uint8_t i,j,n=keycount[c],last
  if(vel){if(n==8){for(j=0;j<7;j++){keystack[c][j]=keystack[c][j+1];keyvel[c][j]=keyvel[c][j+1];}n--;}keystack[c][n]=note;keyvel[c][n++]=vel;keycount[c]=n;play(c,note,vel);}
  else {keycount[c]=n;if(last!=note)return;if(n)play(c,keystack[c][n-1],keyvel[c][n-1]);else {held[c]=255;if(!sustain[c])stop(c);}}}
 void midi(uint8_t b){if(syncmode==SYNC_TWINK)return;if(syncmode&&sync_receive(b))return;midiage=12;if(b>=0xf8)return;if(b&128){count=0;st=b<0xf0?b:0;return;}if(!st)return;
- if((st&0xe0)==0xc0){event(st,b,0);return;}if(!count){first=b;count=1;}else{event(st,first,b);count=0;}}
+ if((st&0xe0)==0xc0){midi_event(st,b,0);return;}if(!count){first=b;count=1;}else{midi_event(st,first,b);count=0;}}
 /* Frame-clock macros update pitch/duty without retriggering hardware envelopes. */
 void service_frame(void) BANKED;
 void roll_feedback_service(void) BANKED;

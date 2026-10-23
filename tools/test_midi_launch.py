@@ -9,13 +9,30 @@ def send(*data):
  p.tick(16)
 
 try:
- enter_app(p,S);choose(18)
+ enter_app(p,S)
+ p.memory[S['_sticky_start']]=1
+ assert not v('midi_launch_enabled'),'MIDI launches must default OFF'
  p.memory[S['_syncmode']]=0
  # This fixture injects bytes into RX directly. Stop hardware serial so an
  # in-flight open-cable transfer cannot overwrite those bytes with 0xff.
  p.memory[S['_syncarmed']]=0
  p.memory[0xff02]=0
  p.memory[0xffff]=p.memory[0xffff]&~8
+ # Disabled launch notes retain instrument routing and never start/switch pads.
+ for note in range(24,29):
+  send(0x92,note,100);send(0x82,note,0)
+  assert v('mx',1)==0 and v('mx',2)==255 and not v('seqplaying')
+ # Expose SYNC in the configurable quick menu, then operate the actual UI.
+ p.memory[S['_pool_root']+100]=27;p.memory[S['_pool_root']+108]=ord('P');p.memory[S['_pool_root']+109]=1
+ choose(27)
+ tap('down');tap('down')
+ configuration=tuple(v(n) for n in ('syncmode','syncslave','syncrole','seqplaying'))
+ p.screen.image.save('build/sync-midi-launch-off.png')
+ tap('b')
+ assert v('midi_launch_enabled'),'Sync menu did not enable MIDI launching'
+ assert tuple(v(n) for n in ('syncmode','syncslave','syncrole','seqplaying'))==configuration
+ p.screen.image.save('build/sync-midi-launch-on.png')
+ choose(18)
  for cc,offset in [(71,0),(72,1),(77,6)]:
   for value in (0,64,127):
    send(0xbf,cc,value)
@@ -50,6 +67,15 @@ try:
   assert v('mx',1)==slot,(slot,v('mx',1))
   p.tick(120);before=len(launches);p.tick(120);assert len(launches)>before
   send(0x80,24+slot,0)
- print('PASS MIDI faders, mute thresholds, held quantized retrigger and release')
+ # Disabling while a MIDI key is held cancels its queued/repeated launch.
+ send(0x90,24,100);p.tick(180);choose(27)
+ configuration=tuple(v(n) for n in ('syncmode','syncslave','syncrole','seqplaying'))
+ tap('b')
+ assert not v('midi_launch_enabled') and v('mx',2)==255
+ assert tuple(v(n) for n in ('syncmode','syncslave','syncrole','seqplaying'))==configuration
+ p.tick(120);n=len(launches);p.tick(180);assert len(launches)==n
+ tap('b');assert v('midi_launch_enabled')
+ p.tick(180);assert len(launches)==n,'Re-enabling revived a stale held key'
+ print('PASS default OFF, Sync toggle, disabled note routing, MIDI controls, held launch/release and disable cleanup')
 finally:
  p.stop(save=False)

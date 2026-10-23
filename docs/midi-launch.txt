@@ -1,10 +1,18 @@
 MIDI performance controls
 =========================
 
-These mappings apply on every MIDI channel and take priority over instrument
-notes and CCs with the same numbers. Other MIDI keeps its existing behavior.
+These mappings apply only to incoming external MIDI. Internal sequencer,
+ARP, audition and editing notes never become MIDI performance commands.
 
-Pads: C1, C#1, D1, D#1, E1 (MIDI notes 24-28) launch pads 1-5.
+MIDI pad launching defaults OFF at each boot. In SYNC, select MIDI LAUNCH
+and tap A/B to toggle, or hold A/B and use Up/Right for ON, Down/Left for OFF.
+Changing this setting does not stop playback or change the sync type/role.
+Disabling clears held MIDI pad keys and cancels their pending launch.
+With it OFF, notes 24-28 follow normal instrument routing. Fader/mute CC
+mappings remain available independently.
+
+When enabled: C1, C#1, D1, D#1, E1 (MIDI notes 24-28) launch pads 1-5
+on every incoming MIDI channel, taking priority over those instrument notes.
 C1 follows the octave labels in GAYBOY; controller octave labels may differ.
 A positive-velocity note-on launches the pad and starts stopped playback.
 Holding the note repeats the active pad at the selected mixer quantization.
