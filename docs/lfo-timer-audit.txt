@@ -1,0 +1,81 @@
+LFO experimental timer path, 2026-10-22
+
+Prepared 64 phase coefficient entries per P1/P2/Wave voice. Settings-only
+preparation; new notes do not rebuild coefficients. Native timer advances
+phase independently of video redraw and PCM reload. Register updates bounded
+at128Hz after256Hz continuous three-voice modulation starved navigation.
+Repeated coefficients and unchanged register values skip redundant work.
+Supported LFO pitch voices retain buffered/native arp scheduling. ADSR pitch,
+fine detune, bend, tables, synth ownership and external slave remain generic.
+
+1/32 remains available for user evaluation. No new speed cap applied.
+Fallback requested by user:1/16 at120BPM and nearest freerun rate about8Hz
+(raw34 is7.96875Hz). Apply only after user evaluates this build.
+
+Tests: tools/test_lfo_irq.py measures actual Wave register transitions with
+three sustained voices plus hihats, navigation, fine/coarse/both, straight,
+triplet,dotted,240BPM,freerun, continuous shapes and unsupported fallback.
+Current128Hz path has up to~8.8ms transition error in tested rates. This is an
+experimental bound, not proof that1/32 is musically stable. Continuous
+three-voice fine+coarse worker peaked4.90ms; navigation acknowledgement
+peaked368ms. Coarse calculation still has meaningful interrupt cost and
+hardware/PCM listening remains required.
+
+Regression passes: native arp order/stop/pages/retained freerun; all-page
+buffered playback and patch changes;16 drag/group/resize publication cases;
+saved-tempo Wave sustain; ROM and WRAM reserve checks.
+Meter suite passed UI/meter/Generate and120BPM timing;240BPM timing had a
+single~3.7ms deviation exceeding its1.5ms threshold. Not a full clean pass.
+Timing-hook helper corrected to exclude ROM bank register symbols when
+finding function end; otherwise relocated editirq_commit was truncated.
+
+Separate GAYBOY-lfo-test ROM/save; latest closed SameBoy save copied from
+GAYBOY-x2-exact-test.sav. Original ROM and save retained. No commit/merge.
+
+
+UI regression follow-up, 2026-10-22
+
+User confirmed1/32 became usable, but navigation and editing regressed.
+Preserve128Hz timer-driven LFO; do not apply1/16 cap or revert clock.
+
+Replaced Q12 period multiplication/octave shifting in IRQ with the existing
+fixed-ROM MIDI-note frequency lookup. Foreground prepares signed semitone and
+fine offsets; table is384 bytes instead of768. Pitch kernel uses register ABI
+assembly; checked518,784 combinations of channel,note,coarse and fine bounds.
+This follows the ROM note table's rounding, which can differ from the previous
+period-scaling approximation by hardware frequency ticks (e.g.1547 vs1548).
+Clamps to supported note table and0..2047 frequency range.
+
+Unrolled fixed native channel register updates to avoid dynamic index/stack
+spills. Timer sequencer phase dispatcher now keeps accumulation in registers.
+Skip preparation calls and per-note ownership checks entirely without native
+LFO users. ROM/WRAM checks pass with621 bytes free and512 reserved stack.
+
+Matched menu fixture (three sustained voices + hats):
+  Pre-LFO baseline median50.23ms.
+  First LFO build triangle117.20ms/sine142.31ms.
+  Revised lookup/unrolled build median50.23ms for both shapes.
+  Worst measured LFO worker reduced4.90ms to0.97ms.
+  Straight1/32@120 actual Wave transitions error<0.36ms in the final test,
+  including navigation; higher tempo/triplet/freerun still quantize to128Hz.
+
+Important remaining limitation: dense editing remains more expensive with LFO.
+81-event fixture, all three voices modulated, steady snapshot established:
+  Pre-LFO baseline cell median192.5ms, paint535.8ms.
+  Revised128Hz build cell~377ms, paint~862ms (before final no-LFO guard pass).
+  Revised note timing stays within~0.85ms throughout, versus much larger
+  foreground note jitter in baseline. This is NOT a fully fixed editing UI.
+  One-voice and LFO-off comparisons also saved under build/*-editor.json.
+  LFO-off final medians match baseline for cells209ms/paint84ms/select33ms.
+
+Test correction: await first playback snapshot rather than assuming800 frames
+is enough for every64-step first-publication boundary. An absent initial
+snapshot had misleadingly looked like loss of a working snapshot on edits.
+
+Rejected experiments:64Hz updates (UI better but reduced modulation detail),
+and generic foreground dispatch of LFO notes (did not fix UI and worsened note
+timing). Final path retains128Hz updates and native buffered note ownership.
+
+Passes: LFO rates/shape/fallback tests; exhaustive actual assembled pitch kernel;
+native arp order/stop/pages/retained freerun; all-page buffering/instrument edits;
+16 drag/resize/group-release cases. Test ROM frozen separately, no merge/commit.

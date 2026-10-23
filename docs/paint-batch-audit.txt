@@ -1,0 +1,52 @@
+Paint scheduling follow-up, 2026-10-22
+
+Keep128Hz timer-driven LFO and1/32 available. No audio-rate limit changes.
+
+Native edit composition is a resumable foreground job. Event scans process
+8 records per pass; rendering reconstructs and publishes at most2 tiles per
+quantum, clipping pixel composition to that span. A newer edit restarts staging
+from current event data while retaining the union of dirty regions. Viewport,
+meter,length,mode and track changes invalidate obsolete staging. Small scans
+fall through stages immediately to avoid delaying ordinary sparse edits.
+
+Input returns between quanta. Full roll repaint abandons unuploaded work if
+new real input arrives; all queued edges remain for normal UI handling.
+Synthetic held-button repeat catch-up is capped at2 grid edits per call and
+its accumulated time debt discarded. Real queued edges and note data remain.
+Plain navigation and non-grid value controls keep existing repeat behavior.
+
+Native velocity bars use the existing idle one-row-at-a-time feedback queue.
+Fast note feedback already provides its bars; avoid redundant track scans.
+Composed overlap edits cache lowest-onset velocities during the bounded scan.
+Native velocity feedback does not clear its queue while composition is pending.
+
+Matched DMG fixture:81 existing events, three pitch-modulated voices,120BPM,
+1/32 triangle LFO. Frozen baseline build/paint-before.gb. Real input gestures,
+real pulse register trigger timing. Each29-cell paint stroke is checked for
+all expected onsets with no gaps or duplicates. Final results:
+
+navigation: median 58.60 -> 50.23 ms; worst 133.94 -> 117.20 ms; note error 0.029 ms
+cells: median 301.37 -> 318.11 ms; worst 736.68 -> 385.08 ms; note error 0.850 ms
+paint: median 786.91 -> 150.68 ms; worst 2812.78 -> 334.86 ms; note error 0.134 ms
+multiselect: median 58.60 -> 66.97 ms; worst 267.88 -> 301.37 ms; note error 0.843 ms
+
+Verification: deferred overlap edits/paint retain data and settle to the same
+pixels as a forced full redraw; interrupted viewport changes match a full
+redraw. Group select/move/resize tests compare rendered pixels for native and
+drum lanes.16 drag/resize/group release cases pass. LFO rate/shape/fallback
+and all-page buffered playback tests pass. ROM and stack reserves checked.
+
+Remaining limits: dense standalone cell toggles still cost hundreds of ms in
+this stress fixture. Visual catch-up can trail sustained paint input; note data
+is applied immediately and buffered playback keeps its established publication
+rules. Emulator performance is not a hardware measurement. No commit/merge.
+
+LFO probe correction: observe note-attack pitch writes as well as timer writes.
+Ignoring a foreground Wave loop-boundary attack had falsely attributed a
+12.7ms interval error to the LFO. Corrected probe passes all supported-path
+cases without loosening thresholds. Triplet and fast/free rates still have
+128Hz update quantization; straight1/32@120 error below0.36ms in that test.
+
+Final reserves:573 bytes WRAM free,512-byte stack reserve. Staging adds48 bytes
+versus pre-paint build (job state, signatures and cached lowest velocities).
+ROM SHA256: e086188fae68ca2a661917d5269b6c4effb9c1e07f00222316c4d084ad334d33

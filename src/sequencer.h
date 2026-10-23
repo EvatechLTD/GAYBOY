@@ -54,6 +54,7 @@ void seq_render(void) BANKED;
 void seq_settings_render(void) BANKED;
 void seq_transport(void) BANKED;
 extern uint8_t seqpopup;
+uint8_t seq_region_scale(uint8_t twice) BANKED;
 uint8_t seq_region_copy(uint8_t cut) BANKED;
 uint8_t seq_region_paste(uint8_t step,uint8_t pitch) BANKED;
 uint8_t seq_clip_kind(void) BANKED;

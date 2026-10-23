@@ -5,6 +5,7 @@
 #include "mixer_shared.h"
 #include "resident.h"
 void eval_chord_dirty(uint8_t c) BANKED;
+void eval_chord_refresh(uint8_t c) BANKED;
 uint16_t seqeventcounts[7],seqeventoffsets[7];uint8_t seqeventfull,seqeventcache;
 /* Address index only: the note records remain resident in their five pools.
    Hash collisions are filtered by track range and step; chains retain insertion order. */
@@ -21,7 +22,7 @@ static uint16_t indexcount;
 #define EB_NEXT 2048U
 #define EB_BITS 2304U
 uint8_t editbuffer_reading,editbuffer_valid,editbuffer_ready,editbuffer_irq_mask;
-static uint8_t eb_newmask;
+static uint8_t eb_newmask,eb_irq_frame,eb_boundarytrack,eb_notify,eb_changedmask;
 uint16_t editbuffer_swaps,editbuffer_restarts;
 static uint8_t eb_slot=255,eb_building,eb_buildtrack;
 uint16_t editbuffer_base=EB_BASE0;
@@ -31,8 +32,8 @@ extern uint16_t pattern_generation;
 extern const uint16_t notes[140];
 extern volatile uint8_t padread,padwrite,padsampled;
 extern uint16_t seqdeadline;
-void editbuffer_reset(void) BANKED {editbuffer_valid=editbuffer_ready=eb_building=editbuffer_reading=0;eb_slot=255;}
-uint8_t editbuffer_active(void) BANKED {return editbuffer_valid&&seqplaying&&page==8&&eb_slot==mx.slot;}
+void editbuffer_reset(void) BANKED {editbuffer_valid=editbuffer_ready=eb_building=editbuffer_reading=0;eb_slot=255;eb_notify=0;}
+uint8_t editbuffer_active(void) BANKED {return editbuffer_valid&&seqplaying&&eb_slot==mx.slot;}
 static uint16_t total(void){return seqeventoffsets[6]+seqeventcounts[6];}
 static void offsets(void){uint8_t c;uint16_t n=0;for(c=0;c<7;c++){seqeventoffsets[c]=n;n+=seqeventcounts[c];}}
 static void changed(uint8_t c){indexvalid=0;offsets();if(!editbuffer_active()){if(c==6)eval_drum_dirty();else eval_chord_dirty(c);}resident_events_changed();seqeventfull=0;}
@@ -43,20 +44,50 @@ static uint8_t eb_byte(uint16_t address){uint8_t v;__critical{SWITCH_RAM_MBC5(2)
 static void eb_note(uint16_t i,uint8_t *e){uint8_t a,b,c,d;const uint8_t *p=(const uint8_t *)(editbuffer_base+i*7);__critical{SWITCH_RAM_MBC5(2);a=*p++;b=*p++;c=*p++;d=*p;SWITCH_RAM_MBC5(0);}e[0]=a;e[1]=b;e[2]=c;e[3]=d;}
 void seq_irq_prepare(void) BANKED;
 void seq_irq_launch(void) BANKED;
-void editbuffer_service(void) BANKED {uint8_t e[4],hash,mask,*dst,*bits,*head,v,amp;uint16_t at,f,scaled;
- if(!seqplaying||page!=8||mx.slot!=eb_slot){if(editbuffer_valid)seq_irq_launch();editbuffer_valid=editbuffer_ready=eb_building=0;eb_slot=mx.slot;}
- if(!seqplaying||page!=8||seqservicing||padread!=padwrite||seqticks>=seqdeadline||seqdeadline-seqticks<4)return;
- if(editbuffer_valid)seq_irq_prepare();
+/* Only changed lanes invalidate their event caches. Keep active gates and
+   modulation clocks, and leave unchanged drum admission entirely alone. */
+static void eb_notify_foreground(void){uint8_t c,mask,reading,busy;if(!eb_notify)return;
+ __critical{mask=eb_notify;eb_notify=0;}
+ reading=editbuffer_reading;busy=seqservicing;seqservicing=1;editbuffer_reading=1;
+ for(c=0;c<3;c++)if(mask&(1<<c))eval_chord_refresh(c);
+ if(mask&64)eval_drum_dirty();editbuffer_reading=reading;seqservicing=busy;
+}
+void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*head,v,amp,budget=16;uint16_t at,f,scaled,longest;
+ if(!seqplaying||mx.slot!=eb_slot){if(editbuffer_valid)seq_irq_launch();editbuffer_valid=editbuffer_ready=eb_building=0;eb_slot=mx.slot;}
+ eb_notify_foreground();
+ if(!seqplaying||seqservicing||padread!=padwrite||seqticks>=seqdeadline||seqdeadline-seqticks<4)return;
+ if(editbuffer_valid&&(seqirqdirty||eb_irq_frame!=(uint8_t)sys_time)){eb_irq_frame=(uint8_t)sys_time;seq_irq_prepare();}
  if(editbuffer_valid&&eb_activegeneration==pattern_generation)return;
- /* Painting/dragging gets the foreground budget. Keep the old snapshot until
-    the gesture ends, then prepare and publish the finished edit at a loop. */
- if(editbuffer_valid&&(padsampled&(J_A|J_B)))return;
+ /* Paint and selection wait for A/B release. A moved/resized note or group
+    may prepare its next snapshot while A/B stays held and the D-pad rests.
+    Prepared edits publish at the next 16-step boundary or earlier loop wrap. */
+ if(editbuffer_valid&&(page==8||page==10&&genopen)&&(padsampled&(J_A|J_B))){
+  if((padsampled&(J_A|J_B))==(J_A|J_B)||
+     (padsampled&(J_UP|J_DOWN|J_LEFT|J_RIGHT|J_SELECT|J_START))||
+     seqhead||seqfocus||!seqamoved||!seqapending||seqapending==4)return;
+ }
  if((eb_building||editbuffer_ready)&&eb_generation!=pattern_generation){eb_building=editbuffer_ready=0;editbuffer_restarts++;}
  if(editbuffer_ready)return;
- if(!eb_building){eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);eb_generation=pattern_generation;eb_left=total();eb_buildtrack=6;eb_newmask=7;for(hash=0;hash<4;hash++)if(seqlength[hash]>64)eb_newmask&=~(1<<hash);for(hash=4;hash<7;hash++)if(eb_newcounts[hash])eb_newmask&=~(1<<(hash-4));
-  __critical{SWITCH_RAM_MBC5(2);memset((void *)(eb_target+EB_BITS),0,32);SWITCH_RAM_MBC5(0);}eb_building=1;return;}
- if(!eb_left){editbuffer_ready=1;eb_building=0;return;}
- at=--eb_left;while(eb_buildtrack&&at<eb_newoffsets[eb_buildtrack])eb_buildtrack--;readnote(at,e);hash=e[0]+eb_buildtrack*64;
+ if(!eb_building){eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);eb_generation=pattern_generation;eb_left=total();eb_buildtrack=6;eb_changedmask=editbuffer_valid?0:127;for(hash=0;hash<7;hash++)if(eb_newcounts[hash]!=eb_counts[hash])eb_changedmask|=1<<hash;eb_newmask=7;for(hash=0;hash<3;hash++)if(!eb_newcounts[hash])eb_newmask&=~(1<<hash);for(hash=0;hash<4;hash++)if(seqlength[hash]>64)eb_newmask&=~(1<<hash);for(hash=4;hash<7;hash++)if(eb_newcounts[hash])eb_newmask&=~(1<<(hash-4));
+  __critical{SWITCH_RAM_MBC5(2);memset((void *)(eb_target+EB_BITS),0,32);SWITCH_RAM_MBC5(0);}eb_building=1;}
+ /* Copy a bounded batch, yielding between records for queued input or audio.
+    A main-loop pass can span many video frames during dense drawing. */
+ do {
+ /* Audio service can catch up between records without dispatching grid edits.
+    A mixer launch may replace the resident pattern: abandon that snapshot. */
+ mixfill();
+ if(!seqplaying||eb_slot!=mx.slot||eb_generation!=pattern_generation)return;
+ if(padread!=padwrite)return;
+ if(!eb_left){
+  longest=0;eb_boundarytrack=255;
+  for(hash=0;hash<7;hash++)if((editbuffer_valid?eb_counts[hash]:seqeventcounts[hash])&&seqlength[hash]>longest){longest=seqlength[hash];eb_boundarytrack=hash;}
+  eb_building=0;editbuffer_ready=1;return;
+ }
+ at=--eb_left;while(eb_buildtrack&&at<eb_newoffsets[eb_buildtrack])eb_buildtrack--;readnote(at,e);
+ /* Compare within each lane, so offsets moving after an insertion in some
+    other lane do not invalidate an otherwise identical playback cache. */
+ if(!(eb_changedmask&(1<<eb_buildtrack))){eb_note(eb_offsets[eb_buildtrack]+at-eb_newoffsets[eb_buildtrack],old);if(memcmp(e,old,4))eb_changedmask|=1<<eb_buildtrack;}
+ hash=e[0]+eb_buildtrack*64;
  f=eb_buildtrack<3?notes[e[1]-1+(eb_buildtrack==2?12:0)]:0;v=e[2];if(mx.level[eb_buildtrack]!=127){scaled=(uint16_t)v*mx.level[eb_buildtrack]+63;v=(scaled>>7)+((uint8_t)((scaled&127)+(scaled>>7))>=127);}
  scaled=eb_buildtrack<4?(uint16_t)param[eb_buildtrack][1]*v:0;amp=(scaled+1+(scaled>>7))>>7;
  if(eb_buildtrack==2){amp=v?(v>84?1:v>42?2:3):0;if(amp&&param[2][15]){amp+=param[2][15]-1;if(amp>3)amp=3;}else amp=0;amp<<=5;}mask=1U<<(hash&7);
@@ -64,13 +95,33 @@ void editbuffer_service(void) BANKED {uint8_t e[4],hash,mask,*dst,*bits,*head,v,
  __critical{SWITCH_RAM_MBC5(2);memcpy(dst,e,4);dst[4]=f;dst[5]=f>>8;dst[6]=amp;
  if((*bits&mask)&&eb_buildtrack<4&&e[1]>=*(uint8_t *)(eb_target+(uint16_t)*head*7+1)){uint8_t *link=(uint8_t *)(eb_target+EB_NEXT+*head);*(uint8_t *)(eb_target+EB_NEXT+at)=*link==*head?(uint8_t)at:*link;*link=at;}
  else{*(uint8_t *)(eb_target+EB_NEXT+at)=(*bits&mask)?*head:(uint8_t)at;*head=at;}*bits|=mask;SWITCH_RAM_MBC5(0);}
+ }while(--budget);
+ if(!eb_left){longest=0;eb_boundarytrack=255;for(hash=0;hash<7;hash++)if((editbuffer_valid?eb_counts[hash]:seqeventcounts[hash])&&seqlength[hash]>longest){longest=seqlength[hash];eb_boundarytrack=hash;}eb_building=0;editbuffer_ready=1;}
+}
+/* Publication is shared with the native timer, which must see the new
+   snapshot before triggering a 16-step boundary. Cache invalidation stays foreground. */
+static void eb_publish(void) NONBANKED {
+ editbuffer_base=eb_target;memcpy(eb_counts,eb_newcounts,14);memcpy(eb_offsets,eb_newoffsets,14);
+ eb_activegeneration=eb_generation;editbuffer_irq_mask=eb_newmask;editbuffer_valid=1;
+ editbuffer_ready=0;editbuffer_swaps++;eb_notify|=eb_changedmask;
+}
+void editbuffer_irq_boundary(const uint8_t *position,uint8_t enabled) NONBANKED {
+ if(!editbuffer_ready||seqservicing||eb_boundarytrack>=3||!(enabled&(1<<eb_boundarytrack))||
+    ((uint16_t)position[eb_boundarytrack]+1<seqlength[eb_boundarytrack]&&
+     ((position[eb_boundarytrack]+1)&15))||
+    eb_slot!=mx.slot||eb_generation!=pattern_generation)return;
+ eb_publish();
 }
 void editbuffer_boundary(void) BANKED {uint8_t c,track=255;uint16_t longest=0;
- if(page!=8||!editbuffer_ready||eb_slot!=mx.slot||eb_generation!=pattern_generation)return;
+ eb_notify_foreground();
+ if(!editbuffer_ready||eb_slot!=mx.slot||eb_generation!=pattern_generation)return;
  for(c=0;c<7;c++)if((editbuffer_valid?eb_counts[c]:seqeventcounts[c])&&seqlength[c]>longest){longest=seqlength[c];track=c;}
- if(track!=255&&(uint16_t)seqposition[track]+1<seqlength[track])return;
- __critical{editbuffer_base=eb_target;memcpy(eb_counts,eb_newcounts,14);memcpy(eb_offsets,eb_newoffsets,14);eb_activegeneration=eb_generation;editbuffer_irq_mask=eb_newmask;editbuffer_valid=editbuffer_reading=1;editbuffer_ready=0;editbuffer_swaps++;}
- for(c=0;c<3;c++)eval_chord_dirty(c);eval_drum_dirty();
+ /* Keep the commitment window bounded even when patterns span many bars.
+    A short/odd-length loop can publish sooner at its wrap. Existing gates
+    are retained: activating edits does not retrigger sustained notes. */
+ if(track!=255&&(uint16_t)seqposition[track]+1<seqlength[track]&&((seqposition[track]+1)&15))return;
+ __critical{eb_publish();editbuffer_reading=1;}
+ eb_notify_foreground();
 }
 /* Called only by the timer. Interrupted foreground SRAM transactions always
    restore bank zero before re-enabling interrupts. Never bank ROM here. */

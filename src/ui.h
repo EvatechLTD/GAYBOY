@@ -105,7 +105,7 @@ void ui_flush(void) BANKED {
   for(tile=0;tile<12;tile++){ui_upload_tile(192+tile,wavepixels+368+(uint16_t)tile*16,0);mixfill();}
   ui_font_upload_pending=0;
  }
- if(page>=7||selected==4||ui_transition_hidden){
+ if(page>=7||page==1||page==2||navopen||selected==4||ui_transition_hidden){
   ui_flush_spans();
   if(ui_transition_hidden){ui_transition_hidden=0;SHOW_BKG;}
   if(page==8&&!navopen)seq_playhead();

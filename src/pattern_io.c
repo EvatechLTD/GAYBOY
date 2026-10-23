@@ -19,11 +19,11 @@ __at (0xACCC) uint8_t pattern_dirty;
 __at (0xACCD) uint16_t pattern_generation;
 void storage_sorted_dirty(void) BANKED;
 void seq_native_launch_clear(void) BANKED;
-void mixer_pattern_changed(void) BANKED {pattern_dirty=1;pattern_generation++;seqirqdirty=1;}
+void mixer_pattern_changed(void) BANKED {pattern_dirty=1;pattern_generation++;seqirqdirty=1;seqdeadline=1;}
 void mixer_pattern_clean(void) BANKED {pattern_dirty=0;}
 static uint16_t getword(const uint8_t *p){return p[0]|((uint16_t)p[1]<<8);}static void offsets(void){uint8_t c;uint16_t n=0;for(c=0;c<7;c++){seqeventoffsets[c]=n;n+=seqeventcounts[c];}}
 void defaults(void) BANKED {uint8_t c;mixer_pattern_changed();seqgrouptrack=255;seq_storage_clear();for(c=0;c<7;c++){seqlength[c]=16;seqdefaultvel[c]=127;seqdefaultdur[c]=c==6?0:c==5?4:1;seqgate[c]=100;mx.level[c]=127;mx.pan[c]=3;}drummutemask=drumsolomask=0;seqmuted=seqsolo=seqmode=0;seqbpm=seqglobalbpm?seqglobalbpm:120;seqbeats=seqdenom=4;memset(mx.name,0,17);}
-void applymeta(const uint8_t *meta) BANKED {seqgrouptrack=255;memcpy(seqeventcounts,meta,14);offsets();memcpy(seqlength,meta+14,14);memcpy(seqdefaultdur,meta+28,14);memcpy(seqdefaultvel,meta+42,7);memset(seqgate,100,7);memcpy(mx.level,meta+56,7);memcpy(mx.pan,meta+63,7);seqmuted=meta[70];seqsolo=meta[71];seqbeats=meta[72];seqdenom=meta[73];seqmode=experimental_mode?meta[74]:0;seqbpm=seqglobalbpm?seqglobalbpm:getword(meta+75);drummutemask=getword(meta+77);drumsolomask=getword(meta+79);seqdeadline=1;seqeventfull=0;}
+void applymeta(const uint8_t *meta) BANKED {seqgrouptrack=255;memcpy(seqeventcounts,meta,14);offsets();memcpy(seqlength,meta+14,14);memcpy(seqdefaultdur,meta+28,14);memcpy(seqdefaultvel,meta+42,7);memset(seqgate,100,7);memcpy(mx.level,meta+56,7);memcpy(mx.pan,meta+63,7);seqmuted=meta[70];seqsolo=meta[71];seqbeats=meta[72];seqdenom=meta[73];if(seqbeats<1)seqbeats=1;else if(seqbeats>32)seqbeats=32;if(seqdenom!=2&&seqdenom!=4&&seqdenom!=8&&seqdenom!=16)seqdenom=4;seqmode=experimental_mode?meta[74]:0;seqbpm=seqglobalbpm?seqglobalbpm:getword(meta+75);if(seqbpm<30)seqbpm=30;else if(seqbpm>240)seqbpm=240;if(seqglobalbpm)seqglobalbpm=seqbpm;drummutemask=getword(meta+77);drumsolomask=getword(meta+79);seqdeadline=1;seqeventfull=0;}
 void tailcopy(uint8_t *dst,const uint8_t *src,uint16_t size) BANKED {uint8_t n;while(size){n=size>16?16:size;memcpy(dst,src,n);dst+=n;src+=n;size-=n;mixfill();}}
 
 uint8_t tag(uint8_t s) BANKED {return sparse_enabled==1&&s<8&&sparse_slots[s]!=POOL_NONE?VALID:0;}

@@ -1,0 +1,54 @@
+ARP STRESS TEST - 2026-10-22
+Branch: cleanup
+Fixture: DATA/SAVES/stress-testing/arptest-original.sav (immutable backup).
+Latest save contains P2's four simultaneous 16-step notes, the 32-step Wave
+lane and original drums. ARPTEST appears in naming scratch; resident pad name
+is still P1. Tests use a copy and preserve the original save.
+
+Method
+DMG PyBoy, actual saved pattern, playback active on the P2 sequencer page.
+120 and 240 BPM; straight and triplet timing; divisions 1/4 through 1/256.
+Each case restores the same playback state, settles for 120 frames, records
+360 frames of P2 play() calls, then sends/release four navigation keys and
+uses the actual A button on the mode header to recover to Mono.
+Input acknowledgment is measured through lastpad, not completed screen redraw.
+Mode recovery is checked after release and 180 further frames. Six seconds
+of idle timing per case is a stress sample, not a long-duration safety proof.
+
+Findings
+120 BPM straight: 1/16 navigation acknowledgments about 33..167 ms;
+1/32 about 50..385 ms; 1/64 about 1.1..3.1 seconds. At 1/128 and 1/256 the
+requested arp rate is missed substantially. Triplets reach saturation sooner.
+240 BPM straight: 1/16 navigation about 67..837 ms; 1/32 roughly 1.5..2 sec.
+Every tested case eventually recovered to Mono. No permanent lockup reproduced.
+The four-note chord's mode recoloring separately costs about 1.5..1.7 seconds
+at 120 BPM, even with no full seq_pixels() rebuild; reducing arp speed alone
+will not remove that drawing delay.
+
+Provisional playback limits for THIS fixture
+120 BPM: fastest recommended straight 1/16, triplet 1/8.
+240 BPM: fastest recommended straight 1/8, triplet 1/4.
+These keep requested arp attacks at or below 8/sec (125 ms minimum spacing).
+They avoid the observed saturation cliff, but do not guarantee fast editing,
+low jitter or safety with multiple simultaneous arpeggiators/other heavy work.
+A single division ceiling is insufficient because tempo and triplets matter.
+Arp range has not been changed; this report records a recommendation.
+
+Implemented BPM limit
+Local mixer/sequencer tempo controls cap at 240 BPM. Loaded pattern tempos
+clamp to 30..240; incoming serial tempo estimates/messages above 240 are
+rejected rather than silently rescaled. Drum timing lookup tables still have
+their original entries; extra table entries do not increase hot-path work.
+
+Evidence
+build/arp-stress-final.json and .log: complete 28-case matrix.
+build/arp-stress.json: first fast-rate matrix before BPM cap.
+build/arp-stress-slower.json: slower-rate confirmation.
+tools/test_arp_stress.py: reproducible test using --save PATH.
+tools/test_tempo_limit.py: mixer, sequencer and loaded-save upper-bound checks.
+
+Validation follow-up: MIDI direct-RX fixture now stops hardware serial after
+switching syncmode off by memory. Otherwise an in-flight open-cable transfer
+can overwrite injected bytes with 0xff. MIDI launch and edit/MIDI integration
+checks pass. No MIDI parser/runtime change was made.
+

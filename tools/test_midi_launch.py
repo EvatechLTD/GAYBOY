@@ -11,6 +11,11 @@ def send(*data):
 try:
  enter_app(p,S);choose(18)
  p.memory[S['_syncmode']]=0
+ # This fixture injects bytes into RX directly. Stop hardware serial so an
+ # in-flight open-cable transfer cannot overwrite those bytes with 0xff.
+ p.memory[S['_syncarmed']]=0
+ p.memory[0xff02]=0
+ p.memory[0xffff]=p.memory[0xffff]&~8
  for cc,offset in [(71,0),(72,1),(77,6)]:
   for value in (0,64,127):
    send(0xbf,cc,value)

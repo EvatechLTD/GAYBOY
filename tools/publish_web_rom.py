@@ -48,7 +48,11 @@ def main():
         payloads[name] = (SOURCE / name).read_bytes()
     assert b'emulator/practice-rom.json' in payloads['emulator/player.js']
     assert b'gayboy-browser-sram-0.3-10cc021b' in payloads['emulator/player.js']
-    sys.path.insert(0, str(ROOT.parent / 'VIBECHOPPER/scripts'))
+    access_dir = next((parent / 'VIBECHOPPER/scripts' for parent in ROOT.parents
+                       if (parent / 'VIBECHOPPER/scripts/namehero_access.py').is_file()), None)
+    if access_dir is None:
+        raise RuntimeError('VIBECHOPPER hosting access helper not found beside workspace')
+    sys.path.insert(0, str(access_dir))
     from namehero_access import connect_sftp
     backup = ROOT / 'build/web-rom-publish' / (datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3))
     backup.mkdir(parents=True)

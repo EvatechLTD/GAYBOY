@@ -1,5 +1,7 @@
 #pragma bank 15
 #include "api.h"
+#include "mod_bypass.h"
+#include "lfo_irq.h"
 extern uint8_t globalmod[10];
 extern uint32_t noiseleft[2];
 void seq_native_touch(void) NONBANKED;
@@ -17,8 +19,8 @@ void stop(uint8_t c) BANKED {
  /* A newly committed IRQ attack already replaced this sequencer release. */
  if(!syncmode&&c<2&&seqplaying&&seqservicing&&(seqirqfired&(1<<c)))return;
  if(c==0&&pulsekickleft){if(!eval_audio_release(c))active[c]=0;return;}
- if(experimental_mode&&c<3&&(mono_owned&(1<<c))){if(c==2){wave_track_down=0;eval_note(2,0);if(evalpatch[2][EV_LEVEL_MODE]!=128||!globalmod[3])active[2]=0;}else if(!eval_audio_release(c))active[c]=0;return;}
- if(c==2&&waveengine==3){if(experimental_mode){wave_track_down=0;eval_note(2,0);if(evalpatch[2][EV_LEVEL_MODE]!=128||!globalmod[3])active[2]=0;}return;}
+ if(experimental_mode&&c<3&&(mono_owned&(1<<c))){if(c==2){wave_track_down=0;eval_note(2,0);if(!MOD_LEVEL(2)||!globalmod[3])active[2]=0;}else if(!eval_audio_release(c))active[c]=0;return;}
+ if(c==2&&waveengine==3){if(experimental_mode){wave_track_down=0;eval_note(2,0);if(!MOD_LEVEL(2)||!globalmod[3])active[2]=0;}return;}
  if(experimental_mode&&c==3&&drumnoiseowned){if(!eval_audio_release(c))active[c]=0;return;}
  if(!monomode&&c==2&&evalwaveactive){wave_track_down=0;eval_note(2,0);if(exp_off()&4)return;}
  if(eval_audio_release(c))return;
@@ -96,7 +98,7 @@ void service_frame(void) BANKED {uint16_t now,delta;uint8_t users=0,needed=0;__c
   if(seqplaying&&!syncmode&&!seqservicing&&delta<seqdeadline&&seqdeadline-delta<=8)return;
   delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;
   {
-   if(eval_moddirty||eval_modgeneration!=pattern_generation)eval_mod_configure();
+   if(eval_moddirty||eval_modgeneration!=pattern_generation)eval_mod_configure();if((eval_lfousers&7)||lfo_irq_mask)lfo_irq_prepare(seqirqdirty);
    if(eval_lfousers||eval_envusers){
     if(active[0]&&!pulsekickleft)users|=1;if(active[1])users|=2;
     if(active[2]&&waveengine!=3)users|=4;if(active[3]&&!drumnoiseowned)users|=8;

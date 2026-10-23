@@ -20,11 +20,11 @@ static uint8_t gen_drum_variation(uint8_t velocity,uint16_t step,uint8_t variati
  }
  return velocity;
 }
-static uint8_t gen_bar_steps(uint8_t beats,uint8_t denominator){return beats*(16/denominator);}
+static uint16_t gen_bar_steps(uint8_t beats,uint8_t denominator){return beats*(16/denominator);}
 /* Euclidean hits are distributed evenly, including a hit at the origin.
    Rotation moves onsets later; it never changes the hit count. */
-static uint8_t gen_onset(uint16_t step,uint8_t bar,uint8_t rhythm,uint8_t hits,uint8_t rotation){
- uint8_t p=(step%bar+bar-rotation%bar)%bar;
+static uint8_t gen_onset(uint16_t step,uint16_t bar,uint8_t rhythm,uint8_t hits,uint8_t rotation){
+ uint16_t p=(step%bar+bar-rotation%bar)%bar;
  switch(rhythm){
  case 0:return !(p%4);
  case 1:return !(p%2);
@@ -35,16 +35,16 @@ static uint8_t gen_onset(uint16_t step,uint8_t bar,uint8_t rhythm,uint8_t hits,u
  default:if(hits>bar)hits=bar;return ((uint16_t)p*hits)%bar<hits;
  }
 }
-static uint16_t gen_chord_steps(uint8_t bar,uint8_t change){
+static uint16_t gen_chord_steps(uint16_t bar,uint8_t change){
  return change<2?4U<<change:(uint16_t)bar*(1U<<(change-2));
 }
 /* CHANGES follows harmonic rhythm; other masks remain independent of pitch. */
-static uint8_t gen_rhythm_onset(uint16_t step,uint8_t bar,uint8_t rhythm,uint8_t hits,uint8_t rotation,uint8_t change){
+static uint8_t gen_rhythm_onset(uint16_t step,uint16_t bar,uint8_t rhythm,uint8_t hits,uint8_t rotation,uint8_t change){
  return rhythm==7?!(step%gen_chord_steps(bar,change)):gen_onset(step,bar,rhythm,hits,rotation);
 }
 /* Simultaneous diatonic triads, in root position or either inversion.
    Pentatonic melody uses natural-minor harmony so triads retain their quality. */
-static void gen_chord_notes(uint16_t step,uint8_t bar,uint8_t progression,uint8_t change,
+static void gen_chord_notes(uint16_t step,uint16_t bar,uint8_t progression,uint8_t change,
  uint8_t root,uint8_t scale,uint8_t octave,uint8_t inversion,uint8_t variation,
  uint16_t seed,uint8_t *notes){
  static const uint8_t thirds[]={0,2,4,7,9};
@@ -61,7 +61,7 @@ static void gen_chord_notes(uint16_t step,uint8_t bar,uint8_t progression,uint8_
 }
 /* A two-bar motif repeats over the harmony. Variation changes pitch only,
    at weak positions near phrase endings; rhythm remains an explicit mask. */
-static uint8_t gen_pitch(uint16_t step,uint8_t bar,uint8_t role,uint8_t progression,
+static uint8_t gen_pitch(uint16_t step,uint16_t bar,uint8_t role,uint8_t progression,
  uint8_t change,uint8_t contour,uint8_t variation,uint8_t root,uint8_t scale,
  uint8_t octave,uint16_t seed){
  uint8_t chord,phase,r,degree,third,index,offset,pc;uint16_t note,motif=step%(bar*2U);
@@ -91,7 +91,7 @@ static uint8_t gen_pitch(uint16_t step,uint8_t bar,uint8_t role,uint8_t progress
  return (uint8_t)note+1;
 }
 /* A zero event duration encodes 256 steps in sparse storage. */
-static uint8_t gen_duration(uint16_t step,uint16_t length,uint8_t bar,uint8_t rhythm,
+static uint8_t gen_duration(uint16_t step,uint16_t length,uint16_t bar,uint8_t rhythm,
  uint8_t hits,uint8_t rotation,uint8_t setting,uint8_t change){
  uint16_t duration=1,next=step+1,limit;
  if(setting<5)duration=1U<<setting;else duration=length-step;

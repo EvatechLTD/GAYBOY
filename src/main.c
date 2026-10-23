@@ -4,9 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "api.h"
+#include "mod_bypass.h"
 #include "link_control.h"
 #include "mixer_shared.h"
 #include "notes.h"
+#include "lfo_irq.h"
 #define REG(a) (*(volatile uint8_t *)(a))
 volatile uint8_t rx[256],wr,rd,overflow;
 extern volatile uint8_t link_rx_ready,link_peer_capable;
@@ -62,7 +64,7 @@ void liveparam(uint8_t c,uint8_t i){uint8_t *v=param[c];if(c==0&&pulsekickleft||
  else if(i==8){if(c<3)updatepitch(c);else NR44_REG=v[8]<<6;}
  else if(i==9){uint8_t mask=(1<<c)|(0x10<<c);route&=~mask;if(!v[9]){if(v[21]&1)route|=1<<c;if(v[21]&2)route|=0x10<<c;}NR51_REG=route;}
  else if(i==14&&c==2){custom=0;wavepending=1;}
- else if(i==15&&c==2)NR32_REG=(evalpatch[2][EV_LEVEL_MODE]==128?(3*eval_signal(0,0)/64?4-3*eval_signal(0,0)/64:0):v[15])<<5;
+ else if(i==15&&c==2)NR32_REG=(MOD_LEVEL(2)?(3*eval_signal(0,0)/64?4-3*eval_signal(0,0)/64:0):v[15])<<5;
  else if(i==16&&c==2)NR31_REG=v[16];
  else if(i==17&&c==2){if(v[17])stop(c);}
  else if(i>=18&&i<=20&&c==3)NR43_REG=(v[18]<<4)|(v[19]<<3)|v[20];
@@ -70,7 +72,7 @@ void liveparam(uint8_t c,uint8_t i){uint8_t *v=param[c];if(c==0&&pulsekickleft||
 }
 uint8_t eval_attack_volume(uint8_t c,uint8_t vel) BANKED;
 uint8_t editirq_owned(uint8_t c) NONBANKED;
-void play(uint8_t c,uint8_t note,uint8_t vel){uint8_t *v=param[c],vol;uint16_t f,amplitude;
+void play(uint8_t c,uint8_t note,uint8_t vel){uint8_t *v=param[c],vol,ie;uint16_t f,amplitude;
 
  if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}
  if(c==2&&waveengine&&!(experimental_mode&&waveengine==3)){enginenote(note,vel,0);return;}
@@ -79,13 +81,15 @@ void play(uint8_t c,uint8_t note,uint8_t vel){uint8_t *v=param[c],vol;uint16_t f
  if(seqservicing&&editirq_owned(c))return;
  tablerow[c]=tablepos[c];if(c<3)f=pitchvalue(c);else f=0;amplitude=(uint16_t)v[1]*vel;/* Exact floor(x/127), x <= 15*127. */vol=(amplitude+1+(amplitude>>7))>>7;if(experimental_mode&&c!=2)vol=eval_attack_volume(c,vel);
  if(c<2){uint16_t base;if(!syncmode&&(seqirqsuppress&(1<<c))){if(v[9]||v[22])stop(c);return;}base=c?0xff16:0xff11;if(!c)NR10_REG=(v[4]<<4)|(v[5]<<3)|v[6];
- REG(base)=(v[0]<<6)|v[7];REG(base+1)=experimental_mode&&evalpatch[c==1&&eval_mode(0)==2?0:c][EV_LEVEL_MODE]==128?(vol<<4)|8:!vol&&!v[2]?8:(vol<<4)|(v[2]<<3)|v[3];REG(base+2)=(uint8_t)f;REG(base+3)=0x80|(v[8]<<6)|(f>>8);
- }else if(c==2){if(1){wave();wavepending=0;NR30_REG=v[17]?0:0x80;NR31_REG=v[16];NR32_REG=(evalpatch[2][EV_LEVEL_MODE]==128?(3*eval_signal(0,0)/64?4-3*eval_signal(0,0)/64:0):v[15])<<5;NR33_REG=(uint8_t)f;NR34_REG=0x80|(v[8]<<6)|(f>>8);}
- }else{NR41_REG=v[7];NR42_REG=experimental_mode&&evalpatch[3][EV_LEVEL_MODE]==128?(vol<<4)|8:(vol<<4)|(v[2]<<3)|v[3];NR43_REG=(v[18]<<4)|(v[19]<<3)|v[20];NR44_REG=0x80|(v[8]<<6);}
+ REG(base)=(v[0]<<6)|v[7];REG(base+1)=experimental_mode&&MOD_LEVEL(c==1&&eval_mode(0)==2?0:c)?(vol<<4)|8:!vol&&!v[2]?8:(vol<<4)|(v[2]<<3)|v[3];/* Foreground synthesis may span an LFO edge. Refresh immediately at the
+    attack so a stale computed pitch cannot overwrite the timer's new phase. */
+ ie=IE_REG;IE_REG=0;if(lfo_irq_mask&(1<<c))f=lfo_irq_pitch(c,note);REG(base+2)=(uint8_t)f;REG(base+3)=0x80|(v[8]<<6)|(f>>8);IE_REG=ie;
+ }else if(c==2){if(1){wave();wavepending=0;NR30_REG=v[17]?0:0x80;NR31_REG=v[16];NR32_REG=(MOD_LEVEL(2)?(3*eval_signal(0,0)/64?4-3*eval_signal(0,0)/64:0):v[15])<<5;ie=IE_REG;IE_REG=0;if(lfo_irq_mask&4)f=lfo_irq_pitch(2,note);NR33_REG=(uint8_t)f;NR34_REG=0x80|(v[8]<<6)|(f>>8);IE_REG=ie;}
+ }else{NR41_REG=v[7];NR42_REG=experimental_mode&&MOD_LEVEL(3)?(vol<<4)|8:(vol<<4)|(v[2]<<3)|v[3];NR43_REG=(v[18]<<4)|(v[19]<<3)|v[20];NR44_REG=0x80|(v[8]<<6);}
  if(v[9]||v[22])stop(c);else eval_audio_note(c);
 }
 void cc_apply(uint8_t c,uint8_t n,uint8_t x) BANKED;
-void cc(uint8_t c,uint8_t n,uint8_t x){cc_apply(c,n,x);seq_native_touch();if(!syncmode)seq_irq_refresh(c);}
+void cc(uint8_t c,uint8_t n,uint8_t x){cc_apply(c,n,x);seq_native_touch();seq_irq_refresh(c);}
 void eval_polyload(uint8_t n) BANKED;
 void polyload(uint8_t n){eval_polyload(n);}
 void polynote(uint8_t n,uint8_t v){(void)n;(void)v;}

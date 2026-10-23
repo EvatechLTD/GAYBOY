@@ -44,6 +44,9 @@ void roll_edit_batch(uint8_t enabled) BANKED {feedbackbatch=enabled;if(!enabled&
 extern volatile uint8_t padsampled,padread,padwrite;
 void roll_feedback_cancel(void) BANKED {feedbackpending=feedbackphase=feedbackbatch=0;}
 static void feedback_velocity_queue(uint8_t c,uint8_t col,uint8_t value){if(feedbacktrack!=c||feedbackbase!=seqbase||feedbackrow!=drumrow){feedbackpending=feedbackphase=0;}feedbacktrack=c;feedbackbase=seqbase;feedbackrow=drumrow;feedbackvel[col]=value;feedbackpending|=1U<<col;feedbackphase=0;}
+/* Native edits share the idle velocity-bar queue instead of forcing a second
+   track scan and synchronous three-row redraw from the input handler. */
+void roll_velocity_queue(uint8_t c,uint8_t col,uint8_t value) BANKED {feedback_velocity_queue(c,col,value);}
 void roll_feedback_velocity_row(void) BANKED {drum_velocity_refresh();}
 
 static uint8_t feedback_ready(uint8_t c){return page==8&&!navopen&&!seqpopup&&seqdrawvalid==1&&seqfontdirty&&rollcache[0]==168&&(!rollbuilding||feedbackbatch)&&seqviewtrack==c&&seqtrack==c&&seqviewbase==seqbase&&seqviewcols==seqcols&&(c==6||seqviewtop==seqtop[c]);}
@@ -237,14 +240,7 @@ handle_store$:
  __endasm;}
 
 /* One slider scanline-row per idle frame. Queued input always wins. */
-void roll_feedback_service(void) BANKED {uint8_t col,height,row,left,width;uint16_t at;if(seqtrack==6){drum_velocity_service();return;}if(!feedbackpending)return;if(!feedback_ready(feedbacktrack)||seqcols!=16||seqvelocityhidden||feedbackbase!=seqbase||feedbackrow!=drumrow){feedbackpending=feedbackphase=0;return;}if(padread!=padwrite||padsampled&(J_A|J_B|J_LEFT|J_RIGHT|J_UP|J_DOWN|J_START|J_SELECT))return;for(col=0;col<16;col++)if(feedbackpending&(1U<<col))break;if(col>=16){feedbackpending=0;return;}height=feedbackvel[col]?1+((uint16_t)feedbackvel[col]*20)/127:0;row=14+feedbackphase;roll_feedback_begin();feedback_region(rollx[col],rollx[col+1],row*8,row*8+8,0,1+height);if(seqtileoverflow){feedbackpending=0;roll_clear_transition();seqfontdirty=seqdrawvalid=0;dirty=1;return;}roll_commit();left=rollx[col]>>3;width=((rollx[col+1]+7)>>3)-left;at=(uint16_t)(row+1)*20+left;ui_upload_map(0x9800U+(uint16_t)(row+1)*32+left,canvas+at,width);memcpy(visible+at,canvas+at,width);if(++feedbackphase==3){feedbackphase=0;feedbackpending&=~(1U<<col);rolloldvel[col]=height;}}
-
-static uint8_t *feedback_header_number(uint8_t *dst,uint16_t value,uint8_t base){uint8_t digit,hundreds=value>=100;if(hundreds){digit=value/100;*dst++='0'+digit-32+base;value-=digit*100;}if(hundreds||value>=10){digit=value/10;*dst++='0'+digit-32+base;value-=digit*10;}*dst++='0'+value-32+base;return dst;}
-__at (0xA428) static uint8_t feedbackheader[7];
-__at (0xA42F) static uint16_t feedbacklength;
-__at (0xA431) static uint8_t feedbackfirst;
-__at (0xA432) static uint8_t feedbackheadvalid;
-void roll_header_range(void) BANKED {uint8_t base=seqhead!=4?96:0,*dst,i;if(feedbackheadvalid!=113||feedbacklength!=seqlength[seqtrack]||feedbackfirst!=seqbase){memset(feedbackheader,0,7);dst=feedback_header_number(feedbackheader,(uint16_t)seqbase+1,0);*dst++='/'-32;feedback_header_number(dst,seqlength[seqtrack],0);feedbackheadvalid=113;feedbacklength=seqlength[seqtrack];feedbackfirst=seqbase;}for(i=0;i<7;i++)canvas[13+i]=feedbackheader[i]+base;}
+void roll_feedback_service(void) BANKED {uint8_t col,height,row,left,width;uint16_t at;if(seqtrack==6){drum_velocity_service();return;}if(!seqdrawvalid)return;if(!feedbackpending)return;if(!feedback_ready(feedbacktrack)||seqcols!=16||seqvelocityhidden||feedbackbase!=seqbase||feedbackrow!=drumrow){feedbackpending=feedbackphase=0;return;}if(padread!=padwrite||padsampled&(J_A|J_B|J_LEFT|J_RIGHT|J_UP|J_DOWN|J_START|J_SELECT))return;for(col=0;col<16;col++)if(feedbackpending&(1U<<col))break;if(col>=16){feedbackpending=0;return;}height=feedbackvel[col]?1+((uint16_t)feedbackvel[col]*20)/127:0;row=14+feedbackphase;roll_feedback_begin();feedback_region(rollx[col],rollx[col+1],row*8,row*8+8,0,1+height);if(seqtileoverflow){feedbackpending=0;roll_clear_transition();seqfontdirty=seqdrawvalid=0;dirty=1;return;}roll_commit();left=rollx[col]>>3;width=((rollx[col+1]+7)>>3)-left;at=(uint16_t)(row+1)*20+left;ui_upload_map(0x9800U+(uint16_t)(row+1)*32+left,canvas+at,width);memcpy(visible+at,canvas+at,width);if(++feedbackphase==3){feedbackphase=0;feedbackpending&=~(1U<<col);rolloldvel[col]=height;}}
 
 uint8_t roll_group_add(uint8_t c,const uint8_t *e,uint16_t index) BANKED {uint16_t count;if(!roll_note_feedback(c,e,0))return 0;if(c==6){count=seq_event_count(c);rollcache[1]=count;rollcache[3]=count>>8;if(e[0]>=seqbase&&(uint16_t)e[0]<seqbase+seqcols)fastcells[DRUM_VIEW_ROW(e[1]-1)][e[0]-seqbase]=index+1;}return 1;}
 

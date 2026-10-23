@@ -1,0 +1,96 @@
+ARP UI RESPONSE AUDIT - 2026-10-22
+Branch: cleanup; experimental, unmerged
+ROM: build/GAYBOY-arp-ui.gb
+SHA256: 2c86a3d59dc8ff70d12b1904c9d69f15e9ee3a69d7b8fb7ddf1fea2f0b62e94a
+
+Changes
+- Menu and instrument/modulation pages use the existing changed-span map uploader.
+- Map uploads yield between rows when input is queued, except hidden transitions.
+- Foreground sequencer catch-up yields after a slice when input is queued on any page.
+- Shorten the native timer countdown, retain exact elapsed/deadline/wrap behavior.
+- Compute DIV fractional elapsed time with byte arithmetic instead of word shifts.
+- Split heavy fallback wait/attack frames out of idle/native foreground polling.
+- Skip inactive arp scans and impossible native preparation for random orders.
+- Normal native phase wrap subtracts once; large catch-up retains remainder fallback.
+- Retain continuous native packets across unrelated edit generations after checking
+  their actual rate, instrument, mixer level and sequence length.
+- This last check fixes late redundant foreground retriggers at loop boundaries.
+- Current limits remain straight/dotted 1/32, triplet 1/16, free 1..16 Hz, BPM<=240.
+
+Measurement
+- DMG PyBoy with the preserved four-note P2 ARPTEST, Wave and original drums.
+- Baseline: build/GAYBOY-arp-limits.gb; identical capped settings and saved pattern.
+- Saved AUTO/link-master configuration uses 1024 timer interrupts/sec with no peer.
+- Internal-clock run explicitly disables link sync and uses the ordinary 256 Hz timer.
+- Input acknowledgment measures sampled edge to lastpad consumption, not finished drawing.
+- Timed entry/return hooks use emulated CPU cycles, not host execution time.
+- Inclusive function spans overlap. Timer percentages below are the measured handler
+  body including its callees, not total CPU utilization or all arp-related work.
+- The foreground busy-loop uses remaining cycles; screen-scan percentages include
+  repeated comparison work and are not equivalent to the cost of drawing one frame.
+
+Menu navigation: typical / worst acknowledgment (ms)
+Saved AUTO/link master
+  120 BPM off         150.7 /   200.9 ->    33.5 /    67.0
+  120 BPM native      234.4 /   318.1 ->    33.5 /    83.7
+  120 BPM random      242.8 /   368.3 ->    33.5 /    83.7
+  120 BPM modulated   326.5 /   485.5 ->    67.0 /   133.9
+  240 BPM off         200.9 /   385.1 ->    50.2 /   133.9
+  240 BPM native      142.3 /  1155.2 ->    92.1 /   251.1
+  240 BPM random     1004.6 /  1088.3 ->   426.9 /   452.1
+  240 BPM modulated  1439.9 /  1473.4 ->   519.0 /   552.5
+Timer handler body share of measured cycles (off / native arp)
+  120 BPM: 23.24 / 37.66% -> 23.24 / 34.61%
+  240 BPM: 23.80 / 39.60% -> 23.80 / 37.36%
+
+Internal clock
+  120 BPM off          83.7 /   117.2 ->    33.5 /    50.2
+  120 BPM native       92.1 /   117.2 ->    33.5 /    50.2
+  120 BPM random      117.2 /   133.9 ->    33.5 /    50.2
+  120 BPM modulated   125.6 /   167.4 ->    33.5 /    50.2
+  240 BPM off         108.8 /   150.7 ->    33.5 /    50.2
+  240 BPM native      125.6 /   184.2 ->    33.5 /    50.2
+  240 BPM random      293.0 /   452.1 ->    50.2 /   117.2
+  240 BPM modulated   602.7 /  1021.3 ->    67.0 /   133.9
+Timer handler body share of measured cycles (off / native arp)
+  120 BPM: 4.57 / 10.30% -> 4.57 / 9.55%
+  240 BPM: 4.57 / 12.96% -> 4.57 / 12.25%
+
+Audio and gestures: actual APU trigger-write intervals
+  paint: 14 conditions; max gesture interval error 0.717 ms; applied 14/14; input timeouts []
+    120 BPM 1/32: max input 234.4 ms, audio error 0.248 ms
+  select: 14 conditions; max gesture interval error 1.422 ms; applied 14/14; input timeouts [(240, '1/32', 'straight')]
+    120 BPM 1/32: max input 184.2 ms, audio error 0.002 ms
+  drag: 14 conditions; max gesture interval error 1.424 ms; applied 14/14; input timeouts [(240, '1/32', 'straight')]
+    120 BPM 1/32: max input 954.3 ms, audio error 0.109 ms
+  free: 6 conditions; max gesture interval error 0.485 ms; applied 6/6; input timeouts []
+
+Limits
+- Dense chord dragging and selection remain costly, especially at 240 BPM.
+- Some edit inputs still exceed the six-second test bound; successful final edit
+  application does not mean all intermediate inputs were timely.
+- Random/modulated fallback arps remain much more expensive than native packets.
+- Source changes do not remove logical phase maintenance entirely; it remains
+  necessary for fallback/ownership handoffs and retained-phase transport.
+- WRAM headroom 1154 ->1127 bytes (27 bytes for packet-input validation); stack512 unchanged.
+- Emulator evidence requires hardware validation. No merge, commit or push.
+
+Validation
+- 160 timer countdown/deadline/zero/disabled/wrap cases match the capped baseline.
+- 47 order/clock/velocity/retain traces match the capped baseline.
+- 120 unrelated edit generations at240 BPM triplet: baseline falsely retriggers3
+  times; new build0, max interval error0.780ms.
+- Eleven arp orders, stop, retained resume and all three native APU voices.
+- Simultaneous arps with PCM Wave ownership, zero mixer level, LFO fallback.
+- UI/free/saved rate caps; eight instrument/mod/menu map completion cases.
+- Playback buffer state, 16 drag-release cases, incremental headers, load cancel,
+  BPM cap, MIDI held launch and duplicate-pad Wave continuity regressions.
+- Real two-ROM TWINK cable test passed, including reconnect.
+- Final-ROM TWINK+native arp+PCM sustain:8000 frames,554/554 packets,
+  zero packet errors, bad sustain frames, unarmed transfers, aborts or failures.
+
+Evidence
+- tools/profile_arp_ui.py and build/arp-menu[-internal]-{before,final}.json
+- tools/test_arp_countdown.py, test_arp_continuity.py, test_arp_menu_upload.py
+- build/arp-ui-{paint,select,drag}-{before,final}.json and free-final.json
+- All original saves and capped baseline artifacts preserved.

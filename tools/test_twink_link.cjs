@@ -55,10 +55,11 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  choose(27);core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));until(()=>v(1,'monocount')>0,200);assert.equal(v(1,'held'),60);assert.equal(v(1,'monovel'),111);assert(v(1,'twink_running'));
  assert(v(0,'seqowned')>0,'Local P1 remains independently sequenced');const pulses=word(1,'twink_pulses');run(60);assert.notEqual(word(1,'twink_pulses'),pulses);assert.equal(v(1,'twink_link'),1);
  core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));run(20);assert.equal(v(1,'monocount'),0);assert.equal(v(1,'twink_running'),0);
- // Round-trip MS through the normal pattern archive UI.
+ // Round-trip MS through the normal pattern archive UI. Slot assignment
+ // precedes metadata restore; wait for the complete handoff before reading.
  choose(20);put(0,'mx',0,6);press(0,'b');run(60);if(v(0,'page')===26){press(0,'up');press(0,'a');run(40);}
- choose(18);put(0,'mx',31,4);press(0,'a');until(()=>v(0,'mx',1)===1);assert.equal(word(0,'seqeventcounts',10),0,'Other pattern has independent MS notes');
- put(0,'mx',30,4);press(0,'a');until(()=>v(0,'mx',1)===0);assert.equal(word(0,'seqeventcounts',10),1,'MS pattern save/restore');
+ choose(18);put(0,'mx',31,4);press(0,'a');until(()=>v(0,'mx',1)===1&&!v(0,'seqservicing'));assert.equal(word(0,'seqeventcounts',10),0,'Other pattern has independent MS notes');
+ put(0,'mx',30,4);press(0,'a');until(()=>v(0,'mx',1)===0&&!v(0,'seqservicing'));assert.equal(word(0,'seqeventcounts',10),1,'MS pattern save/restore');
  choose(27);if(v(0,'seqplaying')){core._link_key(0,6,1);until(()=>v(0,'lastpad')&64);press(0,'a');core._link_key(0,6,0);until(()=>!(v(0,'lastpad')&64));}
  // Tempo changes while stopped and reconnect need no transport restart.
  writeword(0,'seqbpm',30);writeword(0,'seqglobalbpm',30);until(()=>word(1,'twink_bpm')===30);

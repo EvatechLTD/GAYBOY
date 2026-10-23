@@ -7,6 +7,7 @@ from mod_port_harness import Engine
 ap = argparse.ArgumentParser(description=__doc__)
 ap.add_argument('--before', default='build/mod-port-baseline/GAYBOY.gb')
 ap.add_argument('--after', default='build/GAYBOY.gb')
+ap.add_argument('--phase-only', action='store_true', help='Compare an already optimized baseline without requiring another CPU reduction')
 args = ap.parse_args()
 engines = [Engine(args.before), Engine(args.after)]
 try:
@@ -53,7 +54,8 @@ try:
         costs.append(sum(E.call('eval_frame')[1] for _ in range(32)) / 32)
         E.put('frameadvance', 255)
         gap_costs.append(E.call('eval_frame')[1])
-    assert costs[1] < costs[0]
+    if not args.phase_only:
+        assert costs[1] < costs[0]
     # Catch-up is infrequent but must remain bounded, rather than looping 255
     # times. Allow the extra quotient/remainder work compared to old main.
     assert gap_costs[1] < 32768, gap_costs

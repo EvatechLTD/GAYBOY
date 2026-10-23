@@ -1,0 +1,72 @@
+NATIVE ARP TIMER PROTOTYPE - 2026-10-22
+Branch: cleanup; experimental, unmerged
+ROM: MAIN/build/GAYBOY-arp.gb
+SHA256: f64c6de0dd1b3d33ff47de0f04b54fb17def5bea3dfc0c392289f7eedb0f3fa3
+Fixture SHA256: 45aa692325bdc4546e4401434d83d84fffcb34ff122c55057b3897ac0f65e712
+
+Implementation
+- Cache chord note ranks/frequencies and rate quotient/remainders.
+- Compile common ordered chords (up to four notes) into native APU packets.
+- A small timer countdown drives attacks; packet work runs only at a deadline.
+- Packet updates are staged and published atomically after foreground catch-up.
+- Preserve logical foreground phase while the timer owns audible attacks.
+- Handle musical loop retriggering in the timer; retain free phase when disabled.
+- Keep unchanged packets playing during unrelated edits and across UI pages.
+- Respect shared P1/Wave ownership, zero mixer level, mute/solo and transport.
+- Retain generic synthesis for random orders, larger chords, pitch/modulation,
+  ADSR, tables, swing and externally clocked slave playback.
+- Use the existing DIV time accounting through native/PCM timer changes.
+- Skip arp preparation and timer calls when arps are inactive.
+
+Matched saved-pattern results (DMG PyBoy, actual hardware trigger writes)
+120 BPM, straight timing; original four-note P2 chord, Wave and drums active.
+Rate       Before max error   After max error   Before worst input   After worst input
+1/64         65.196 ms         0.352 ms        3080.7 ms            267.9 ms
+1/128        79.134 ms         0.348 ms        2578.4 ms            368.3 ms
+
+At 120 BPM / 1/128, max timing error during gestures:
+- paint: 0.112 ms; worst input acknowledgment 267.9 ms
+- select: 0.355 ms; worst input acknowledgment 368.3 ms
+- drag: 0.354 ms; worst input acknowledgment 1758.0 ms
+
+Freerun, retrigger disabled, 120 BPM:
+- 16ms: max interval error 0.712 ms; worst input acknowledgment 368.3 ms
+- 8ms: max interval error 1.026 ms; worst input acknowledgment 870.6 ms
+
+Limits and interpretation
+- This is an emulator-tested prototype, not a hardware-qualified release.
+- 172 measured conditions include overload cases; they are not 172 usability passes.
+- 240 BPM at the fastest divisions and 2-4 ms freerun can still starve input.
+- A missing acknowledgment means no response within the six-second test bound.
+- Dense chord dragging remains slow to draw even while its arp stays regular.
+- Freerun with RETRIGGER ON intentionally shortens some intervals at bar reset;
+  the retained-phase matrix separates this behavior from timing jitter.
+- Arp/LFO ranges remain unchanged. The earlier 240 BPM cap remains in place.
+- Native fast mode currently covers deterministic orders and ordinary native
+  voices. LFO/ADSR/pitch-modulated, random and larger-chord arps still fall back.
+- LFO algorithm/limits are unchanged; 1836 phase/clock comparisons match baseline.
+- No-arp navigation median/max input acknowledgments remain about 33.5/83.7 ms.
+  Matched navigation gesture duration was 3.48 s before vs 3.78 s after;
+  idle timing remains below 1 ms in that separate fixture.
+- WRAM headroom: 1736 -> 1154 bytes; 512-byte reserved stack unchanged.
+
+Validation
+- Eleven order/stop cases and 47 baseline order/velocity/clock configurations.
+- Native P1/P2/Wave together; PCM stealing/return; zero level and LFO fallback.
+- Arps continue through instrument/mixer/sequencer pages; retained stop/resume.
+- Edit-buffer state/drag release, chord drawing, 48 PCM gate/restart cases.
+- MIDI held launch and editing integration; duplicate-pad continuity.
+- TWINK real emulated cable: UI, MS archive, clocks, stop, reconnect, MIDI toggle.
+- TWINK with local native arp plus PCM: 8000 frames, 553/553 packets,
+  zero packet errors, unarmed transfers, aborts or bad sustain samples.
+- Save/tempo, load cancel and prior Wave whole-note regression checks.
+
+Evidence
+- build/arp-review-{tempo,alone,free,free-retain,paint,select,drag}.json/.log
+- build/arp-reference-tempo.json/.log: immutable pre-optimization baseline.
+- build/arp-noarp-before.json and arp-noarp-final.json: arps disabled.
+- DATA/SAVES/stress-testing/arptest-original.sav is preserved unmodified.
+- Its four-note P2 content identifies the requested ARPTEST fixture; the
+  resident pad name is P1 and ARPTEST was in naming scratch in the original save.
+- Trial save is a separate copy, named ARPTEST and set to 120 BPM / 1/128.
+- No commits, merge, push or website/download deployment performed.

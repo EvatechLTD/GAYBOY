@@ -47,14 +47,19 @@ void mixer_pattern_changed(void) BANKED;
 extern uint8_t seqrecordtrack;
 void seq_record_finish(void) BANKED;
 /* A427 is dedicated input state; B4E3 overlaps the retained grid tiles. */
-void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();edge=ui_repeat(p,edge);for(i=0;i<repeatsteps;i++){mixfill();/* Only value gestures can change a tone; grid mutations mark themselves. */if(edge&&!navopen&&!(p&(J_START|J_SELECT))&&page!=8&&(page<18||page==23)&&(p&(J_A|J_B)))mixer_pattern_changed();ui_action(p,edge);}*(uint8_t *)0xA427=0;}
+void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();edge=ui_repeat(p,edge);
+ /* A slow paint/drag must not turn elapsed repeat time into eight expensive
+    edits before the next input edge can be handled. Keep real queued edges;
+    bound only synthetic held-button catch-up and discard its time debt. */
+ if(page==8&&!navopen&&!seqhead&&!seqfocus&&(p&(J_A|J_B))&&repeatsteps>2){repeatsteps=2;__critical{repeatlast=sys_time;}}
+ for(i=0;i<repeatsteps;i++){mixfill();/* Only value gestures can change a tone; grid mutations mark themselves. */if(edge&&!navopen&&!(p&(J_START|J_SELECT))&&page!=8&&(page<18||page==23)&&(p&(J_A|J_B)))mixer_pattern_changed();ui_action(p,edge);}*(uint8_t *)0xA427=0;}
 
 /* Durations are one byte (zero means256); avoid a generic32-bit multiply
    in the real-time onset path. Validated tempo/gate bounds fit24 bits. */
 static uint32_t gate_multiply(uint32_t value,uint8_t count){uint32_t total=0;while(count){if(count&1)total+=value;count>>=1;if(count)value<<=1;}return total;}
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED {uint32_t total=duration?gate_multiply(units,duration):(uint32_t)units<<8;(void)gate;return total?total:1;}
 
-void load(uint8_t c,uint8_t n) BANKED {seq_native_touch();keycount[c]=0;stop(c);memcpy(param[c],patch(n)->v,26);memset(mods[c],0,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=0;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;if(!syncmode)seq_irq_refresh(c);dirty=1;}
+void load(uint8_t c,uint8_t n) BANKED {seq_native_touch();keycount[c]=0;stop(c);memcpy(param[c],patch(n)->v,26);memset(mods[c],0,6);phase[c]=age[c]=stepclock[c]=0;tablemode[c]=0;tablelen[c]=(patch(n)->tconfig>>2)+1;stocktable(c,patch(n)->table);tablepos[c]=notestep[c]=0;program[c]=n;held[c]=255;bend[c]=0;wheellast[c]=8192;route&=~((1<<c)|(0x10<<c));if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;NR51_REG=route;edited[c]=0;if(c==2)custom=0;seq_irq_refresh(c);dirty=1;}
 
 void eval_polyload(uint8_t n) BANKED {(void)n;}
 void eval_polyevent(uint8_t t,uint8_t a,uint8_t b) BANKED {(void)t;(void)a;(void)b;}

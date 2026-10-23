@@ -1,0 +1,104 @@
+GENERATED ARP VS LIVE ARP - MATCHED-TEMPO EXPERIMENT
+2026-10-22; cleanup branch; no production changes for this experiment
+
+Frozen ROM: build\GAYBOY-arp-ui.gb
+SHA256: 2c86a3d59dc8ff70d12b1904c9d69f15e9ee3a69d7b8fb7ddf1fea2f0b62e94a
+Original save SHA256: 45aa692325bdc4546e4401434d83d84fffcb34ff122c55057b3897ac0f65e712
+
+Question
+Can the existing1/16 sequencer at240 BPM play the same music more cheaply
+as Generate-written notes than a live1/32 arp at120 BPM?
+
+Method
+- 36 conditions: internal/link-master clocks x menu/sequencer pages x
+  4/8/16 attacks per second x three implementations.
+- A: live arp120 BPM, divisions1/8,1/16,1/32.
+- B: live arp240 BPM, divisions1/4,1/8,1/16.
+- C: production Generate ARP LINE at240 BPM, quarter/eighth/sixteenth rhythm.
+- In B and C every other track has doubled event positions, durations and
+  track lengths. Drum length16->32; Wave32->64. Accompaniment has the same
+  intended wall-clock timing, pitches, velocities and gates; BPM alone is
+  not used as an equal-workload shortcut.
+- Generate controls use C major, ascending contour, no variation; invocation
+  and APPLY execute the real ROM UI/Generate code, not a host-generated line.
+- All three arms use the same C/E/G pitches and127 velocity.
+- P2 phrase has eight intended attacks [C,E,G,C,E,G,C,E], then resets.
+- At16Hz its loop lengths are4 steps at120 or8 steps at240. This intentionally
+  tests a short looping arp; it is not an indefinitely held chord benchmark.
+- Existing generator shape repeats over two meter-defined bars; meter was
+  chosen per rate to produce this exact eight-note phrase.
+- Three held events versus eight explicit events;19 versus24 total events.
+- No timebase changes: the immutable pre-resolution build is hash-checked.
+- User emulator/save are separate and untouched. Source meter prototype remains
+  paused, unvalidated and unmerged.
+
+CPU measurement
+- Timed function entry/return hooks count emulated cycles, not host CPU time.
+- Listed percentages sum disjoint EXCLUSIVE spans of instrumented audio/
+  sequencer functions. They omit uninstrumented wrappers and audio polling
+  checks inside UI functions; they are not complete system utilization.
+- Audio is measured separately from a saved playback state with actual APU
+  frequency/trigger writes. Buffered editor commits are included.
+- Input latency measures queued edge acknowledgment, not finished drawing.
+- Menu inputs move menu selection; grid inputs move the pitch cursor and
+  can require redraws, so grid max delays include drawing work.
+
+Results: playback/scheduler function cycle share (%)
+clock / view / attacks-per-second: live120 | live240 | Generate240
+internal    menu  4Hz:  29.51 |  45.41 |  38.20
+internal    menu  8Hz:  29.23 |  47.02 |  40.82
+internal    menu 16Hz:  39.03 |  52.78 |  45.76
+internal    grid  4Hz:  51.73 |  52.48 |  39.39
+internal    grid  8Hz:  52.41 |  53.99 |  39.26
+internal    grid 16Hz:  57.21 |  57.72 |  39.77
+link-master menu  4Hz:  57.37 |  74.22 |  67.97
+link-master menu  8Hz:  60.38 |  77.79 |  70.47
+link-master menu 16Hz:  65.49 |  82.73 |  76.30
+link-master grid  4Hz:  68.38 |  81.56 |  67.75
+link-master grid  8Hz:  70.79 |  83.16 |  68.17
+link-master grid 16Hz:  72.89 |  86.60 |  72.82
+
+Fastest rate: worst input acknowledgment and APU interval error (ms)
+clock / view / implementation: input max | interval max error | exact pitch order
+internal    menu live120     :    100.5 |   63.490 | False
+internal    menu live240     :    133.9 |   63.970 | False
+internal    menu generated240:     67.0 |    1.736 | True
+internal    grid live120     :   1305.9 |   65.954 | False
+internal    grid live240     :   1624.0 |   66.290 | False
+internal    grid generated240:    100.5 |    0.348 | True
+link-master menu live120     :    200.9 |   60.698 | False
+link-master menu live240     :    267.9 |   60.192 | False
+link-master menu generated240:    133.9 |   10.284 | True
+link-master grid live120     :   2980.2 |   63.126 | False
+link-master grid live240     :   1958.9 |  126.910 | False
+link-master grid generated240:    318.1 |    0.398 | True
+
+Failures and limits
+- Explicit generated lines preserve the intended pitch order in all12 conditions.
+- Some fastest short-loop live-arp runs repeat/skip the intended phrase position
+  and have one-step-scale timing outliers. Thus these are matched INTENDED
+  phrases, not36 successful identical audio traces. Slower traces are mostly
+  exact; see raw pitch-order flags and interval outliers in the JSON.
+- Live240 link-master start/release acknowledgment exceeded the6s bound in
+  all three menu cases. Steady playback was measured afterward.
+- Live240 link-master grid cases each had an input acknowledgment timeout.
+- Remaining input delays depend heavily on chord-grid redraw versus menu.
+- No real connected peer in link-master profiling; prior cable tests are
+  separate evidence, not part of this benchmark.
+
+Interpretation
+- At the same240 BPM, generated explicit notes cost less than live arp in
+  every measured context/rate.
+- Against120 BPM live arp, Generate240 is cheaper on the sequencer page,
+  where its note attacks use the edit-buffer IRQ path.
+- In menu pages,120 BPM live arp is cheaper than Generate240: doubling
+  scheduler step frequency outweighs the saved arp work in this fixture.
+- Therefore keep meter and resolution decisions separate. Doubling BPM is
+  musically workable after retiming every track, but not a universal CPU win.
+- A natural next experiment is prepared single-note event playback across
+  pages, avoiding a whole-pattern timebase change. This is a proposal only.
+
+Evidence
+- tools/compare_generated_arp.py
+- build/generated-arp-comparison.json and .log
+- Original frozen ROM and save hashes verified; no save writes.

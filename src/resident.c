@@ -19,6 +19,7 @@ uint8_t tones_match_buffer(const uint8_t *raw) BANKED {uint8_t c;
  return DRUM_MAPPED&&raw[320]=='D'&&raw[321]==1&&!memcmp(drumsourcekit,raw+322,10)&&!memcmp(drumsourceslot,raw+332,10);
 }
 
+void arp_irq_reset(void) NONBANKED;
 void seq_pattern_release(void) BANKED;void seq_pattern_handoff(void) BANKED;
 uint8_t sparse_enabled,sparse_install_slot=255,sparse_song=0,sparse_patterns=5;
 uint16_t sparse_slots[8],sparse_tones[8];char sparse_song_name[17]="STRIPPED";
@@ -194,7 +195,7 @@ void resident_move(uint16_t to,uint16_t from,uint16_t bytes) BANKED {uint8_t ban
 void resident_events_changed(void) BANKED {last_edit=sys_time;mixer_pattern_changed();seqirqdirty=1;}
 static void metadata(uint8_t slot,uint8_t writing){uint8_t b[81];if(writing){memcpy(b,seqeventcounts,14);memcpy(b+14,seqlength,14);memcpy(b+28,seqdefaultdur,14);memcpy(b+42,seqdefaultvel,7);memcpy(b+49,seqgate,7);memcpy(b+56,mx.level,7);memcpy(b+63,mx.pan,7);b[70]=seqmuted;b[71]=seqsolo;b[72]=seqbeats;b[73]=seqdenom;b[74]=0;memcpy(b+75,&seqbpm,2);memcpy(b+77,&drummutemask,2);memcpy(b+79,&drumsolomask,2);resident_write(slot,32,b,81);resident_write(slot,16,(uint8_t *)mx.name,16);}else{resident_read(slot,32,b,81);applymeta(b);resident_read(slot,16,(uint8_t *)mx.name,16);mx.name[16]=0;}}
 uint8_t sparse_snapshot(uint8_t slot) BANKED {if(slot>=5||slot!=mx.slot||io_busy)return 0;io_busy=1;metadata(slot,1);tones_capture();resident_write(slot,128,TONE_RAW,POOL_TONE_BYTES);saved_generation=pattern_generation;pattern_dirty=0;io_busy=0;return 1;}
-uint8_t sparse_restore(uint8_t slot) BANKED {if(slot>=5||sparse_enabled!=1)return 0;resident_same_tones=0;mx.slot=slot;storage_sorted_dirty();
+uint8_t sparse_restore(uint8_t slot) BANKED {if(slot>=5||sparse_enabled!=1)return 0;arp_irq_reset();resident_same_tones=0;mx.slot=slot;storage_sorted_dirty();
  if(slot==launchslot&&launchready){
   applymeta(launchdata+16);memcpy(mx.name,launchdata,16);mx.name[16]=0;
   if(launchequal&&launchgeneration==resident_tone_generation)resident_same_tones=1;

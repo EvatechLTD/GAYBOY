@@ -104,6 +104,7 @@ uint8_t finder_edit_allowed(uint8_t item) BANKED {
  if(item==40)return page==18&&sparse_enabled==1&&(edit_pad()==mx.slot||sparse_slots[edit_pad()]!=POOL_NONE);
  if(item==41)return page==18&&sparse_enabled==1&&pool_reference(POOL_PATTERN_CLIP)!=POOL_NONE;
  if(!edit_grid())return 0;
+ if(item==51||item==52)return seq_event_count(seqtrack)!=0;
  if(item==21||item==42||item==43||item==46)return seqgrouptrack==seqtrack;
  if(item==22)return seq_clip_kind()==2;
  if(item==37)return seq_clip_kind()==1;
@@ -126,5 +127,6 @@ uint8_t finder_edit_action(uint8_t item) BANKED {uint8_t ok=1;
  if(item==22){sparse_journal_edit_barrier();sparse_finish_install();ok=seq_region_paste(seqcursor[seqtrack],seqtrack==6?drumrow:seqpitch[seqtrack]);if(ok)mixer_pattern_changed();}
  if(item==42)seq_delete_selection();
  if(item==46)ok=seq_region_duplicate();
- if(!ok)mx.error=2;seqdrawvalid=0;mx.padcache=0;dirty=1;return ok;
+ if(item==51||item==52){ok=seq_region_scale(item==51);if(ok!=1)mx.error=ok;ok=ok==1;}
+ if(!ok&&item!=51&&item!=52)mx.error=2;seqdrawvalid=0;mx.padcache=0;dirty=1;return ok;
 }
