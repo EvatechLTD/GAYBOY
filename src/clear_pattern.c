@@ -1,5 +1,6 @@
 #pragma bank 45
 #include "api.h"
+#include "seq_live_note.h"
 #include "mixer_shared.h"
 #include "link_control.h"
 #include "clear_pattern.h"
@@ -11,7 +12,14 @@ uint8_t mixer_file_load(void) BANKED;
 uint8_t mixer_file_save(void) BANKED;
 extern uint8_t seqselectused;
 extern uint8_t seqauditionnote,seqauditiontrack;
-void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=0;if(n){if(c==TWINK_TRACK)twink_note(0,n-1,0);else event(0x80|c,n-1,0);}}
+void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=0;if(n){if(c==6)drum_stop();else if(c==TWINK_TRACK)twink_note(0,n-1,0);else event(0x80|c,n-1,0);}}
+void seq_plot_audition(uint8_t c,uint8_t note,uint8_t vel) BANKED {
+ if(seqplaying)return;seq_audition_stop();vel=mixer_velocity(c,vel);if(!vel)return;
+ seqauditionnote=note+1;seqauditiontrack=c;
+ if(c==6){drum_plot_audition(note,vel);return;}
+ if(c==4&&!monomode)monoenable();
+ if(c==TWINK_TRACK)twink_note(1,note,vel);else event(0x90|c,note,vel);
+}
 uint8_t seq_group_contains(uint8_t step,uint8_t pitch) BANKED {return seqgrouptrack==seqtrack&&step>=seqgroupx0&&step<=seqgroupx1&&pitch>=seqgroupy0&&pitch<=seqgroupy1;}
 uint8_t mixer_clear_saved(uint8_t slot) BANKED;
 static void clear_text(uint8_t x,uint8_t y,const char *text,uint8_t inverse){uint8_t c;while(*text&&x<20){c=*text++;if(c>='a'&&c<='z')c-=32;canvas[(uint16_t)y*20+x++]=c-32+(inverse?96:0);}mixfill();}

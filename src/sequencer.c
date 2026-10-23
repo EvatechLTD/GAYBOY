@@ -1,5 +1,6 @@
 #pragma bank 10
 #include "api.h"
+#include "seq_live_note.h"
 uint8_t native_edit_flush(void) BANKED;
 uint8_t native_edit_service(void) BANKED;
 extern uint8_t seqeditpreview,seqpreviewpinned;
@@ -168,7 +169,7 @@ void seq_next_deadline(void) BANKED;
 uint8_t sync_local_stop_allowed(void) BANKED;
 void eval_drum_prepare(void) BANKED;
 void storage_sorted_prepare(void) BANKED;
-void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;if(seqplaying){if(syncmode==1&&syncslave&&!syncbusy&&!sync_local_stop_allowed())return;if(!seqservicing)seq_frame();seq_stop();return;}seq_stop();
+void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;seq_audition_stop();if(seqplaying){if(syncmode==1&&syncslave&&!syncbusy&&!sync_local_stop_allowed())return;if(!seqservicing)seq_frame();seq_stop();return;}seq_stop();
  if(experimental_mode){monomode=polymode=0;}else if(seqmode){if(!monomode)monoenable();}
  else {if(monomode||polymode)panic();monomode=polymode=0;if(oldmono){TAC_REG=waveengine?4:0;route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}globals();}}
  memset(seqposition,0,SEQ_TRACKS);seqclock=seqticks=seqfraction=0;if(!(TAC_REG&4)){TMA_REG=240;TIMA_REG=240;IF_REG&=~TIM_IFLAG;TAC_REG=4;}seq_gates();mixer_clock_reset();seqservicing=1;
@@ -231,7 +232,7 @@ uint16_t seq_hit(uint8_t c,uint8_t step,uint8_t pitch){uint16_t i,best=65535,dur
  return best!=65535&&note==pitch+1&&(uint16_t)step-best<duration?best:65535;
 }
 void seq_erase(uint8_t c,uint8_t step){uint8_t e[4],fast=0;uint16_t duration=seq_duration_get(c,step);e[0]=step;e[1]=seqpitch[c]+1;e[2]=0;e[3]=duration;if(duration)fast=roll_note_feedback(c,e,1);if(seqplaying&&seqsource[c]==step&&!editbuffer_active())seq_off(c);seq_note_set(c,step,0,0,1);seqdrawvalid=fast;dirty=1;}
-void seq_insert(void){uint8_t c=seqtrack,step=seqcursor[c],fast=0,e[4];uint16_t hit=seq_hit(c,step,seqpitch[c]);if(hit!=65535){seq_erase(c,hit);return;}e[0]=step;e[1]=seqpitch[c]+1;e[2]=eval_plotvel[c];e[3]=seqdefaultdur[c];if(seq_event_total()<256)fast=roll_note_feedback(c,e,0);if(!seq_note_set(c,step,seqpitch[c]+1,eval_plotvel[c],seqdefaultdur[c]))fast=0;seqdrawvalid=fast;dirty=1;}
+void seq_insert(void){uint8_t c=seqtrack,step=seqcursor[c],fast=0,e[4];uint16_t hit=seq_hit(c,step,seqpitch[c]);if(hit!=65535){seq_erase(c,hit);return;}e[0]=step;e[1]=seqpitch[c]+1;e[2]=eval_plotvel[c];e[3]=seqdefaultdur[c];if(seq_event_total()<256)fast=roll_note_feedback(c,e,0);if(!seq_note_set(c,step,seqpitch[c]+1,eval_plotvel[c],seqdefaultdur[c]))fast=0;else if(!seqplaying)seq_plot_audition(c,seqpitch[c],eval_plotvel[c]);seqdrawvalid=fast;dirty=1;}
 void eval_seq_clamp_cursor(void) BANKED;
 void seq_clamp_cursor(void){eval_seq_clamp_cursor();}
 void eval_seq_off_track(uint8_t c) BANKED {if(!editbuffer_reading&&editbuffer_active())return;seq_off(c);}

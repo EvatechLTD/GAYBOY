@@ -1,6 +1,7 @@
 #pragma bank 48
 #pragma opt_code_speed
 #include "api.h"
+#include "seq_live_note.h"
 #include "drum_rows.h"
 #include "mixer_shared.h"
 #include "mixer_drum_names.h"
@@ -77,7 +78,7 @@ static void brush_cell(uint8_t erase){uint8_t c=seqtrack,e[4],fast;uint16_t curs
  if(c==6){if(erase)drum_brush_erase();else drum_brush_plot();return;}
  while(seq_event_next_step(c,seqcursor[c],&cursor,e))if(e[1]==seqpitch[c]+1){if(erase){fast=roll_note_feedback(c,e,1);if(seqplaying&&seqsource[c]==e[0])seq_clear_release(c);seq_event_erase(c,cursor-1);seqdrawvalid=fast;dirty=1;}return;}
  if(erase)return;
- e[0]=seqcursor[c];e[1]=seqpitch[c]+1;e[2]=eval_plotvel[c];e[3]=seqdefaultdur[c];fast=seq_event_total()<256?roll_note_feedback(c,e,0):0;if(!seq_event_put(c,65535U,e))fast=0;seqdrawvalid=fast;dirty=1;
+ e[0]=seqcursor[c];e[1]=seqpitch[c]+1;e[2]=eval_plotvel[c];e[3]=seqdefaultdur[c];fast=seq_event_total()<256?roll_note_feedback(c,e,0):0;if(!seq_event_put(c,65535U,e))fast=0;else if(!seqplaying)seq_plot_audition(c,e[1]-1,e[2]);seqdrawvalid=fast;dirty=1;
 }
 void seq_brush_input(uint8_t edge) BANKED {uint8_t c=seqtrack,step=seqcursor[c],pitch=c==6?drumrow:seqpitch[c];
  if(!brushmode){/* B may have created a provisional note before A arrived. */

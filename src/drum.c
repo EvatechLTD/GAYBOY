@@ -1,6 +1,7 @@
 #pragma bank 17
 #pragma opt_code_speed
 #include "api.h"
+#include "seq_live_note.h"
 #include "mod_bypass.h"
 #include "mixer_shared.h"
 #include "drum_rows.h"
@@ -646,12 +647,12 @@ uint16_t drum_plot(uint8_t step,uint8_t row,uint16_t dur,uint8_t vel,uint16_t ag
  if(row<3){i=drum_find(step,row);if(i!=65535U&&i!=replace){seq_event_get(6,i,e);if(e[0]==step){drum_erase(i,row);if(replace!=65535U&&i<replace)replace--;}}}
  e[0]=step;e[1]=DRUM_VOICE_ROW(row)+1;e[2]=vel;e[3]=(uint8_t)dur;if(replace!=65535U&&seq_event_get(6,replace,old))fast=roll_replace_feedback(6,old,e,replace);if(replace==65535U&&seq_event_total()<256)fast=roll_note_feedback(6,e,0);if(!seq_event_put(6,replace,e)){seqdrawvalid=0;return 65535U;}seqdrawvalid=fast;dirty=1;return replace==65535U?seq_event_count(6)-1:replace;
 }
-void drum_insert(void){uint16_t n=drum_find(seqcursor[6],drumrow),dur=seqdefaultdur[6];if(n!=65535U){drum_erase(n,drumrow);return;}if(!dur)dur=drumrow>=3?drum_auto(DRUM_VOICE_ROW(drumrow)):1;n=drum_plot(seqcursor[6],drumrow,dur,eval_plotvel[6],0);eval_message=n!=65535U&&!seqdrawvalid&&!eval_drum_allowed(n)?1:0;dirty=1;}
+void drum_insert(void){uint16_t n=drum_find(seqcursor[6],drumrow),dur=seqdefaultdur[6];if(n!=65535U){drum_erase(n,drumrow);return;}if(!dur)dur=drumrow>=3?drum_auto(DRUM_VOICE_ROW(drumrow)):1;n=drum_plot(seqcursor[6],drumrow,dur,eval_plotvel[6],0);eval_message=n!=65535U&&!seqdrawvalid&&!eval_drum_allowed(n)?1:0;if(n!=65535U&&!seqplaying)seq_plot_audition(6,drumrow,eval_plotvel[6]);dirty=1;}
 void drum_brush_erase(void) BANKED {uint8_t e[4];uint16_t n=roll_drum_onset(seqcursor[6],drumrow),cursor=0;
  if(n==65534U){n=65535U;while(seq_event_next_step(6,seqcursor[6],&cursor,e))if(e[1]==DRUM_VOICE_ROW(drumrow)+1){n=cursor-1;break;}}
  if(n!=65535U)drum_erase(n,drumrow);
 }
-void drum_brush_plot(void) BANKED {uint8_t e[4];uint16_t n=roll_drum_onset(seqcursor[6],drumrow),cursor=0;if(n==65534U){while(seq_event_next_step(6,seqcursor[6],&cursor,e))if(e[1]==DRUM_VOICE_ROW(drumrow)+1)return;}else if(n!=65535U)return;n=drum_plot(seqcursor[6],drumrow,seqdefaultdur[6],eval_plotvel[6],0);eval_message=n!=65535U&&!seqdrawvalid&&!eval_drum_allowed(n)?1:0;dirty=1;}
+void drum_brush_plot(void) BANKED {uint8_t e[4];uint16_t n=roll_drum_onset(seqcursor[6],drumrow),cursor=0;if(n==65534U){while(seq_event_next_step(6,seqcursor[6],&cursor,e))if(e[1]==DRUM_VOICE_ROW(drumrow)+1)return;}else if(n!=65535U)return;n=drum_plot(seqcursor[6],drumrow,seqdefaultdur[6],eval_plotvel[6],0);eval_message=n!=65535U&&!seqdrawvalid&&!eval_drum_allowed(n)?1:0;if(n!=65535U&&!seqplaying)seq_plot_audition(6,drumrow,eval_plotvel[6]);dirty=1;}
 
 uint8_t drum_selected_event(const uint8_t *e){return seqgrouptrack==6&&e[1]&&e[0]>=seqgroupx0&&e[0]<=seqgroupx1&&DRUM_VIEW_ROW(e[1]-1)>=seqgroupy0&&DRUM_VIEW_ROW(e[1]-1)<=seqgroupy1;}
 uint8_t drum_group_size(int8_t delta){uint16_t i,t,count=seq_event_count(6);uint8_t e[4],old[4],voices,pcm=0,fast=seqdrawvalid;int16_t d;
@@ -688,6 +689,11 @@ void drum_synth_input(uint8_t p,uint8_t edge) BANKED {eval_input(p,edge);}
 
 uint16_t drum_clip_plot(uint8_t step,uint8_t row,uint16_t dur,uint8_t vel) BANKED {uint16_t length=seqlength[6],n;seqlength[6]=256;n=drum_plot(step,row,dur,vel,0);seqlength[6]=length;return n;}
 
+void drum_plot_audition(uint8_t row,uint8_t vel) BANKED {
+ drum_init();if(row>=3){drum_start(DRUM_VOICE_ROW(row),vel,1);return;}
+ if(row==2){kick_start(vel,65535UL);return;}
+ drumreleasing[row]=0;eval_note(5+row,1);noiseleft[row]=65535UL;noiselevel[row]=vel;drum_noise();
+}
 void kit_audition(uint8_t row) BANKED {drum_start(row,127,1);}
 
 
