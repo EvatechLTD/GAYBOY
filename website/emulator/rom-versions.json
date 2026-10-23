@@ -159,7 +159,7 @@
       "mixer": 44160
     },
     "4d7ff1a7f48a456657bd699a053c796d533456cd649ab76add9565bae500bcdc": {
-      "rom": "emulator/roms/GAYBOY.gb",
+      "rom": "emulator/roms/GAYBOY-4d7ff1a7f48a.gb",
       "sha256": "4d7ff1a7f48a456657bd699a053c796d533456cd649ab76add9565bae500bcdc",
       "version": "1.0",
       "channel": "stable",
@@ -184,7 +184,34 @@
         "lastpad": 54525
       },
       "mixer": 44160
+    },
+    "bdc10a1d647b3d38a4ed9aca73e1e491f4c841233f353c83bc04edb814448ac5": {
+      "rom": "emulator/roms/GAYBOY.gb",
+      "sha256": "bdc10a1d647b3d38a4ed9aca73e1e491f4c841233f353c83bc04edb814448ac5",
+      "version": "1.0",
+      "channel": "stable",
+      "symbols": {
+        "page": 53411,
+        "navopen": 53428,
+        "navchoice": 53429,
+        "seqplaying": 53776,
+        "seqtrack": 53777,
+        "seqcursor": 53721,
+        "seqpitch": 54924,
+        "seqhead": 53783,
+        "seqfocus": 53779,
+        "seqedit": 53780,
+        "seqapending": 54224,
+        "seqposition": 53714,
+        "seqeventcounts": 53597,
+        "seqeventoffsets": 53611,
+        "seqmuted": 53781,
+        "seqsolo": 53782,
+        "seqlength": 54882,
+        "lastpad": 54810
+      },
+      "mixer": 44160
     }
   },
-  "current": "4d7ff1a7f48a456657bd699a053c796d533456cd649ab76add9565bae500bcdc"
+  "current": "bdc10a1d647b3d38a4ed9aca73e1e491f4c841233f353c83bc04edb814448ac5"
 }
