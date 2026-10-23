@@ -282,7 +282,7 @@ void seq_drag(int8_t delta){uint8_t c=seqtrack,step,old[4],next[4],fast;uint16_t
  if(!seqdrag){hit=seq_hit(c,seqcursor[c],seqpitch[c]);if(hit==65535){seq_insert();hit=seqcursor[c];}seqdragstart=hit;seqdrag=1;}
  step=seqdragstart;max=seqlength[c]-step;length=(int16_t)seq_dur(c,step)+delta;if(length<1)length=1;if(length>max)length=max;
  if(!seq_length_step((uint16_t)step+seq_dur(c,step)-1,(uint16_t)step+length-1))return;
- old[0]=step;old[1]=seq_note_get(c,step);old[2]=seq_velocity_get(c,step);old[3]=seq_dur(c,step);memcpy(next,old,4);next[3]=length;fast=roll_replace_feedback(c,old,next,0);if(!seq_note_set(c,step,next[1],next[2],length))fast=0;seqdefaultdur[c]=length;seqcursor[c]=step+length-1;seqbused=1;seqdrawvalid=fast;dirty=1;
+ old[0]=step;old[1]=seq_note_get(c,step);old[2]=seq_velocity_get(c,step);old[3]=seq_dur(c,step);memcpy(next,old,4);next[3]=length;fast=roll_replace_feedback(c,old,next,0);if(!seq_note_set(c,step,next[1],next[2],length))fast=0;seqdefaultdur[c]=length;seqcursor[c]=step+length-1;seqbused=1;seqdrawvalid=fast;dirty=1;if(!seqplaying&&next[3]!=old[3])seq_live_current(1);
 }
 void seq_move(uint8_t edge){uint8_t c=seqtrack,e[4],other[4],old[4],fast;uint16_t i,source=65535,dur;int16_t dst,pitch;
  seqamoved=1;if(seqaanchor==65535)return;
@@ -291,7 +291,7 @@ void seq_move(uint8_t edge){uint8_t c=seqtrack,e[4],other[4],old[4],fast;uint16_
  if(dst<0||dst+dur>seqlength[c]||pitch<SEQ_NOTE_MINIMUM(c)+1||pitch>seq_note_maximum(c)+1)return;
  if(dst!=e[0])for(i=0;i<seq_event_count(c);i++){if(i==source)continue;seq_event_get(c,i,other);if(other[1]&&((!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY])||other[1]==pitch)&&dst<other[0]+(other[3]?other[3]:256)&&other[0]<dst+dur)return;seq_audio();}
  if(seqplaying&&seqsource[c]==e[0]&&!editbuffer_active())seq_off(c);memcpy(old,e,4);e[0]=dst;e[1]=pitch;fast=roll_replace_feedback(c,old,e,source);if(!seq_event_put(c,source,e))fast=0;
- seqaanchor=dst;seqcursor[c]=dst+seqaoffset;seqpitch[c]=pitch-1;seq_clamp_cursor();seqdrawvalid=fast;dirty=1;
+ seqaanchor=dst;seqcursor[c]=dst+seqaoffset;seqpitch[c]=pitch-1;seq_clamp_cursor();seqdrawvalid=fast;dirty=1;if(!seqplaying)seq_live_current(0);
 }
 uint8_t seq_selected_event(uint8_t *e){return e[1]&&seq_group_contains(e[0],e[1]-1);}
 void eval_seq_group_move(uint8_t edge) BANKED;

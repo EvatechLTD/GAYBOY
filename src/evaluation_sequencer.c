@@ -1,5 +1,6 @@
 #pragma bank 51
 #include "api.h"
+#include "seq_live_note.h"
 #include "sequencer_limits.h"
 #include "mixer_shared.h"
 extern uint16_t pattern_generation;
@@ -28,7 +29,7 @@ void eval_seq_group_move(uint8_t edge) BANKED{uint8_t c=seqtrack,e[4],other[4],c
   for(j=0;j<count;j++){if(selectedbits[j>>3]&(1<<(j&7)))continue;seq_event_get(c,j,other);if(other[1]&&((!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY])||other[1]==e[1]+dy)&&at<other[0]+(other[3]?other[3]:256)&&other[0]<at+dur)return;}mixfill();
  }
  for(i=0;i<count;i++){if(!(selectedbits[i>>3]&(1<<(i&7))))continue;seq_event_get(c,i,e);if(seqplaying&&seqsource[c]==e[0])eval_seq_off_track(c);e[0]+=dx;e[1]+=dy;seq_event_put(c,i,e);mixfill();}
- seqgroupx0+=dx;seqgroupx1+=dx;seqgroupy0+=dy;seqgroupy1+=dy;seqaanchor+=dx;seqcursor[c]+=dx;seqpitch[c]+=dy;eval_seq_clamp_cursor();selection_remember(c,count);seqdrawvalid=0;dirty=1;
+ seqgroupx0+=dx;seqgroupx1+=dx;seqgroupy0+=dy;seqgroupy1+=dy;seqaanchor+=dx;seqcursor[c]+=dx;seqpitch[c]+=dy;eval_seq_clamp_cursor();selection_remember(c,count);seqdrawvalid=0;dirty=1;if(!seqplaying)seq_live_current(0);
 }
 
 void eval_seq_group_resize(int8_t delta) BANKED {uint8_t c=seqtrack,e[4],old[4],fast=seqdrawvalid,local=eval_mode(seqtrack)||evalpatch[seqtrack][EV_CHORD_HISTORY];uint16_t i,count=seq_event_count(c);int16_t n;
@@ -37,5 +38,5 @@ void eval_seq_group_resize(int8_t delta) BANKED {uint8_t c=seqtrack,e[4],old[4],
  selectionvalid=0;memset(selectedbits,0,32);
  for(i=0;i<count;i++){seq_event_get(c,i,e);if(selected_event(e)){selectedbits[i>>3]|=1<<(i&7);n=(e[3]?e[3]:256)+delta;if(n<1||n>seqlength[c]-e[0])return;}mixfill();}
  roll_edit_batch(1);for(i=0;i<count;i++){if(!(selectedbits[i>>3]&(1<<(i&7))))continue;seq_event_get(c,i,e);memcpy(old,e,4);e[3]=(e[3]?e[3]:256)+delta;if(!local&&!roll_replace_feedback(c,old,e,i))fast=0;seq_event_put(c,i,e);mixfill();}
- seqdefaultdur[c]=seq_duration_get(c,seqaanchor);seqcursor[c]=seqaanchor+seqdefaultdur[c]-1;seqdrawvalid=fast;roll_edit_batch(0);dirty=1;
+ seqdefaultdur[c]=seq_duration_get(c,seqaanchor);seqcursor[c]=seqaanchor+seqdefaultdur[c]-1;seqdrawvalid=fast;roll_edit_batch(0);dirty=1;if(!seqplaying)seq_live_current(1);
 }

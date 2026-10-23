@@ -1,5 +1,6 @@
 #pragma bank 15
 #include "api.h"
+#include "seq_live_note.h"
 #include "mod_bypass.h"
 #include "lfo_irq.h"
 extern uint8_t globalmod[10];
@@ -97,6 +98,7 @@ void service_frame(void) BANKED {uint16_t now,delta;uint8_t users=0,needed=0;__c
      lastframe stays unchanged so the deferred update catches up afterward. */
   if(seqplaying&&!syncmode&&!seqservicing&&delta<seqdeadline&&seqdeadline-delta<=8)return;
   delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;
+  if(seq_live_timed)seq_live_service();
   {
    if(eval_moddirty||eval_modgeneration!=pattern_generation)eval_mod_configure();if((eval_lfousers&7)||lfo_irq_mask)lfo_irq_prepare(seqirqdirty);
    if(eval_lfousers||eval_envusers){

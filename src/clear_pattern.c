@@ -1,6 +1,7 @@
 #pragma bank 45
 #include "api.h"
 #include "seq_live_note.h"
+#include "drum_rows.h"
 #include "mixer_shared.h"
 #include "link_control.h"
 #include "clear_pattern.h"
@@ -12,13 +13,42 @@ uint8_t mixer_file_load(void) BANKED;
 uint8_t mixer_file_save(void) BANKED;
 extern uint8_t seqselectused;
 extern uint8_t seqauditionnote,seqauditiontrack;
-void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=0;if(n){if(c==6)drum_stop();else if(c==TWINK_TRACK)twink_note(0,n-1,0);else event(0x80|c,n-1,0);}}
+uint8_t seq_live_timed;
+static uint8_t resizepending,resizechannel,resizenote,resizevelocity;
+static uint16_t resizeduration,auditionuntil;
+void seq_audition_stop(void) BANKED {uint8_t n=seqauditionnote,c=seqauditiontrack;seqauditionnote=seq_live_timed=resizepending=0;if(n){if(c==6)drum_stop();else if(c==TWINK_TRACK)twink_note(0,n-1,0);else event(0x80|c,n-1,0);}}
 void seq_plot_audition(uint8_t c,uint8_t note,uint8_t vel) BANKED {
  if(seqplaying)return;seq_audition_stop();vel=mixer_velocity(c,vel);if(!vel)return;
  seqauditionnote=note+1;seqauditiontrack=c;
  if(c==6){drum_plot_audition(note,vel);return;}
  if(c==4&&!monomode)monoenable();
  if(c==TWINK_TRACK)twink_note(1,note,vel);else event(0x90|c,note,vel);
+}
+void seq_live_current(uint8_t resize) BANKED {
+ uint8_t c=seqtrack,e[4],note;uint16_t i,duration;
+ if(seqplaying)return;
+ for(i=0;i<seq_event_count(c);i++){
+  seq_event_get(c,i,e);if(!e[1])continue;
+  duration=e[3]?e[3]:256;note=c==6?DRUM_VIEW_ROW(e[1]-1):e[1]-1;
+  if(note!=(c==6?drumrow:seqpitch[c])||seqcursor[c]<e[0]||seqcursor[c]>=(uint16_t)e[0]+duration)continue;
+  if(resize){resizepending=1;resizechannel=c;resizenote=note;resizevelocity=e[2];resizeduration=duration;}
+  else seq_plot_audition(c,note,e[2]);
+  return;
+ }
+}
+void seq_live_release(void) BANKED {
+ uint8_t pending=resizepending,c=resizechannel,note=resizenote,vel=resizevelocity;uint16_t duration=resizeduration,frames;
+ seq_audition_stop();if(!pending||seqplaying)return;
+ seq_plot_audition(c,note,vel);if(!seqauditionnote)return;
+ /* DMG frame rate is about59.7275Hz; each grid cell remains a sixteenth. */
+ frames=((uint32_t)duration*896U+seqbpm/2)/seqbpm;if(!frames)frames=1;
+ __critical{auditionuntil=sys_time+frames;}seq_live_timed=1;
+}
+void seq_live_service(void) BANKED {
+ uint16_t now;uint8_t pending=resizepending;__critical{now=sys_time;}
+ if(seq_live_timed&&(seqplaying||(int16_t)(now-auditionuntil)>=0)){
+  seq_audition_stop();if(!seqplaying)resizepending=pending;
+ }
 }
 uint8_t seq_group_contains(uint8_t step,uint8_t pitch) BANKED {return seqgrouptrack==seqtrack&&step>=seqgroupx0&&step<=seqgroupx1&&pitch>=seqgroupy0&&pitch<=seqgroupy1;}
 uint8_t mixer_clear_saved(uint8_t slot) BANKED;
