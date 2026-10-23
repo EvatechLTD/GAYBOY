@@ -1,0 +1,76 @@
+BLACK NOTES / PLAYBACK-INDEPENDENT VISUALS ? 2026-10-23
+
+Branch black-notes, prototype based on the current LFO-prep-cache experiment.
+Main/online ROM unchanged; no commit,merge,push or deployment.
+
+Remove note-body dimming based on lowest pitch or drum admission. All note
+bodies are black; selection inversion and the background grid remain intact.
+No playback selection/admission code changed. ARP history remains in note data
+and playback logic; it no longer blocks fast graphics feedback by itself.
+
+Changes:
+- Piano full rendering no longer computes lowest/second pitch per column or
+  chooses grey/black from the playback mode. All programmed pitches are drawn.
+- MODE changes update the header without recoloring the grid.
+- Bounded note compositor rebuilds only affected rows/columns, with all bodies
+  black; it no longer dirties other pitches to update playback coloring.
+- Fast edits reject only genuinely dependent geometry: same-pitch overlap or
+  a shared onset requiring a resolved velocity bar. One note is fast in ARP
+  and after returning to MONO. Existing overlap source data remains intact.
+- Drum rendering no longer calls playback admission to choose note colors.
+  Cross-row PCM voice-count scans and dimmed-hit edit guards are removed
+  from graphics feedback. Same-row overlap protection is retained.
+
+Hardware-report-like forced-DMG fixture:120BPM,32steps,one P2 note spanning
+32steps,4Wave bass notes over2bars,16synth hats,4snares,4pulse kicks.
+Eight real A+Up/Down drags per state; source pitch,duration/count are asserted.
+Measure actual visible note feedback, not only queued input acknowledgement.
+
+Mode,old median visible ms,new median visible ms,old max visible ms,new max visible ms
+mono_before,485.537,468.796,535.767,519.023
+arp,2762.547,502.280,2879.748,569.253
+mono_after,2561.632,359.968,2611.862,435.311
+
+Important metric distinction: fast feedback now performs work inside the UI
+action. In ARP,the input acknowledgement median rose from50ms to226ms,
+while actual visible feedback dropped from2763ms to502ms. MONO after ARP
+input acknowledgement rose50ms->167ms; visible feedback2562ms->360ms.
+Fresh MONO visible feedback is effectively unchanged469ms vs486ms before.
+
+Overlapping PCM visual fixture: two8-step samples at0,plot/delete a third
+sample on a different row. Median visible latency720ms->75ms,max84ms.
+The rejected third sample is now drawn black instead of grey. Playback still
+admits only the original first two PCM voices,verified through actual sample
+voice state over playback; all3note records are retained before deletion.
+
+Validation:
+- test_black_note_drag: real one-note moves,ARP on/off,source preserved,
+  no ARP attacks after switching off.
+- test_black_note_overlap: all pitches black,MODE leaves grid pixels identical,
+  erasing an overlapping same-pitch onset preserves its sustaining neighbor,
+  moved notes match a full rebuild,MONO plays lowest active note and ARP
+  cycles exactly the programmed pitches. PCM admissions unchanged.
+- test_paint_deferred_feedback: full grid/bar pixel equivalence,all paint
+  data,velocity queue catchup and viewport cancellation pass. Initial mismatch
+  at a shared-onset velocity bar was fixed by refusing unsafe fast insertion.
+- test_stripped_groups: native/drum group moves,resizes,selection and pixel
+  checks pass.
+- test_seq_header_feedback now passes all native MODE/mute/solo controls and
+  offscreen length edits without full-grid rebuilding.
+- test_mod_bypass,test_buffer_all_pages,16drag-release cases and existing
+  ARP order/page/retained FREE tests pass.
+
+Modulated81event editor fixture: navigation,cells,paint,multiselect show
+maxP1note-on timing error0.138ms,no native IRQ underruns; all29painted
+notes are retained and selection is exercised. MOD OFF maxerror0.137ms.
+Painting remains bounded; dense data and same-pitch overlap are not promised
+constant-time edits.
+
+Known remaining modulation tradeoff: strict test_lfo_irq.py fails combined
+fine+coarse1/32 during navigation with5.319ms max edge error (fine-only and
+coarse-only checks pass). No tolerance was relaxed. This is not a claim of
+perfect LFO timing; it remains a test build needing hardware listening.
+
+ROM layout passes:587bytes WRAM free plus512reserved stack (+22vsLFO-cache).
+ROM SHA256:3a23cf605cab2f464911be91904eb010f58a4f09ee166dd49ada33c45a397d61
+Artifact: build/GAYBOY-black-notes-test.gb (+.noi/.map and copied session .sav).

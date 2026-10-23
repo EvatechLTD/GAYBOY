@@ -46,13 +46,64 @@ uint8_t ui_repeat(uint8_t p,uint8_t edge) BANKED {uint8_t axis,interval,resetmas
 void mixer_pattern_changed(void) BANKED;
 extern uint8_t seqrecordtrack;
 void seq_record_finish(void) BANKED;
+/* During a drag the resident data remains authoritative for hit testing,
+   but drawing keeps the published notes until every direction is released. */
+uint8_t seqeditpreview,seqpreviewdirty,seqpreviewpinned;
+uint8_t seqgestureblocked,seqgesturepressed;
+static uint8_t seqgesturepage;
+uint8_t roll_preview_finish(void) BANKED;
 /* A427 is dedicated input state; B4E3 overlaps the retained grid tiles. */
-void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i;*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();edge=ui_repeat(p,edge);
+void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i,head=seqhead,gesture,tracking,c=seqtrack,oldcursor,oldpitch,oldtop,oldbase,stop;int16_t top;*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();
+ seqgesturepressed=edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN);
+ gesture=page==8&&!navopen&&!seqhead&&!seqfocus&&seqapending&&
+  !(p&(J_START|J_SELECT))&&((p&(J_A|J_B))==J_A||(p&(J_A|J_B))==J_B);
+ tracking=gesture||(page==8&&!navopen&&!seqfocus&&(!seqhead||seqhead==6)&&!(p&(J_A|J_B|J_START|J_SELECT)));
+ if(!tracking){seqgestureblocked=seqgesturepage=0;}
+ if(!(p&(J_LEFT|J_RIGHT|J_UP|J_DOWN)))seqgestureblocked=0;
+ if(seqgesturepage&&seqdrawvalid&&seqfontdirty&&seqviewtrack==c&&seqviewbase==seqbase&&(c==6||seqviewtop==seqtop[c])){seqgesturepage=0;__critical{repeatstart=repeatlast=sys_time;}}
+ edge=ui_repeat(p,edge);
+ if(tracking){edge&=~seqgestureblocked;
+  if(seqgesturepage){edge&=~(J_LEFT|J_RIGHT|J_UP|J_DOWN);__critical{repeatstart=repeatlast=sys_time;}}
+ }
  /* A slow paint/drag must not turn elapsed repeat time into eight expensive
     edits before the next input edge can be handled. Keep real queued edges;
     bound only synthetic held-button catch-up and discard its time debt. */
  if(page==8&&!navopen&&!seqhead&&!seqfocus&&(p&(J_A|J_B))&&repeatsteps>2){repeatsteps=2;__critical{repeatlast=sys_time;}}
- for(i=0;i<repeatsteps;i++){mixfill();/* Only value gestures can change a tone; grid mutations mark themselves. */if(edge&&!navopen&&!(p&(J_START|J_SELECT))&&page!=8&&(page<18||page==23)&&(p&(J_A|J_B)))mixer_pattern_changed();ui_action(p,edge);}*(uint8_t *)0xA427=0;}
+ seqeditpreview=page==8&&!navopen&&!seqhead&&!seqfocus&&seqapending&&seqapending!=4&&
+  !(p&(J_START|J_SELECT))&&((p&(J_A|J_B))==J_A||(p&(J_A|J_B))==J_B)&&
+  (p&(J_UP|J_DOWN|J_LEFT|J_RIGHT));
+ /* A fresh edge crossing explicitly permits drawing the destination page.
+    Until it is published, discard synthetic repeat debt from that hold. */
+ seqpreviewpinned=0;if(seqgesturepage)seqeditpreview=0;
+ if(!seqeditpreview&&seqpreviewdirty){seqpreviewdirty=0;seqdrawvalid=roll_preview_finish();dirty=1;}
+ for(i=0;i<repeatsteps;i++){uint8_t retained=seqdrawvalid;oldcursor=seqcursor[c];oldpitch=c==6?drumrow:seqpitch[c];oldtop=seqtop[c];oldbase=seqbase;mixfill();/* Only value gestures can change a tone; grid mutations mark themselves. */if(edge&&!navopen&&!(p&(J_START|J_SELECT))&&page!=8&&(page<18||page==23)&&(p&(J_A|J_B)))mixer_pattern_changed();ui_action(p,edge);
+  if(seqeditpreview){seqpreviewdirty=1;if(retained)seqdrawvalid=seqgrouptrack==seqtrack?2:1;}
+  if(tracking){stop=0;
+   if(c!=6&&seqpitch[c]!=oldpitch){
+    if(gesture&&(edge&J_UP)&&seqpitch[c]>oldtop){top=(int16_t)oldtop+seqrows;seqtop[c]=top>127?127:top;seqgesturepage=1;}
+    if(gesture&&(edge&J_DOWN)&&(int16_t)seqpitch[c]<(int16_t)oldtop-seqrows+1){top=(int16_t)oldtop-seqrows;seqtop[c]=top<(c==2?24:36)+seqrows-1?(c==2?24:36)+seqrows-1:top;seqgesturepage=1;}
+    /* Ordinary one-row octave scrolling keeps its retained fast path. Stop
+       on arrival at an edge, but do not relatch every retained scroll row. */
+    if(gesture||seqtop[c]==oldtop){
+     if((edge&J_UP)&&seqpitch[c]==seqtop[c])stop|=J_UP;
+     if((edge&J_DOWN)&&(int16_t)seqpitch[c]==(int16_t)seqtop[c]-seqrows+1)stop|=J_DOWN;
+    }
+   }else if(c==6&&drumrow!=oldpitch){if((edge&J_UP)&&!drumrow)stop|=J_UP;if((edge&J_DOWN)&&drumrow==12)stop|=J_DOWN;}
+   if(seqcursor[c]!=oldcursor){
+    if((seqcursor[c]/seqcols)*seqcols!=oldbase){seqbase=(seqcursor[c]/seqcols)*seqcols;seqgesturepage=1;}
+    if((edge&J_LEFT)&&seqcursor[c]==seqbase)stop|=J_LEFT;
+    if((edge&J_RIGHT)&&(uint16_t)seqcursor[c]+1==seqbase+seqcols)stop|=J_RIGHT;
+   }
+   seqgestureblocked|=stop;
+   if(seqgesturepage){seqdrawvalid=seqeditpreview=0;dirty=1;stop=1;}
+   if(stop||(edge&seqgestureblocked)){__critical{repeatstart=repeatlast=sys_time;}break;}
+  }
+  /* A grid-repeat batch ends at the focus boundary. Its remaining UPs must
+     not become header scrolling or carry accelerated repeat debt into it. */
+  if(page==8&&!navopen&&!(p&(J_A|J_B))&&(!head)!=(!seqhead)){
+   __critical{repeatstart=repeatlast=sys_time;}break;
+  }
+ }*(uint8_t *)0xA427=0;}
 
 /* Durations are one byte (zero means256); avoid a generic32-bit multiply
    in the real-time onset path. Validated tempo/gate bounds fit24 bits. */

@@ -68,3 +68,17 @@ void seq_popup_render(void) BANKED {uint8_t y;memcpy(canvas,seqscreen,360);
  gen_text(4,11,"X2",seqpopupchoice==4);gen_text(4,12,"/2",seqpopupchoice==5);
  gen_text(0,14,seqpopuperror?(seqpopupchoice>=4?seq_scale_error(seqpopuperror):"CAN'T DO THAT"):"A/B OK SELECT BACK",0);seqflushpending=1;HIDE_SPRITES;
 }
+
+extern uint8_t seqpreviewpinned;
+/* A resize endpoint can advance past the published page. Keep its cursor
+   clipped to that page until B release; the actual endpoint remains intact. */
+void seq_feedback_cursor(void) BANKED{uint8_t c=seqtrack,cursor=seqcursor[c];
+ if(seqpreviewpinned){if(seqcursor[c]<seqbase)seqcursor[c]=seqbase;else if((uint16_t)seqcursor[c]>=seqbase+seqcols)seqcursor[c]=seqbase+seqcols-1;}
+ seq_playhead();seqcursor[c]=cursor;
+}
+void seq_resize_status(void) BANKED{uint16_t length;uint8_t d;
+ if(!seqpreviewpinned||!seqvelocityhidden||seqtrack>=3)return;
+ length=seqdefaultdur[seqtrack];memset(canvas+340,96,20);gen_text(0,17,"LENGTH ",1);
+ d=length/100;canvas[347]=112+d;length-=d*100;d=length/10;canvas[348]=112+d;canvas[349]=112+length-d*10;
+ if((uint16_t)seqcursor[seqtrack]>=seqbase+seqcols)gen_text(11,17,">",1);seqflushpending=1;
+}

@@ -2,6 +2,10 @@
 #pragma opt_code_speed
 #include "api.h"
 #include "drum_rows.h"
+extern uint8_t seqpreviewpinned;
+/* Reversible selection-only variants. Tile reuse invalidates both links;
+   masks of zero mark unused entries, including at startup. */
+static uint8_t selectionmask[120],selectionpair[120];
 /* Foreground-only VRAM copy. Keep the STAT check and byte write together:
    the PCM ISR can otherwise return after the safe LCD window has ended.
    Interrupts run between bytes, never across a complete tile/map upload. */
@@ -103,15 +107,35 @@ const uint8_t rollqx[20]={0,8,16,24,32,0,8,16,24,32,0,8,16,24,32,0,8,16,24,32};
 const uint8_t rollqy[20]={0,0,0,0,0,8,8,8,8,8,16,16,16,16,16,24,24,24,24,24};
 void roll_clear_transition(void) BANKED;
 extern volatile uint8_t padsampled;
+extern volatile uint8_t padqueue[32];
 uint8_t rollcancelled;
+#define ROLL_ABORTED 1
+#define ROLL_RETAINED_SCROLL 2
 /* New input must not wait behind an obsolete full roll repaint. Leave all
    captured edges queued for normal handling; discard only unuploaded work. */
 uint8_t roll_navigation_abort(void) BANKED {
- if(padread==padwrite&&(!(padsampled&J_START)||(lastpad&J_START)))return 0;
- rollcancelled=1;seqdrawvalid=0;rollcache[0]=0;rollbuilding=rollreplace=0;memset(rollpending,0,15);HIDE_SPRITES;return 1;
+ uint8_t at=padread,end=padwrite,previous=lastpad,next;
+ if(at==end&&(!(padsampled&J_START)||(lastpad&J_START)))return 0;
+ if(at!=end){
+  /* Releasing directions does not change the requested view or note data.
+     Let the small retained scroll finish. Cancelling it here discards the
+     whole tile cache and turns a key-up into a full-screen rebuild. Keep
+     every edge queued for normal input handling after publication. */
+  while(at!=end){next=padqueue[at];
+   /* Finish a bounded retained scroll for queued navigation too. Its old
+      image is still correct until those arrows are dispatched; throwing
+      it away here makes rapid taps restart a full-screen rebuild. */
+   if(rollcancelled==ROLL_RETAINED_SCROLL&&!((next|previous)&~(J_LEFT|J_RIGHT|J_UP|J_DOWN))){previous=next;at=(at+1)&31;continue;}
+   if((next&~previous)||((next^previous)&~(J_LEFT|J_RIGHT|J_UP|J_DOWN)))goto cancel;
+   previous=next;at=(at+1)&31;
+  }
+  return 0;
+ }
+ cancel:
+ rollcancelled=ROLL_ABORTED;seqdrawvalid=0;rollcache[0]=0;rollbuilding=rollreplace=0;memset(rollpending,0,15);HIDE_SPRITES;return 1;
 }
 void roll_render_begin(void) BANKED {
- if(rollcancelled){roll_clear_transition();seqfontdirty=0;rollcancelled=0;}
+ if(rollcancelled==ROLL_ABORTED){roll_clear_transition();seqfontdirty=0;}rollcancelled=0;
 }
 void roll_audio(void){mixfill();if(monomode&&expconfig[0])exp_fill();}
 void seq_dimensions(void) BANKED {
@@ -320,6 +344,7 @@ uint8_t roll_intern(uint8_t *bytes){uint8_t h=roll_hash(bytes),n,id,*link;
   /* Remove the unused immutable tile from its old hash chain before reuse. */
   link=&rollheads[roll_hash(rolltiles[n])];while(*link!=n&&*link!=255)link=&rollnext[*link];if(*link==n)*link=rollnext[n];
  }
+ if(selectionmask[n]){selectionmask[selectionpair[n]]=0;selectionmask[n]=0;}
  memcpy(rolltiles[n],bytes,16);rollnext[n]=rollheads[h];rollheads[h]=n;rollpins[n]=1;id=roll_id(n);
  /* Stage in the existing RAM cache. The outgoing screen's VRAM stays intact
     throughout construction, including complete cache replacements. */
@@ -486,8 +511,17 @@ uint8_t roll_selection_update(void) BANKED {
   for(x=first;x<last;x++){
    mask=rollrow[offset+x];if(!mask)continue;
    at=(uint16_t)(row+1)*20+x;n=roll_index(seqscreen[at]);if(n==255)goto selection_full;
-   memcpy(pixels,rolltiles[n],16);roll_xor_tile(pixels,mask);
-   id=roll_intern(pixels);refs[n]--;refs[roll_index(id)]++;canvas[at]=seqscreen[at]=id;roll_audio();
+   if(selectionmask[n]==mask){id=roll_id(selectionpair[n]);rollpins[selectionpair[n]]=1;}
+   else{
+    memcpy(pixels,rolltiles[n],16);roll_xor_tile(pixels,mask);id=roll_intern(pixels);
+    /* Replacing either link must also invalidate its previous reciprocal. */
+    if(!seqtileoverflow){uint8_t partner=roll_index(id);
+     if(selectionmask[n])selectionmask[selectionpair[n]]=0;
+     if(selectionmask[partner])selectionmask[selectionpair[partner]]=0;
+     selectionmask[n]=selectionmask[partner]=mask;selectionpair[n]=partner;selectionpair[partner]=n;
+    }
+   }
+   refs[n]--;refs[roll_index(id)]++;canvas[at]=seqscreen[at]=id;roll_audio();
   }
   service();
  }
@@ -500,14 +534,16 @@ uint8_t roll_selection_update(void) BANKED {
  roll_clear_transition();seqfontdirty=0;return 0;
 }
 void seq_pixels(uint8_t navigation) BANKED {
- uint8_t c=seqtrack,i,x,t,y,gy,within,left,right,color,style,firstcol,lastcol,built=0,retained,velocitydirty=0,selectiondirty=0,oldy,oldnote,kind,event[4],lastnote=0,beatsteps=16/seqdenom,retried=0;
+ uint8_t c=seqtrack,i,x,t,y,gy,within,left,right,color,style,firstcol,lastcol,built=0,retained,velocitydirty=0,selectiondirty=0,oldy,oldnote,kind,event[4],lastnote=0,beatsteps=16/seqdenom,retried=0,multi=seq_event_count(seqtrack)>1;
  int16_t note_y,scroll;uint16_t at,s,last=256,lastdur=0,e,count=0;
- roll_render_begin();if(roll_navigation_abort())return;
+ roll_render_begin();
  redraw:
  built=0;velocitydirty=selectiondirty=0;scroll=0;last=256;lastdur=0;lastnote=0;
  ENABLE_RAM_MBC5;SWITCH_RAM_MBC5(0);seqtileoverflow=0;rollbuilding=1;rollreplace=rollpinslazy=0;memset(rollpending,0,15);HIDE_SPRITES;
  retained=(rollcache[0]==167||rollcache[0]==168)&&seqfontdirty&&seqviewtrack==c&&seqviewbase==seqbase&&seqviewcols==seqcols&&rollcache[1]==(uint8_t)seqlength[c]&&rollcache[2]==seqbeats&&rollcache[3]==seqdenom&&rollcache[4]==seqgridheight;
  if(retained){scroll=((int16_t)seqtop[c]-seqviewtop)*(seqheight>>3);if(scroll>=seqgridheight/8||scroll<=-(int16_t)(seqgridheight/8)){retained=0;scroll=0;}}
+ rollcancelled=retained&&scroll&&navigation?ROLL_RETAINED_SCROLL:0;
+ if(roll_navigation_abort())return;
  if(retained){rollpinslazy=1;memset(rollpins,0,128);memcpy(canvas,seqscreen,360);memset(rollrowsdirty,0,17);built=3;
   /* Pitch scrolling moves immutable tile references, not their pixels.
      Dirty value 2 marks newly exposed rows that also need a piano label. */
@@ -522,13 +558,16 @@ void seq_pixels(uint8_t navigation) BANKED {
   selectiondirty=1;if(rollcache[5]==c)roll_selection_dirty(rollcache[8],rollcache[9]);if(seqgrouptrack==c)roll_selection_dirty(seqgroupy0,seqgroupy1);
  }
 
- if(scroll&&navigation&&(!experimental_mode||!evalpatch[c][EV_CHORD_HISTORY])){roll_scroll_cells();goto paint_rows;}
+ /* Every note has a fixed black body now. Retained pitch scrolling can
+    shift chord lanes too; only exposed rows need their full event overlay.
+    Keep its count when skipping the onset/representative rebuild below. */
+ if(scroll&&navigation){roll_scroll_cells();if(multi)count=seq_event_count(c);goto paint_rows;}
  /* Cache each visible onset once; insertion order need not match step order.
     The nearest prior onset supplies any sustained body crossing the left edge. */
- memset(rollonsets,0,sizeof(rollonsets));memset(rolllowest,255,40);memset(rollsecond,255,40);count=seq_event_count(c);
+ memset(rollonsets,0,sizeof(rollonsets));count=seq_event_count(c);
  for(e=0;e<count;e++){if(roll_navigation_abort())return;seq_event_get(c,e,event);
-  if(event[1]){if(experimental_mode&&evalpatch[c][EV_CHORD_HISTORY]){uint16_t begin=event[0],end=begin+(event[3]?event[3]:256U);uint8_t pitch=event[1]-1;for(i=0;i<seqcols;i++){uint16_t step=(uint16_t)seqbase+i;if(!(i&3))roll_audio();if(step>=begin&&step<end){if(pitch<rolllowest[i]){rollsecond[i]=rolllowest[i];rolllowest[i]=pitch;}else if(pitch!=rolllowest[i]&&pitch<rollsecond[i])rollsecond[i]=pitch;}}}s=event[0];if(s<seqbase){if(last==256||s>last){last=s;lastnote=event[1];lastdur=event[3]?event[3]:256;}}
-   else if(s<(uint16_t)seqbase+seqcols)memcpy(rollonsets[s-seqbase],event,4);
+  if(event[1]){s=event[0];if(s<seqbase){if(last==256||s>last){last=s;lastnote=event[1];lastdur=event[3]?event[3]:256;}}
+   else if(s<(uint16_t)seqbase+seqcols&&(!rollonsets[s-seqbase][1]||event[1]<rollonsets[s-seqbase][1]))memcpy(rollonsets[s-seqbase],event,4);
   }if(!(e&3))roll_audio();
  }
  for(i=0;i<seqcols;i++){s=(uint16_t)seqbase+i;
@@ -546,7 +585,7 @@ void seq_pixels(uint8_t navigation) BANKED {
  if(!retained)for(x=0;x<20;x++){at=(uint16_t)x*16;for(y=1;y<8;y++){rollbackground[at+y*2]=rollbackground[at];rollbackground[at+y*2+1]=rollbackground[at+1];}roll_audio();}
  paint_rows:
  for(t=0;t<seqgridheight/8;t++){if(roll_navigation_abort())return;
-  if(experimental_mode&&evalpatch[c][EV_CHORD_HISTORY])rollrowsdirty[t]=1;if(!rollrowsdirty[t])continue;service();
+  if(multi&&!(retained&&navigation))rollrowsdirty[t]=1;if(!rollrowsdirty[t])continue;service();
   style=seqheight>8?(((t+1)*8)&(seqheight-1))==0:0;
   if(!(built&(1<<style))){
    built|=1<<style;
@@ -557,7 +596,7 @@ void seq_pixels(uint8_t navigation) BANKED {
    memcpy(rollbasepixels[style],rollrow,320);
    for(x=0;x<20;x++){roll_audio();rollbaseids[style][x]=roll_intern(rollrow+x*16);}
   }
-  memset(rolldirty,experimental_mode&&evalpatch[c][EV_CHORD_HISTORY]?1:0,20);if(selectiondirty||seqgrouptrack==c)memset(rolldirty+2,1,18);if(!retained||rollrowsdirty[t]==2)rolldirty[0]=rolldirty[1]=1;
+  memset(rolldirty,multi?1:0,20);if(selectiondirty||seqgrouptrack==c)memset(rolldirty+2,1,18);if(!retained||rollrowsdirty[t]==2)rolldirty[0]=rolldirty[1]=1;
   for(i=0;i<seqcols;i++)if(rollnotey[i]!=255&&rollnotey[i]<t*8+8&&rollnotey[i]+seqheight>t*8){
    firstcol=rollx[i]>>3;lastcol=(rollx[i+1]-1)>>3;for(x=firstcol;x<=lastcol;x++)rolldirty[x]=1;
   }
@@ -566,16 +605,16 @@ void seq_pixels(uint8_t navigation) BANKED {
   /* A retained edit cannot change the piano; keep its immutable tile IDs. */
   if(!retained||rollrowsdirty[t]==2)roll_keyboard(t);roll_audio();
   for(i=0;i<seqcols;i++)if(rollnotey[i]!=255&&rollnotey[i]<t*8+8&&rollnotey[i]+seqheight>t*8){
-   note_y=rollnotey[i];left=rollx[i]+(rollkind[i]==1);right=rollx[i+1];color=seqbase+i>=seqlength[c]?2:3;
+   note_y=rollnotey[i];left=rollx[i]+(rollkind[i]==1);right=rollx[i+1];color=3;
    if(i+1==seqcols||rollnotes[i+1]!=rollnotes[i]||rollkind[i+1]==1)right--;
    for(y=0;y<8;y++){gy=t*8+y;if((int16_t)gy>=note_y+1&&(int16_t)gy<note_y+seqheight-1)roll_span(rollrow,y,left,right,color);}
    roll_audio();
   }
 
-  if(experimental_mode&&evalpatch[c][EV_CHORD_HISTORY]){
+  if(multi){
    for(e=0;e<count;e++){roll_audio();seq_event_get(c,e,event);note_y=((int16_t)rolltop-(event[1]-1))*seqheight;if(!event[1]||note_y>=t*8+8||note_y+seqheight<=t*8)continue;
     for(i=0;i<seqcols;i++){s=(uint16_t)seqbase+i;roll_audio();if(s<event[0]||s>=(uint16_t)event[0]+(event[3]?event[3]:256U))continue;
-     left=rollx[i]+(s==event[0]);right=rollx[i+1]-(s+1==(uint16_t)event[0]+(event[3]?event[3]:256U));color=s>=seqlength[c]?2:eval_mode(c)==1||event[1]-1==rolllowest[i]||eval_mode(c)==2&&event[1]-1==rollsecond[i]?3:1;
+     left=rollx[i]+(s==event[0]);right=rollx[i+1]-(s+1==(uint16_t)event[0]+(event[3]?event[3]:256U));color=3;
      for(y=0;y<8;y++){gy=t*8+y;if((int16_t)gy>=note_y+1&&(int16_t)gy<note_y+seqheight-1)roll_span(rollrow,y,left,right,color);}
     }if(!(e&7))roll_audio();
    }
@@ -600,7 +639,7 @@ void seq_pixels(uint8_t navigation) BANKED {
  }
  if(seqtileoverflow&&!retried){retried=1;roll_clear_transition();seqfontdirty=0;goto redraw;}
  rollcache[0]=167;rollcache[1]=(uint8_t)seqlength[c];rollcache[2]=seqbeats;rollcache[3]=seqdenom;rollcache[4]=seqgridheight;rollcache[5]=seqgrouptrack;rollcache[6]=seqgroupx0;rollcache[7]=seqgroupx1;rollcache[8]=seqgroupy0;rollcache[9]=seqgroupy1;
- previewshape=255;seqfontdirty=1;seqviewtop=seqtop[c];seqviewbase=seqbase;seqviewcols=seqcols;seqviewtrack=c;
+ previewshape=255;seqfontdirty=1;seqviewtop=seqtop[c];seqviewbase=seqbase;seqviewcols=seqcols;seqviewtrack=c;rollcancelled=0;
 }
 /* Playhead and cursor sprites move without touching the background cache. */
 void seq_playhead(void) BANKED {
@@ -624,7 +663,7 @@ void seq_playhead(void) BANKED {
  if(c==6){seqheight=8;seqgridheight=!seqvelocityhidden?112:128;cursor_y=DRUM_SCREEN_ROW(drumrow)*8;}else cursor_y=((int16_t)seqtop[c]-seqpitch[c])*seqheight;
  ch=seqhead==5?24:seqheight;limit=seqhead==5?136:seqgridheight;if(seqhead==5)cursor_y=112;
  if((!seqhead||seqhead==5||seqhead==6)&&!seqfocus&&cursor_y>=0&&cursor_y<limit){
-  i=seqcursor[c]-seqbase;top=cursor_y+8;
+  i=seqpreviewpinned&&seqcursor[c]<seqbase?0:seqcursor[c]-seqbase;if(seqpreviewpinned&&i>=seqcols)i=seqcols-1;top=cursor_y+8;
   if(!rollcursorvisible||rollcursorcell!=i||rollcursory!=top||rollcursorcols!=seqcols||rollcursortrack!=c||rollcursorhead!=seqhead||rollcursorh!=ch){
   if(seqhead==6){left=0;right=c==6?24:16;}else{left=(c==6?24:16)+((uint16_t)i*(c==6?136:144))/seqcols;right=(c==6?24:16)+((uint16_t)(i+1)*(c==6?136:144))/seqcols;}width=right-left;top=cursor_y+8;
   if(rollcursorw!=width||rollcursorh!=ch){

@@ -1,0 +1,58 @@
+PLAYBACK PREPARATION AUDIT ? 2026-10-23
+
+Read-only cycle attribution on released main ROM4d7ff1a7f48a456657bd699a053c796d533456cd649ab76add9565bae500bcdc.
+The failed rolling-buffer sources are NOT the measured ROM. No playback
+source changes made for this audit. tools/audit_prep_work.py instruments
+PyBoy entry/return hooks and the actual assembled LFO table-rebuild branch.
+Tracked nested children, including engine_timer interrupts, are subtracted
+from exclusive cycle counts; inclusive percentages overlap and must not sum.
+Open spans at frame-based measurement boundaries are reported and excluded
+until completed. Percentages are short fixture observations, not whole-program
+proof or a measured speedup from removing work.
+
+Fixture:120BPM,64-step tracks,81notes,3fine/coarse1/32LFO voices.
+Comparison uses the global MOD UI bypass with settings retained.
+
+Findings:
+1. LFO preparation validation is a significant foreground candidate.
+   idle: 88calls, 12.263%exclusive CPU, 0table rebuilds, 0forced calls.
+   navigation: 141calls, 11.954%exclusive CPU, 0table rebuilds, 0forced calls.
+   paint: 222calls, 10.934%exclusive CPU, 0table rebuilds, 28forced calls.
+   lfo_irq_prepare is reached from service_frame and seq_irq_prepare.
+   Each call can walk3voices, construct keys and compare settings. Its frame
+   guard only coalesces unforced calls within the same frame. The native
+   sequencer preparation early-return occurs AFTER this LFO validation call.
+   Candidate: specific modulation revision/dirty bits, preserving a cheap
+   safety check for ownership changes; prove gains with A/B timing before edits.
+
+2. Broad pattern generation drives unrelated foreground checks.
+   mixer_pattern_changed marks seqirqdirty and seqdeadline for note edits,
+   velocities and other changes. service_frame then reruns eval_mod_configure,
+   even when no modulation routing changed. Measured~1.0%CPU during paint;
+   initial8-part routing scan is much smaller than LFO validation.
+
+3. Shared ADSR/LFO frame dispatch still calls eval_mod_frame/eval_audio_frame
+   when configured voices are native LFO-owned. With supported LFO-only voices,
+   lfo_advance is skipped, and eval_audio_frame loops voices but skips native
+   pitch writes. Still~1.2%idle/~1.7%paint exclusive CPU in this fixture.
+   Candidate: compute fallback/frame-only work mask, not skip required ADSR.
+
+4. Full event snapshots are not continuously rebuilt in main.
+   editbuffer_service returns when generation unchanged and defers active
+   paint edits. Painting exclusive CPU~0.03%, snapshot preparation is not the
+   large recurring painting cost in this fixture. When OFF, idle polling was
+   ~5.2%CPU but fell to~0.15%while painting: distinguish spare idle-loop polling
+   from expensive useful work or a demonstrated editing slowdown.
+
+5. Launch preparation is guarded by pending pad and launchready. It does not
+   rescan the next pattern constantly with no launch queued. sparse_snapshot
+   autosave is disabled during playback. Measured inactive launch preparation
+   is small. Drum admission uses a dirty flag; no drum cache rebuilds in this
+   no-drums fixture. Need a drum/launch-specific profile before conclusions.
+
+Do not remove preparation indiscriminately: native IRQ tables/packets avoid
+expensive runtime synthesis and full snapshots preserve continuity through edits.
+This audit identifies validation/invalidation scope as the next candidate,
+not evidence that the prepared playback paths should be removed.
+
+Evidence: build/prep-audit-main-mod-on.json and -off.json (+logs).

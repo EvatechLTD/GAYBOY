@@ -1,0 +1,34 @@
+Header focus responsiveness audit (2026-10-23)
+
+Prototype branch: black-notes. Not merged or deployed.
+Reproduction: plot P2 chord through normal buttons, enable ARP, navigate
+cells across a grid page, return to each of four top-bar regions. A second
+ARP and synth drums/bass remain active. Repeat ARP OFF/ON between cases.
+
+Cause: a cancelled page repaint leaves seqdrawvalid=0. seq_render waited
+for seq_pixels to rebuild the grid before publishing static header focus.
+Input could be accepted within 100ms while the highlight took seconds.
+
+Fix: publish static header tiles before pending grid work. Incoming input
+can interrupt/retry that work as before. Avoid dynamic tile refcount scans
+for static header changes. End synthetic repeat batches at grid/header
+focus boundaries and reset repeat acceleration to prevent spillover.
+
+Actual visible header entry, milliseconds (four regions):
+Before: 3516, 3683, 3633, 3566.
+After: 151, 151, 134, 184.
+ARP OFF visible: 100-134ms. ARP ON visible: 117-201ms.
+The underlying idle full grid repaint can still take seconds. This fix
+prioritizes controls; it does not remove that pending rendering work.
+
+Playback check: 81-event fixture, navigation and paint, 120BPM.
+MOD ON maximum measured note error 0.176ms, no IRQ underruns.
+MOD bypass maximum error 0.041ms, no IRQ underruns.
+Existing LFO preparation prototype modulation-edge tradeoffs remain;
+this audit does not claim every LFO timing regression is resolved.
+
+Primary regression: tools/test_arp_topbar_user_flow.py.
+Reports: build/topbar-ui-topbar-before.json, build/topbar-ui-GAYBOY.json,
+build/header-focus-mod-on.json, build/header-focus-mod-off.json.
+Rendering/playback regression output: build/header-focus-regressions.log.
+Frozen test build: build/GAYBOY-header-focus-test.gb (with symbols/save).

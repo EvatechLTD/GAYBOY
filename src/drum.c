@@ -681,7 +681,7 @@ void drum_input(uint8_t p,uint8_t edge) BANKED {uint8_t s=seqcursor[6],row=drumr
   else if(edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN)){seqamoved=drumbused=1;dst=e[0];r=row;if(edge&J_LEFT)dst--;if(edge&J_RIGHT)dst++;if(edge&J_UP)r--;if(edge&J_DOWN)r++;if(dst<0||dst+dur>seqlength[6]||r<0||r>12)return;drumanchor=drum_plot(dst,r,dur,e[2],n+1);seqcursor[6]=dst;drumrow=r;}else return;
   dirty=1;return;
  }
- if(edge&J_LEFT){if(s==seqbase){seqhead=6;seqedit=0;}else seqcursor[6]=s-1;}if((edge&J_RIGHT)&&(uint16_t)s+1<seqlength[6])seqcursor[6]=s+1;if(edge&J_UP){if(row==0)seqhead=seq_top_entry();else drumrow--;}if(edge&J_DOWN){if(row<12)drumrow++;}if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT))dirty=1;
+ if(edge&J_LEFT){if(!s){seqhead=6;seqedit=0;}else seqcursor[6]=s-1;}if((edge&J_RIGHT)&&(uint16_t)s+1<seqlength[6])seqcursor[6]=s+1;if(edge&J_UP){if(row==0)seqhead=seq_top_entry();else drumrow--;}if(edge&J_DOWN){if(row<12)drumrow++;}if(edge&(J_UP|J_DOWN|J_LEFT|J_RIGHT))dirty=1;
 }
 void drum_synth_render(void) BANKED {eval_render();}
 void drum_synth_input(uint8_t p,uint8_t edge) BANKED {eval_input(p,edge);}

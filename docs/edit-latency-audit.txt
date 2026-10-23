@@ -1,0 +1,58 @@
+Edit-to-playback latency fix prototype, 2026-10-23, black-notes branch.
+Candidate: build/GAYBOY-edit-latency-test.gb. Unmerged, no deployment/push.
+
+User reported needing two loops to hear ordinary one-bar Wave edits, before
+reaching the chord/ARP test. Matched baseline tests show this simple case
+already exists in fast-taps as well as the chord-resize build. It is not
+solely caused by that build's larger redraw batches.
+
+Measured with120BPM16step Wave bass,4notes, hats every16th plus snare/kick,
+no ARP needed. Actual A+UP edits at four target steps and four playhead phases
+(16 combinations). Snapshot readiness/publication and first changed sounding
+Wave note are sampled separately. Late target12 edit could wait3.633s.
+Preparation (~435ms) plus bar-boundary-only publication could miss an upcoming
+occurrence, requiring almost another full loop after publication.
+
+Changes:
+- main gives release/edited source a bounded preparation opportunity before
+  drawing (up to4existing16record batches). Stops on lack of progress from
+  input/audio deadline gating, readiness or completion.
+- Render service also offers buffer preparation between bounded drawing
+  batches, so the snapshot cannot rely solely on the next main-loop pass.
+- Ready immutable snapshots publish before the next sequencer step in both
+  IRQ and foreground paths. Active gates/owners remain intact. Launch rules
+  are untouched. This deliberately replaces16step edit-publication spacing.
+
+16 edit+beat trials, previous chord-resize build -> candidate:
+Preparation median435ms ->201ms.
+First changed note median2143ms ->1390ms; max3633ms ->2160ms.
+A just-missed note onset can still require its next loop plus preparation;
+there is no promise that edits retrigger a note already sounding or that all
+edit-to-sound times fit exactly one bar. Snapshot publication is much sooner
+than the changed note when that note has not yet reached its scheduled step.
+Direct B plotting into a one-bar bassline also tested at four playhead phases.
+All16 bounded-latency regression trials require publication<500ms and first
+changed note<2250ms in this specific fixture. Passed.
+
+Hardware register test: mid-pattern Wave snapshot publication did NOT write
+a new trigger into the sounding gate. The next Wave APU trigger interval was
+2001.046ms (nominal2000ms). No premature note restart at publication.
+Modded81-event UI timing: maximum note interval error0.287ms; zero underruns.
+Navigation median50.2ms, selection50.2ms, paint150.7ms. Dense group movement
+median452.1ms vs418.6ms in the chord-resize build: earlier preparation and
+cache publication have a UI cost; do not claim an across-the-board speedup.
+
+Passed: all16 Dpad-release edits, playback on all test pages, chord resize
+past16steps and selection while note redraw is pending (ARP ON/OFF), exact
+final note/selection pixels, paint velocity catch-up, overlapping native/PCM
+notes and admission, lowest MONO/ARP pitches, rapid8tap single/group source
+and pixel integrity, top-bar real plotting regression. Old original saves
+were not altered. ROM bank checks pass;284bytes spare WRAM,512reserved stack.
+
+New tools: test_wave_edit_audible_latency.py,test_wave_edit_latency_matrix.py,
+test_wave_plot_audible_latency.py,test_wave_edit_latency_bound.py,
+test_edit_snapshot_wave_gate.py. Reports: build/wave-edit-matrix-*.json,
+wave-plot-latency-*.json,edit-priority-*.log/json.
+This includes all earlier prototype changes and preserves the chord-resize
+fix. Prior known modulation precision and dense full-repaint discrepancies
+are not claimed solved. Hardware confirmation remains necessary.
