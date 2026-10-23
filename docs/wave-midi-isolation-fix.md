@@ -45,5 +45,11 @@ contains the same build. SHA256:
 
 Evidence and frozen ROM/symbols/map are preserved under
 `DATA/EXPERIMENTS/wave-midi-isolation-20261023`.
-Branch: `fix/wave-low-notes`. Not merged or published; physical hardware
-confirmation of this fix remains pending. No user emulator/save was modified.
+The tested `fix/wave-low-notes` branch is merged into main for stable 1.0.
+The main rebuild must match the SHA256 above before web packaging. Existing
+tutorial/shared-beat cartridges and browser saves retain their own mappings.
+Release evidence and deployment backups are archived under
+`DATA/ARCHIVES/wave-midi-isolation-20261023`; the completed branch is retained
+by tag `archive/wave-midi-isolation-2026-10-23`.
+No separate physical hardware confirmation was recorded for this fix.
+No user emulator/save was modified.
