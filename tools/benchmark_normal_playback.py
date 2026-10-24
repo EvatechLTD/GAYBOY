@@ -12,6 +12,9 @@ if '--arp-div' in sys.argv:
 bpm=120
 if '--bpm' in sys.argv:
  at=sys.argv.index('--bpm');bpm=int(sys.argv[at+1]);del sys.argv[at:at+2]
+start_offset=0
+if '--start-offset' in sys.argv:
+ at=sys.argv.index('--start-offset');start_offset=int(sys.argv[at+1]);del sys.argv[at:at+2]
 smooth='--smooth' in sys.argv
 if smooth:sys.argv.remove('--smooth')
 exec(Path('tools/test_prepared_drums.py').read_text().split('\ntry:\n')[0])
@@ -79,7 +82,7 @@ try:
   put('page',8);put('seqtrack',2);put('selected',2);put('seqhead',0);put('seqfocus',0);put('seqcursor',4,2);put('seqpitch',72,2);put('seqtop',79,2);put('seqviewinitialized',127);put('dirty',1);p.tick(90)
   if phase=='group_move':
    put('seqcursor',0,2);put('seqpitch',36,2);put('seqtop',50,2);put('seqgrouptrack',2);put('seqgroupx0',0);put('seqgroupx1',112);put('seqgroupy0',36);put('seqgroupy1',42);put('dirty',1);p.tick(30)
-  transport();p.tick(240)
+  p.tick(start_offset);transport();p.tick(240)
   assert get('seqplaying') and bool(get('smooth_playback_active'))==smooth
   noise_hits.clear();kick_hits.clear();notes=[[],[],[]];acks.clear();graphics={n:0 for n in graphics}
   profiling=True;irq_stack=[];irq_stats={}

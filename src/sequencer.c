@@ -99,6 +99,7 @@ void seq_clear_release(uint8_t track) BANKED {if(!editbuffer_reading&&editbuffer
 void seq_stop(void){uint8_t c;drum_irq_active=0;arp_irq_reset();seq_native_launch_clear();editbuffer_reset();if(!syncmode)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
 uint8_t seq_audible(uint8_t c){uint8_t solos=seqsolo&(syncmode==SYNC_TWINK?111:experimental_mode?95:79);if(drumsolomask&&(!seqmode||experimental_mode))solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
 void seq_gates(void) BANKED;
+void seq_clock_epoch(void) BANKED;
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED;
 void seq_pulse_fire(uint8_t c,const uint8_t *event) BANKED;
 uint8_t resident_first_note(uint8_t c,uint8_t *e) BANKED;
@@ -192,7 +193,7 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode,smooth=smooth_playba
  storage_sorted_prepare();eval_drum_prepare();
  if(smooth_playback_preparing&&!syncmode){editbuffer_reading=1;eval_mod_configure();eval_seq_startup_prepare();drum_irq_prepare();editbuffer_reading=0;}
  smooth_playback_preparing=0;
- __critical {editirq_clock_reset();TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;}
+ seq_clock_epoch();
  if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}
  drum_irq_start();
  seq_irq_launch();editbuffer_reading=editbuffer_active();
