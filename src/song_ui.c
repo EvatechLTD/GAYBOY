@@ -119,7 +119,7 @@ void song_render(void) BANKED {uint8_t cells[5][16],lane,col,i,tile,a,index,cur;
   }
  }
  text(0,14,"1 CELL = 1 BAR",0);text(0,15,"B PLOT  A MOVE",0);text(0,16,"B+LR LENGTH",0);text(0,17,"START+SELECT SMOOTH",0);
- if(song_view.error){static const char * const errors[]={"","EMPTY SONG","AUDIO CACHE FULL","UNSUPPORTED PATCH","PCM NOT PREPARED","P1 / KICK SHARED","STOP PATTERN FIRST","SYNC OFF REQUIRED","CLIPS CANNOT OVERLAP","SONG MEMORY FULL"};memset(canvas+300,0,40);text(0,15,errors[song_view.error<10?song_view.error:3],0);}
+ if(song_view.error){static const char * const errors[]={"","EMPTY SONG","AUDIO CACHE FULL","UNSUPPORTED PATCH","PCM NOT PREPARED","P1 / KICK SHARED","STOP PATTERN FIRST","SYNC OFF REQUIRED","CLIPS CANNOT OVERLAP","SONG MEMORY FULL","PAST SONG END"};memset(canvas+300,0,40);text(0,15,errors[song_view.error<11?song_view.error:3],0);}
  LASTBASE=song_view.base;LASTCOL=cur;LASTLANE=song_view.lane;LASTHEAD=song_view.head;LASTSELECT=song_view.selected;LASTPLAY=song_playing;LASTERROR=song_view.error;CONTENTDIRTY=0;
  TILEVALID=1;seqfontdirty=1;seqtilesready=0;*(uint8_t *)0xAD80=0;seqdrawvalid=0;seqflushpending=1;
 }

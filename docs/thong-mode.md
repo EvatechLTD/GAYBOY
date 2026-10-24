@@ -18,7 +18,7 @@ The editor uses one fixed four-quarter bar per cell and sixteen normal-sized cel
 - Hold A from empty time and move the D-pad to box-select clips. Selected groups move/resize horizontally with the same modifiers. Conflicting edits are rejected before changing the arrangement.
 - Header controls are PLAY, LOOP/ONCE and BPM. Each Left/Right move or resize is one whole bar.
 - Start+Select starts blank-screen song playback; repeat to stop.
-- Select+A or header PLAY starts graphical playback. Select+A also stops.
+- Select+A or header PLAY starts graphical playback from the navigator bar. Select+A also stops and places the navigator at the committed playback bar.
 - Set SYNC to OFF before playing this experimental backend. External clock/link playback is not supported here yet.
 
 ## The timing result and the failed approach
@@ -99,3 +99,9 @@ The final fixed-grid test measured about 6.3 ms maximum cursor-render time and 2
 Newly plotting or B-resizing a clip does not select it. Inverted bodies are reserved for A selection: a held single-clip A gesture highlights that clip and release clears it; box-selected groups retain the existing inverted selection behavior. Pending B-delete anchors do not render as selections. Entering Song clears transient single-selection and gesture anchors, including values left in volatile SRAM by a previous session. test_thong_plot_selection.py verifies actual interior pixels for solid plot/resize, inverted A selection, release and deletion, rather than testing stored notes alone.
 
 The reported overlap example was confirmed against the saved current arrangement: pad three occupied bars5..8, followed by pad two at9..10. Bars7..8 appeared hollow because the newly extended pad-three clip had been automatically highlighted; they were occupied. Collision rules were correct. The user's arrangement was retained, the requested listening-save LFO depths were disabled, and ARP was retained. Original and current pre-change saves were archived locally under build/song-visibility-save-*.
+
+## Starting from the navigator
+
+Select+A/header PLAY now starts at the navigator's bar instead of bar one. A pre-start seek locates the active clip or silent gap, reconstructs active pulse/Wave note groups from the compiled streams at the clip's local offset, and positions the next-clip lookahead correctly. Adjacent same-pad clips share their chain offset. Seek scans at most the cached pattern events and arrangement records; it never replays all elapsed song time. All seek work completes while stopped, before the first hardware packet. ARP/LFO oscillators begin a fresh phase on an explicit seek; this is a transport start, not phase-exact restoration of a previous oscillator state. Drums use the current step and active noise state.
+
+Manual/automatic stop captures the committed hardware position atomically and rounds the navigator down to its bar; reaching the end returns it to the final occupied bar. Starting past the song end reports PAST SONG END. Start+Select retains the existing whole-song blank-screen start at bar one. test_thong_seek.py fails against the previous frozen ROM and passes on the change, checking a distinct second-bar P2 note, sustained Wave note, later clip, silent gap and following transition, stop position and end guard. Blank playback ARP/LFO timing and editor selection/navigation/page ownership checks pass.

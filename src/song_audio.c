@@ -186,6 +186,34 @@ static void scene(uint8_t pad){uint8_t c;SongScene *s;
  R.drumstep=0;R.drumcursor=s->begin[3];song_drum_emit();
  for(c=0;c<3;c++){R.voice[c].step=R.voice[c].count=R.voice[c].index=0;R.voice[c].residual=0;R.voice[c].wait=65535U;R.voice[c].cursor=s->begin[c];group(c);}
 }
+/* Cold seek before starting the timer. Read only compiled events up to each
+   track's local position; never replay the whole song or add IRQ work. */
+static void seek_scene(uint8_t pad,uint32_t offset){uint8_t c,h[2],p[6],flags=0,env=8,freq=0,*d;SongScene *s;SongVoice *v;
+ R.scene=pad;quiet();if(pad>=5)return;s=&song_scenes[pad];current_scene=s;
+ put_reg(0x26,s->power?128:0);put_reg(0x24,s->master);
+ for(c=0;c<3;c++){
+  v=&R.voice[c];v->step=offset%s->length[c];v->cursor=s->begin[c];v->count=v->index=0;v->residual=0;v->wait=65535U;
+  while(v->cursor<s->end[c]){song_cache_get(v->cursor,h,2);if(h[0]>v->step)break;v->cursor+=2;v->count=h[1];if(v->count)song_cache_get(v->cursor,(uint8_t *)v->tones,v->count*4);v->cursor+=v->count*4;}
+  if(v->count){song_emit(c,s->mode[c]?rank_next(c):0);v->wait=s->mode[c]?arp_wait(c):65535U;}
+ }
+ R.drumstep=offset%s->length[3];R.drumcursor=s->begin[3];p[1]=0;
+ while(R.drumcursor<s->end[3]){song_cache_get(R.drumcursor,p,6);if(p[0]>R.drumstep){p[1]=0;break;}R.drumcursor+=6;if(p[1]&3){flags=p[1];env=p[2];freq=p[3];}if(p[0]==R.drumstep)break;p[1]=0;}
+ d=s->drum;
+ if(flags&1){route=(route&~0x88)|d[flags&32?5:4];put_reg(0x25,route);put_reg(0x20,0);put_reg(0x21,env);put_reg(0x22,freq);put_reg(0x23,128);}
+ if(p[1]&4){R.kickleft=p[5]?p[5]:256;route=(route&~0x11)|d[6];put_reg(0x25,route);put_reg(0x10,d[0]);put_reg(0x11,d[1]);put_reg(0x12,p[4]);put_reg(0x13,d[2]);put_reg(0x14,d[3]);}
+}
+static void seek_position(uint32_t start){uint16_t i;uint32_t chain=0;uint8_t pad=255;SongClip clip;
+ R.position=start;R.current.pad=255;R.next.pad=255;R.prefetch=R.total;
+ for(i=0;i<R.total;i++){
+  song_read(i,&clip);
+  if(clip.start>start){R.next=clip;R.prefetch=i;break;}
+  if(R.current.pad!=clip.pad||R.current.start+R.current.length!=clip.start)chain=clip.start;
+  R.current=clip;
+  if(start<clip.start+clip.length){pad=clip.pad;R.clipindex=i;R.prefetch=i+1;if(R.prefetch<R.total)song_read(R.prefetch,(SongClip *)&R.next);break;}
+ }
+ if(pad==255)R.current.pad=255;
+ if(start==0)scene(R.first.start?255:R.first.pad);else seek_scene(pad,start-chain);
+}
 static void next_clip(void){
  uint8_t same=R.scene==R.next.pad&&R.current.start+R.current.length==R.next.start;R.current=R.next;R.clipindex=R.prefetch;R.prefetch++;R.need=1;if(!same)scene(R.current.pad);
 }
@@ -376,26 +404,24 @@ static void fill(uint8_t budget){while(budget--&&!R.done&&((song_qwrite+1)&7)!=s
  R.clock+=R.wait;begin_frame();song_audio_due();plan_prefetch();finish_frame();
 }}
 void song_timer(void) NONBANKED {song_irq_tick(1);}
-void song_start(uint8_t smooth) BANKED {uint8_t original=mx.slot,mask=0,c,err;uint16_t i,n,used=0,bpm=seqbpm;SongClip clip;
- if(song_playing){song_stop();return;}if(seqplaying){song_view.error=6;return;}if(syncmode){song_view.error=7;return;}
- n=song_count();if(!n){song_view.error=1;return;}
+void song_start(uint8_t smooth) BANKED {uint8_t original=mx.slot,mask=0,c,err;uint16_t i,n,used=0,bpm=seqbpm;uint32_t start=smooth?0:song_view.cursor&~15UL;SongClip clip;
+ dirty=1;if(song_playing){song_stop();return;}if(seqplaying){song_view.error=6;return;}if(syncmode){song_view.error=7;return;}
+ n=song_count();if(!n){song_view.error=1;return;}if(start>=song_end()){song_view.error=10;return;}
  song_pick_clear();seq_audition_stop();if(pattern_dirty)sparse_snapshot(original);panic();memset((void *)&R,0,sizeof(R));R.origin=original;R.scene=255;R.bpm=bpm;R.units=15360U/bpm;R.remainder=15360U-R.units*bpm;
  for(i=0;i<n;i++){song_read(i,&clip);if(clip.pad>=5||!clip.length||clip.start+clip.length<clip.start){song_view.error=8;return;}mask|=1<<clip.pad;}
  if(smooth)smooth_playback_begin();else smooth_playback_preparing=1;
  for(c=0;c<5;c++)if(mask&(1<<c)){if(!sparse_restore(c)){R.error=3;break;}seqbpm=bpm;if(!compile_scene(c,&used))break;}
  err=R.error;sparse_restore(original);seqbpm=bpm;smooth_playback_preparing=0;editbuffer_reset();arp_irq_reset();editirq_enabled=editirq_running=lfo_irq_mask=drum_irq_active=0;seqirqdirty=seqirqready=seqirqfired=0;
  if(err){song_view.error=err;smooth_playback_update();return;}
- R.end=song_end();R.total=n;R.loop=song_loop();song_read(0,(SongClip *)&R.first);R.current=R.first;
- R.prefetch=R.first.start?0:1;R.next=R.first;
- if(R.prefetch<n)song_read(R.prefetch,(SongClip *)&R.next);
+ R.end=song_end();R.total=n;R.loop=song_loop();song_read(0,(SongClip *)&R.first);
  song_qread=song_qwrite=0;song_qpointer=0xa500;song_hwclock=0;song_hwwait=1;song_actual_done=0;song_actual_scene=255;song_actual_position=0;song_underruns=0;memset(SIM,0,48);
  R.clock=R.last=R.phase=0;R.lfoleft=8;R.stepleft=R.units+(R.remainder!=0);R.prepared=mask;R.wait=R.stepleft;song_view.error=0;
- begin_frame();scene(R.first.start?255:R.first.pad);deadline(0);finish_frame();fill(6);
+ begin_frame();seek_position(start);deadline(0);finish_frame();fill(6);
  __critical{remove_TIM(engine_timer);add_TIM(song_timer);editirq_clock_reset();TMA_REG=TIMA_REG=252;IF_REG&=~TIM_IFLAG;seqplaying=song_playing=1;TAC_REG=4;song_audio_commit();}
  dirty=1;
 }
-void song_stop(void) BANKED {uint8_t original=R.origin;uint16_t bpm=R.bpm;
- __critical{TAC_REG=0;remove_TIM(song_timer);add_TIM(engine_timer);song_playing=0;seqplaying=0;}NR12_REG=NR22_REG=NR42_REG=8;NR14_REG=NR24_REG=NR44_REG=128;NR30_REG=0;panic();editbuffer_reset();storage_sorted_dirty();sparse_restore(original);wave_cache_invalidate();seqbpm=bpm;seqirqdirty=1;seqdrawvalid=seqtilesready=0;song_view.selected=SONG_NONE;song_view.error=0;song_pick_clear();rd=wr;st=count=0;
+void song_stop(void) BANKED {uint8_t original=R.origin;uint16_t bpm=R.bpm;uint32_t position,end=R.end;
+ __critical{TAC_REG=0;remove_TIM(song_timer);add_TIM(engine_timer);song_playing=0;seqplaying=0;position=song_actual_position;}song_view.cursor=(position>=end&&end?end-1:position)&~15UL;NR12_REG=NR22_REG=NR42_REG=8;NR14_REG=NR24_REG=NR44_REG=128;NR30_REG=0;panic();editbuffer_reset();storage_sorted_dirty();sparse_restore(original);wave_cache_invalidate();seqbpm=bpm;seqirqdirty=1;seqdrawvalid=seqtilesready=0;song_view.selected=SONG_NONE;song_view.error=0;song_pick_clear();rd=wr;st=count=0;
  *(uint8_t *)0xA475=0;*(uint8_t *)0xA4D0=0;smooth_playback_update();dirty=1;
 }
 void song_service(void) BANKED {uint32_t position,width;if(song_actual_done){song_stop();return;}fill(2);
