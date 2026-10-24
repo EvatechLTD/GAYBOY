@@ -40,6 +40,11 @@ def u16(n):return get(n)+256*get(n,1)
 try:
  setup_fixture();fixture=BytesIO();p.save_state(fixture)
  events=bytes(p.memory[1,0xa300:event_end]);kits=bytes(p.memory[2,0xa800:0xad00])
+ protected=[(0xa000,0xa820),(0xaa00,0xb200),(0xb400,0xb810),(0xbf80,0xc000)]
+ # Seed unused/private storage without disturbing the loaded fixture.
+ for start,end in protected:
+  if start!=0xbf80:p.memory[3,start:end]=[(i*37+11)&255 for i in range(end-start)]
+ saved=[bytes(p.memory[3,i] for i in range(start,end)) for start,end in protected]
  transport();p.tick(600)
  assert get('drum_irq_active') and get('smooth_playback_active')
  assert len(noise_hits)>=80 and len(kick_hits)>=15,(len(noise_hits),len(kick_hits))
@@ -48,14 +53,15 @@ try:
  gaps=[(y['cycle']-x['cycle'])/4194.304 for x,y in zip(noise_hits,noise_hits[1:])]
  assert max(abs(g-125) for g in gaps)<1,gaps[:20]
  assert bytes(p.memory[1,0xa300:event_end])==events and bytes(p.memory[2,0xa800:0xad00])==kits
+ assert all(bytes(p.memory[3,i] for i in range(start,end))==data for (start,end),data in zip(protected,saved)), 'Prepared drums overwrote persistent storage/clipboard'
  transport();assert not get('seqplaying') and not get('drum_irq_active')
  before=len(noise_hits);p.tick(120);assert len(noise_hits)==before
  transport();p.tick(120);assert get('drum_irq_active')
  print('PASS complete hat/kick rhythm, original noise mix, timing, unchanged notes/kits, stop and restart')
- # A new edit invalidates the scratch consumer before publication reuses its RAM.
+ # An unrelated edit must leave independent prepared percussion running.
  word('pattern_generation',u16('pattern_generation')+1);p.tick(5)
- assert not get('drum_irq_active') and get('seqplaying')
- print('PASS edit generation returns drums to the normal dispatcher')
+ assert get('drum_irq_active') and get('seqplaying')
+ print('PASS unrelated generation keeps timer-owned drums running')
  for kind in ('pcm','shared_p1','modulated'):
   fixture.seek(0);p.load_state(fixture)
   if kind=='pcm':p.memory[1,0xa300+sum(counts[:6])*4+1]=1

@@ -35,14 +35,36 @@ static volatile uint16_t timer_clock,timer_wait=65535U;
 
 uint8_t arp_irq_owned(uint8_t c) NONBANKED {return (arpirq_enabled|lost_ownership)&(1<<c);}
 void arp_irq_cancel(uint8_t c) NONBANKED;
+/* A changed snapshot ends automatic future looping, retaining the current
+   chord until its natural gate/onset. Foreground will admit the edited chord. */
+void arp_irq_pattern_changed(uint8_t c) NONBANKED {
+ uint8_t bit=1<<c;if(!(pattern_mask&bit))return;
+ __critical{pattern_mask&=~bit;continuous[c]=repeating[c]=reset_loop[c]=0;}
+}
 uint8_t arp_irq_valid(uint8_t c) NONBANKED {return power&&(seqplaying||smooth_playback_preparing)&&seqswing==50&&(!syncmode||!syncslave)&&(arpirq_enabled&(1<<c))&&generation[c]==pattern_generation&&prepared_bpm[c]==seqbpm&&!bend[c];}
-uint8_t arp_irq_pattern_owned(uint8_t c) NONBANKED {return c<3&&(pattern_mask&(1<<c))&&arp_irq_valid(c);}
+uint8_t arp_irq_continue(uint8_t c) BANKED;
+static uint16_t pattern_steps[3];
+uint8_t arp_irq_pattern_owned(uint8_t c) BANKED {
+ uint8_t e[4],i,j,matched=0;uint16_t count;
+ if(c>=3||!(pattern_mask&(1<<c)))return 0;
+ if(arp_irq_valid(c))return 1;
+ /* Global generations also change during edits on other lanes, including
+    during this chord's rest. Verify the active snapshot before preserving
+    its timer-owned next onset; never hide a changed chord or gate. */
+ count=seq_event_count(c);if(count!=prepared_count[c])return 0;
+ for(i=0;i<count;i++){
+  seq_event_get(c,i,e);if(e[0]||(e[3]?e[3]:256U)!=pattern_steps[c])return 0;
+  for(j=0;j<prepared_count[c];j++)if(!(matched&(1<<j))&&e[1]==prepared_notes[c][j]+1&&e[2]==prepared_vel[c][j])break;
+  if(j==prepared_count[c])return 0;matched|=1<<j;
+ }
+ return arp_irq_continue(c);
+}
 static uint8_t eligible(uint8_t c,uint16_t period,uint16_t scale);
 uint8_t arp_irq_continue(uint8_t c) BANKED {
  if(!continuous[c])return 0;if(arp_irq_valid(c))return 1;
  /* An unrelated lane edit must not retrigger this unchanged, looping chord.
     Validate actual inputs before adopting its new global generation. */
- if(!(arpirq_enabled&(1<<c))||prepared_bpm[c]!=seqbpm||prepared_length[c]!=seqlength[c]||!eligible(c,periods[c],scales[c])||prepared_level[c]!=mx.level[c]||
+ if(!(arpirq_enabled&(1<<c))||prepared_bpm[c]!=seqbpm||prepared_length[c]!=seqlength[c]||!eligible(c,periods[c],scales[c])||prepared_level[c]!=mx.level[c]||prepared_retrigger[c]!=evalpatch[c][EV_RETRIGGER]||
     memcmp(prepared_eval[c],evalpatch[c]+1,7)||memcmp(prepared_param[c],param[c],26)||
     (c==2&&(prepared_custom!=custom||(custom&&memcmp(wave_image,customwave,16)))))return 0;
  generation[c]=pattern_generation;return 1;
@@ -106,7 +128,7 @@ uint8_t arp_irq_prepare(uint8_t c,uint32_t requested,uint16_t scale,uint16_t ste
  }
  memcpy(prepared_eval[c],evalpatch[c]+1,7);prepared_length[c]=seqlength[c];memcpy(prepared_notes[c],arpfirstnotes[c],count);memcpy(prepared_vel[c],arpfirstvel[c],count);memcpy(prepared_param[c],v,26);prepared_count[c]=count;prepared_order[c]=order;prepared_level[c]=mx.level[c];prepared_retrigger[c]=evalpatch[c][EV_RETRIGGER];if(c==2)prepared_custom=custom;
  __critical{memcpy(packets[c],stage_packets,length*6);memcpy(patches[c],stage_patch,6);if(c==2)memcpy(wave_image,stage_wave,16);lost_ownership&=~bit;periods[c]=period;scales[c]=scale;arp_phase[c]=residual;attack_wait[c]=wait;whole_ticks[c]=whole;fractions[c]=fraction;continuous[c]=keep;unit_shift[c]=shift;prepared_bpm[c]=seqbpm;repeating[c]=keep;remaining[c]=left;sequence_length[c]=length;generation[c]=pattern_generation;lasttick[c]=timer_clock;
-  if(pattern){pattern_mask|=bit;pattern_gate[c]=((uint32_t)steps*15360U+seqbpm-1)/seqbpm;remaining[c]=gatewindow;}else pattern_mask&=~bit;reset_loop[c]=keep&&evalpatch[c][EV_RETRIGGER];loop_wait[c]=left;loop_whole[c]=barwhole;loop_fraction[c]=barfraction;loop_residual[c]=barresidual;first_wait[c]=whole+(fraction!=0);first_residual[c]=fraction?scale-fraction:0;
+  if(pattern){pattern_steps[c]=steps;pattern_mask|=bit;pattern_gate[c]=((uint32_t)steps*15360U+seqbpm-1)/seqbpm;remaining[c]=gatewindow;}else pattern_mask&=~bit;reset_loop[c]=keep&&evalpatch[c][EV_RETRIGGER];loop_wait[c]=left;loop_whole[c]=barwhole;loop_fraction[c]=barfraction;loop_residual[c]=barresidual;first_wait[c]=whole+(fraction!=0);first_residual[c]=fraction?scale-fraction:0;
   if(pattern&&gatewindow<wait)wait=gatewindow;if(left<wait&&(!repeating[c]||reset_loop[c]))wait=left;if(wait<timer_wait)timer_wait=wait;arpirq_enabled|=bit;}
  return 1;
 }

@@ -6,6 +6,7 @@
 #include "mixer_shared.h"
 #include "drum_rows.h"
 extern volatile uint8_t drum_irq_active;
+void drum_irq_reset(void) BANKED;
 uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED;
 uint16_t roll_drum_onset(uint8_t step,uint8_t row) BANKED;
 uint16_t roll_drum_hit(uint8_t step,uint8_t row) BANKED;
@@ -99,7 +100,7 @@ static void drum_noise_release(uint8_t force){
   if(experimental_mode&&active[3])eval_audio_resume_noise();
  }
 }
-void drum_stop(void) BANKED {if(!druminit)return;kick_stop();drumon[0]=drumon[1]=0;if(waveengine==3){drumtail=1;mixrunning=0;if(!experimental_mode)active[2]=0;mixready[0]=mixready[1]=0;NR30_REG=0;}noiseleft[0]=noiseleft[1]=0;memset(drumreleasing,0,2);if(drumnoiseowned||drumnoisetail)drum_noise_silence();drumnoiseowned=0;}
+void drum_stop(void) BANKED {drum_irq_reset();if(!druminit)return;kick_stop();drumon[0]=drumon[1]=0;if(waveengine==3){drumtail=1;mixrunning=0;if(!experimental_mode)active[2]=0;mixready[0]=mixready[1]=0;NR30_REG=0;}noiseleft[0]=noiseleft[1]=0;memset(drumreleasing,0,2);if(drumnoiseowned||drumnoisetail)drum_noise_silence();drumnoiseowned=0;}
 void drum_noise(void){uint8_t i,n=0,pan,v[5],a=!!noiseleft[0],b=!!noiseleft[1];if(!a&&!b){drum_noise_release(0);return;}
  for(i=0;i<5;i++){v[i]=a&&b?(noisepatch[0][i]+noisepatch[1][i]+1)>>1:noisepatch[b?1:0][i];}
  if(a&&b)n=drum_scale(((uint16_t)eval_drum_level(5,noisepatch[0][0])*noiselevel[0]+(uint16_t)eval_drum_level(6,noisepatch[1][0])*noiselevel[1]+127)>>1);else n=drum_scale((uint16_t)eval_drum_level(b?6:5,v[0])*noiselevel[b?1:0]);
@@ -719,8 +720,10 @@ void seq_next_deadline(void) BANKED {uint8_t c;uint16_t next,step;
   if(c<4&&!experimental_mode&&!monomode&&seqgate[c]==100&&seqgateleft[c]+1==step)continue;
   next=seqgateleft[c];
  }
- if(drumnoiseowned)for(c=0;c<2;c++)if(noiseleft[c]&&noiseleft[c]<next)next=noiseleft[c];
- if(pulsekickleft&&pulsekickleft<next)next=pulsekickleft;{step=eval_arp_wait();if(step<next)next=step;}seqdeadline=next?next:1;
+ /* Timer-owned percussion has its own gate deadline. Its ownership flags
+    are not foreground durations and must not force continuous catch-up. */
+ if(!drum_irq_active){if(drumnoiseowned)for(c=0;c<2;c++)if(noiseleft[c]&&noiseleft[c]<next)next=noiseleft[c];
+ if(pulsekickleft&&pulsekickleft<next)next=pulsekickleft;}{step=eval_arp_wait();if(step<next)next=step;}seqdeadline=next?next:1;
 }
 
 void drum_synth_audition(void) BANKED {drum_init();if(drumsynthvoice==2)kick_start(100,256);else {drumreleasing[drumsynthvoice]=0;eval_note(5+drumsynthvoice,1);noiseleft[drumsynthvoice]=256;noiselevel[drumsynthvoice]=100;drum_noise();}dirty=1;}

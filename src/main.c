@@ -9,6 +9,8 @@
 #include "mixer_shared.h"
 #include "midi_input.h"
 #include "smooth_playback.h"
+extern volatile uint8_t drum_irq_pending;
+void drum_irq_service(void) BANKED;
 #include "notes.h"
 #include "lfo_irq.h"
 #define REG(a) (*(volatile uint8_t *)(a))
@@ -147,7 +149,7 @@ void main(void){uint8_t p,edge,frame=0;sync_init();intro_run();DISPLAY_OFF;NR52_
  if(!syncmode&&seqplaying&&!seqservicing&&seqirqdirty&&!seqirqready&&!seqirqfired){seqservicing=1;seq_irq_prepare();seqservicing=0;}
  /* Release/edit edges above may have made a playback snapshot eligible.
     Give its bounded prep batch priority before starting foreground drawing. */
- editbuffer_priority_service();
+ editbuffer_priority_service();if(drum_irq_pending)drum_irq_service();
  if(smooth_playback_active&&!seqplaying&&!smooth_playback_preparing)smooth_playback_update();
  if(smooth_playback_active)continue;
  /* Settings pages change on input. Periodic refresh is only for live views. */

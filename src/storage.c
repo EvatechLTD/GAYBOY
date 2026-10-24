@@ -6,6 +6,8 @@
 #include "resident.h"
 #include "smooth_playback.h"
 void eval_chord_dirty(uint8_t c) BANKED;
+void drum_irq_changed(uint8_t mask) BANKED;
+void arp_irq_pattern_changed(uint8_t c) NONBANKED;
 void eval_chord_refresh(uint8_t c) BANKED;
 uint16_t seqeventcounts[7],seqeventoffsets[7];uint8_t seqeventfull,seqeventcache;
 /* Address index only: the note records remain resident in their five pools.
@@ -50,8 +52,8 @@ void seq_irq_launch(void) BANKED;
 static void eb_notify_foreground(void){uint8_t c,mask,reading,busy;if(!eb_notify)return;
  __critical{mask=eb_notify;eb_notify=0;}
  reading=editbuffer_reading;busy=seqservicing;seqservicing=1;editbuffer_reading=1;
- for(c=0;c<3;c++)if(mask&(1<<c))eval_chord_refresh(c);
- if(mask&64)eval_drum_dirty();editbuffer_reading=reading;seqservicing=busy;
+ for(c=0;c<3;c++)if(mask&(1<<c)){arp_irq_pattern_changed(c);eval_chord_refresh(c);}
+ if(mask&64)eval_drum_dirty();drum_irq_changed(mask);editbuffer_reading=reading;seqservicing=busy;
 }
 void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*head,v,amp,budget=16;uint16_t at,f,scaled,longest;
  if((!seqplaying&&!smooth_playback_preparing)||mx.slot!=eb_slot){if(editbuffer_valid)seq_irq_launch();editbuffer_valid=editbuffer_ready=eb_building=0;eb_slot=mx.slot;}
@@ -143,13 +145,19 @@ void editbuffer_boundary(void) BANKED {
    restore bank zero before re-enabling interrupts. Never bank ROM here. */
 uint8_t editbuffer_irq_event(uint8_t c,uint8_t step,uint8_t *out) NONBANKED {
  uint8_t h=step+(c<<6),i,next,found=0,ie=IE_REG,*base=(uint8_t *)editbuffer_base,*record;
- uint16_t begin=eb_offsets[c],end=begin+eb_counts[c],limit=256;
+ uint8_t begin=eb_offsets[c],count=eb_counts[c],full=eb_counts[c]>>8,limit=0,best=255,first=1;
+ if(!count&&!full)return 0;
  IE_REG=0;SWITCH_RAM_MBC5(2);
  if(base[EB_BITS+(h>>3)]&(1U<<(h&7))){
   i=base[EB_HEAD+h];do{
    record=base+(uint16_t)i*7;
-   if(i>=begin&&i<end&&record[0]==step&&record[1]&&(!found||record[1]<out[1])){memcpy(out,record,7);found=1;}
-   next=base[EB_NEXT+i];if(next==i)break;i=next;
+   /* Lane ranges fit in one byte (with256 explicitly represented). */
+   if((full||(uint8_t)(i-begin)<count)&&record[0]==step&&record[1]&&record[1]<best){
+    memcpy(out,record,7);best=record[1];found=1;
+    /* A matching head is already the lowest note of its melodic lane. */
+    if(first)break;
+   }
+   next=base[EB_NEXT+i];if(next==i)break;i=next;first=0;
   }while(--limit);
  }
  SWITCH_RAM_MBC5(0);IE_REG=ie;return found;

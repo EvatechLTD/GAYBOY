@@ -120,7 +120,7 @@ void drum_timer(void) BANKED;
 void input_vblank(void);
 uint8_t editirq_elapsed(uint8_t fallback) NONBANKED;
 extern volatile uint8_t drum_irq_active;
-void drum_irq_tick(uint8_t elapsed) BANKED;
+void drum_irq_tick(uint8_t elapsed) NONBANKED;
 void engine_timer(void){uint8_t n;
  sync_clock_isr();
  if(syncarmed){

@@ -9,6 +9,7 @@ extern uint8_t editbuffer_valid,editbuffer_irq_mask,arpirq_enabled;
 extern uint8_t arp_active_mask;
 void arp_irq_tick(uint8_t elapsed) NONBANKED;
 void eval_arp_prepare(void) BANKED;
+void drum_irq_configure(void) BANKED;
 extern uint16_t seqclock;
 uint8_t editbuffer_active(void) BANKED;
 uint8_t editbuffer_irq_event(uint8_t c,uint8_t step,uint8_t *out) NONBANKED;
@@ -138,6 +139,7 @@ void seq_irq_launch(void) BANKED {uint8_t c,mask;uint16_t clock;uint32_t left;__
 void seq_irq_refresh(uint8_t c) BANKED {(void)c;seq_irq_launch();}
 void seq_irq_prepare(void) BANKED {
  uint8_t c,want=0,patch[3][7],image[16],changed=seqirqdirty;uint16_t start,units;
+ if(changed)drum_irq_configure();
  if((eval_lfousers&7)||lfo_irq_mask)lfo_irq_prepare(changed);if(arp_active_mask)eval_arp_prepare();
  seqirqdirty=0;
  if((syncmode&&linkstate==2)||!editbuffer_active()||monomode||polymode||seqswing!=50||seqmode||syncmode&&syncslave){if(editirq_running)seq_irq_launch();return;}

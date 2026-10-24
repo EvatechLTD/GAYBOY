@@ -54,7 +54,7 @@ void arp_irq_reset(void) NONBANKED;
 uint8_t arp_irq_owned(uint8_t c) NONBANKED;
 uint8_t arp_irq_valid(uint8_t c) NONBANKED;
 uint8_t arp_irq_continue(uint8_t c) BANKED;
-uint8_t arp_irq_pattern_owned(uint8_t c) NONBANKED;
+uint8_t arp_irq_pattern_owned(uint8_t c) BANKED;
 uint8_t arp_irq_prepare(uint8_t c,uint32_t period,uint16_t scale,uint16_t steps) BANKED;
 extern uint8_t eval_prepare_due,editbuffer_reading;
 extern uint16_t seqclock;

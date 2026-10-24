@@ -185,16 +185,16 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode,smooth=smooth_playba
  if(waveengine!=3&&seq_enabled(6)&&seq_audible(6)){uint8_t e[4];uint16_t cursor=0,bit;
   while(seq_event_next_step(6,0,&cursor,e))if(e[1]&&e[1]<=10){bit=1U<<(e[1]-1);if(!(drummutemask&bit)&&(!drumsolomask||(drumsolomask&bit))){drum_init();drum_enable();break;}}
  }
- if(smooth){
-  smooth_playback_begin();
-  if(!editbuffer_prepare_stopped()){smooth_playback_preparing=0;seqservicing=0;smooth_playback_update();return;}
- }
+ /* Both transports prepare audio while musical time is stopped. Only the
+    explicit Smooth transport changes or suppresses the display. */
+ if(smooth)smooth_playback_begin();else smooth_playback_preparing=1;
+ if(!editbuffer_prepare_stopped()){smooth_playback_preparing=0;seqservicing=0;smooth_playback_update();return;}
  storage_sorted_prepare();eval_drum_prepare();
  if(smooth_playback_preparing&&!syncmode){editbuffer_reading=1;eval_mod_configure();eval_seq_startup_prepare();drum_irq_prepare();editbuffer_reading=0;}
  smooth_playback_preparing=0;
  __critical {editirq_clock_reset();TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;}
  if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}
- if(smooth_playback_active)drum_irq_start();
+ drum_irq_start();
  seq_irq_launch();editbuffer_reading=editbuffer_active();
  {for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);
  if(seq_enabled(6))seq_fire(6);}seq_next_deadline();seq_irq_prepare();editbuffer_reading=0;seqservicing=0;dirty=1;
