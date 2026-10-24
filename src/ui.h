@@ -79,10 +79,12 @@ void ui_channel(uint8_t c){uint8_t i;auditionstop();if(monomode||polymode){panic
  eval_row=eval_col=eval_tab=0;seqtrack=c==4?5:c;selected=c;choice=c<4?program[c]:0;cursor[1]=cursor[2]=cursor[4]=cursor[5]=cursor[6]=0;tablefield=0;
 }
 /* The pixel roll borrows preview, meter and grey-font tile slots. */
-void ui_restore_seq_tiles(void){extern uint8_t seqtilesready;uint8_t tile,y,c,v,buf[16],defer=page>=18;uint16_t bit,packed;
- if(!defer)ui_transition_begin();
- for(tile=220;tile<243;tile++){mixfill();c=graychars[tile-220]-32;for(y=0;y<8;y++){v=0;if(c<64&&y<7){bit=((uint16_t)c*7+y)*5;packed=ui_glyphs[bit>>3]|((uint16_t)ui_glyphs[(bit>>3)+1]<<8);v=((packed>>(bit&7))&31)<<2;}buf[y*2]=v;buf[y*2+1]=0;}if(defer)memcpy(wavepixels+(uint16_t)(tile-220)*16,buf,16);else ui_upload_tile(tile,buf,0);}
- for(tile=0;tile<12;tile++){mixfill();for(y=0;y<8;y++){v=tile<9?(y+tile>=8?126:0):tile==9?(y==3?255:0):y==1||y==6?126:y>1&&y<6?(tile==11?126:66):0;buf[y*2]=v;buf[y*2+1]=tile==9?0:v;}if(defer)memcpy(wavepixels+368+(uint16_t)tile*16,buf,16);else ui_upload_tile(192+tile,buf,0);}ui_font_upload_pending=defer;seqfontdirty=0;seqtilesready=0;previewshape=255;
+void ui_restore_seq_tiles(void){extern uint8_t seqtilesready;uint8_t tile,y,c,v,buf[16];uint16_t bit,packed;
+ /* Publish from the local buffer: wavepixels is shared with pattern/file
+    preparation, which mixfill may run before a deferred upload. */
+ ui_transition_begin();
+ for(tile=220;tile<243;tile++){mixfill();c=graychars[tile-220]-32;for(y=0;y<8;y++){v=0;if(c<64&&y<7){bit=((uint16_t)c*7+y)*5;packed=ui_glyphs[bit>>3]|((uint16_t)ui_glyphs[(bit>>3)+1]<<8);v=((packed>>(bit&7))&31)<<2;}buf[y*2]=v;buf[y*2+1]=0;}ui_upload_tile(tile,buf,0);}
+ for(tile=0;tile<12;tile++){mixfill();for(y=0;y<8;y++){v=tile<9?(y+tile>=8?126:0):tile==9?(y==3?255:0):y==1||y==6?126:y>1&&y<6?(tile==11?126:66):0;buf[y*2]=v;buf[y*2+1]=tile==9?0:v;}ui_upload_tile(192+tile,buf,0);}ui_font_upload_pending=0;mixerfontdirty=0;seqfontdirty=0;seqtilesready=0;previewshape=255;
 }
 
 void ui_render(void) BANKED {uint8_t i,n,start,inv;if(page>=18)seqflushpending=1;

@@ -55,4 +55,12 @@ python tools/test_arp_loop_edit_isolation.py
 
 Detailed traces and the frozen main baseline live in ignored build output. Private user-session captures and saves remain outside the repository.
 
-ROM SHA-256: `69118c5a3df0bfd7e9eb599f3898b2b9625f565814a9115c34ed42bae520f2c7`.
+ROM SHA-256: `804f77b50e8a8afcfe4fad6339dc2751ae00b46dd8888e2034b53df8288ebe4f`.
+
+## Shared graphics fixes before promotion
+
+Mixer faders occupy tiles 244..249, overlapping sequencer M/S glyphs. Mixer now explicitly revokes the M/S tile cache when claiming those slots. Font restoration also revokes cached fader graphics; returning from a pad-paste confirmation must rebuild rails even when their numeric values are unchanged. Font tiles upload from a local buffer, avoiding deferred staging in scratch SRAM shared with file/pattern work.
+
+`python tools/test_shared_ui_tiles.py` reproduces the mixer corruption on the previous ROM through real pad copy, paste, and overwrite confirmation. The fixed ROM preserves all 42 fader tiles, the copied pad data, and all eight M/S variants through repeated sequencer/mixer/load-screen round trips. The M/S cache test also covers the cleared grid-font state left by an aborted roll rebuild.
+
+Graphical playback and active-LFO benchmarks still pass, with worst drum interval errors below 0.4 ms in their regular 120 BPM cases. Smooth controls, stopped live audition/drag/resize, graphical drum edits and tempo changes, and selection scope also pass. The experimental song-mode worktree is untouched.

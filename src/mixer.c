@@ -257,7 +257,11 @@ static void pattern_library_render(void){uint8_t i,start=mx.browser>3?mx.browser
  if(mx.error)text(0,16,"NOT ENOUGH SPACE",0);storage_footer();
 }
 static char *pad_hint(void){uint8_t state;if(mx.error)return sparse_enabled?(pool_error==2?"SAVE DATA DAMAGED":"NOT ENOUGH SPACE"):"PATTERN >256 EVENTS";if(link_pair_phase)return "PAIR PREPARING...";if(linkpair&&linkstate!=2)return "PAIR NEEDS LINK";if(mx.focus==64)return "A+ARROWS B OFF";if(mx.focus>=65)return "A/B+ARROWS VOLUME";if(mx.focus>=38)return "A/B TOGGLE";if(mx.focus<30)return "A PICK B EDIT";state=mixer_prepare_status(mx.focus-30);return state==1?"READY A/B":state==2?"PREPARING...":state==3?"QUEUED":"A PICK B EDIT";}
+extern uint8_t seqtilesready;
 void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_init();rendering_slot=mx.slot;
+ /* Font/roll pages reuse rail tiles, including the M/S header slots. A
+    cached knob value is reusable only while Mixer still owns its graphics. */
+ if(page==18&&!mixerfontdirty){mixer_image.valid=0;memset(fader_image_knob,255,6);}
  if(page==18&&MIXER_LINK_VIEW){mixer_image.valid=0;mixer_link_render();return;}
  /* Pad navigation changes only the two pattern rows and their footer. Reuse
     the published strip image when every value that affects it is unchanged. */
@@ -269,7 +273,7 @@ void mixer_render(void) BANKED {uint8_t c,i,rendering_slot;char name[17];mixer_i
  if(page==20&&mx.naming){namekeyboard();return;}
  if(page!=18){for(i=0;i<8;i++){getname(i,name);num(0,2+i,i+1,mx.browser==i);text(4,2+i,name[0]?name:"EMPTY",mx.browser==i);mixfill();}if(page==20){text(0,11,"NAME",0);text(0,12,mx.name,0);text(0,14,"A NAME WITH KEYBOARD",0);text(0,15,"B SAVE",0);}else {text(0,12,"A LOAD INTO PAD",0);num(16,12,file_target+1,0);}if(mx.error)text(0,16,sparse_enabled?"NOT ENOUGH SPACE":"TOO MANY NOTES (>512)",0);storage_footer();return;}
  if(fader_pattern!=mx.slot){fader_pattern=mx.slot;fader_ready_frame=sys_time+2;}
- if(ui_font_upload_pending){ui_transition_begin();ui_font_upload_pending=0;}mixerfontdirty=1;
+ if(ui_font_upload_pending){ui_transition_begin();ui_font_upload_pending=0;}mixerfontdirty=1;seqtilesready=0;
  /* A new strip viewport replaces pending graphics requests from the old one. */
  fader_pending=0;
  text(15,0,"LOCAL",1);text(8,0,seqplaying?"STOP":"PLAY",mx.focus!=0);text(0,1,"BPM",0);if(seqglobalbpm)num(4,1,seqglobalbpm,mx.focus==64);else text(4,1,"OFF",mx.focus==64);
