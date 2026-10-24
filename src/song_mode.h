@@ -5,9 +5,9 @@
 #define SONG_PAGE 29
 #define SONG_CAPACITY 158U
 #define SONG_NONE 65535U
-/* Timeline retains native sixteenths; the closest visible zoom is eighths. One record, not one record per visible cell. */
+/* Audio positions use native sixteenths. Editor cells are fixed sixteen-step bars; sixteen cells per screen. */
 typedef struct {uint32_t start,length;uint8_t pad;} SongClip;
-typedef struct {uint32_t cursor,base;uint16_t selected;uint8_t lane,zoom,head,gesture,used,error;} SongView;
+typedef struct {uint32_t cursor,base;uint16_t selected;uint8_t lane,reserved,head,gesture,used,error;} SongView;
 extern __at (0xA4ED) SongView song_view;
 extern uint8_t song_playing;
 uint16_t song_count(void) BANKED;

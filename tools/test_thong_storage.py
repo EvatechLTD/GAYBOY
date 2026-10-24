@@ -24,7 +24,7 @@ try:
   for at,v in enumerate((index*32).to_bytes(4,'little')):put('song_view',v,at)
   put('song_view',index%5,10);put('song_view',0,11);put('song_view',0,12);put('dirty',1);p.tick(60)
   key('a',True);tap('right');key('a',False)
-  assert clips()[index]==(index*32+2,16,index%5),(index,clips()[index])
+  assert clips()[index]==(index*32+16,16,index%5),(index,clips()[index])
  before=read_storage(0,1430)
  choose(18);put('mx',30,4);put('dirty',1);p.tick(30);choose(40,1)
  put('mx',31,4);put('dirty',1);p.tick(30);choose(41,1);assert get('page')==26;tap('up');tap('a');p.tick(60)

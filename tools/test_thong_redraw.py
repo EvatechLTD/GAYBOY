@@ -26,5 +26,5 @@ try:
  for _ in range(60):frame()
  assert not transitions,('Song editor invoked a full-page tile restoration',len(transitions))
  p.screen.image.save('build/thong-redraw.png')
- print('PASS no transient blanking during navigation, plot, resize, move, zoom and header edits')
+ print('PASS no transient blanking during navigation, plot, resize, move, fixed-grid resolution and header edits')
 finally:p.stop(save=False)

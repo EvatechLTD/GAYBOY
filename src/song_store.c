@@ -19,7 +19,7 @@ void song_read(uint16_t i,SongClip *c) BANKED {if(i>=SONG_CAPACITY){memset(c,0,s
 uint16_t song_find(uint32_t at) BANKED {uint16_t i,n=song_count();SongClip c;
  for(i=0;i<n;i++){song_read(i,&c);if(c.start>at)break;if(at-c.start<c.length)return i;}return SONG_NONE;}
 uint32_t song_end(void) BANKED {SongClip c;uint16_t n=song_count();if(!n)return 0;song_read(n-1,&c);return c.start+c.length;}
-void song_delete(uint16_t i) BANKED {uint8_t h[8];SongClip c;header(h);if(i>=h[4])return;while(i+1<h[4]){song_read(i+1,&c);bytes(8+i*9,(uint8_t *)&c,9,1);i++;}h[4]--;bytes(0,h,8,1);}
+void song_delete(uint16_t i) BANKED {uint8_t h[8];*(uint8_t *)0xBEA1=1;SongClip c;header(h);if(i>=h[4])return;while(i+1<h[4]){song_read(i+1,&c);bytes(8+i*9,(uint8_t *)&c,9,1);i++;}h[4]--;bytes(0,h,8,1);}
 uint8_t song_put(uint16_t old,const SongClip *input) BANKED {SongClip c,previous;uint16_t i,n=song_count(),rank=0;uint8_t h[8];
  if(old!=SONG_NONE&&old>=n)return 0;
  if(input->pad>=5||!input->length||input->start+input->length<input->start)return 0;
@@ -27,7 +27,7 @@ uint8_t song_put(uint16_t old,const SongClip *input) BANKED {SongClip c,previous
  if(old==SONG_NONE&&n>=SONG_CAPACITY)return 0;
  c=*input;if(old!=SONG_NONE){song_delete(old);n--;}
  for(i=n;i>rank;i--){song_read(i-1,&previous);bytes(8+i*9,(uint8_t *)&previous,9,1);}
- bytes(8+rank*9,(uint8_t *)&c,9,1);header(h);h[4]=n+1;bytes(0,h,8,1);
+ *(uint8_t *)0xBEA1=1;bytes(8+rank*9,(uint8_t *)&c,9,1);header(h);h[4]=n+1;bytes(0,h,8,1);
  return 1;
 }
 uint32_t song_pattern_length(uint8_t pad) BANKED {uint8_t b[28],c;uint16_t longest=0,n,length;
@@ -42,7 +42,7 @@ uint32_t song_pattern_length(uint8_t pad) BANKED {uint8_t b[28],c;uint16_t longe
 __at (0xA7C0) static uint8_t pick[20];
 __at (0xA7D4) static uint32_t pick_anchor;
 __at (0xA7D8) static uint8_t pick_lane;
-void song_pick_clear(void) BANKED {memset(pick,0,20);}
+void song_pick_clear(void) BANKED {*(uint8_t *)0xBEA1=1;memset(pick,0,20);}
 uint8_t song_pick_has(uint16_t i) BANKED {return i<SONG_CAPACITY&&(pick[i>>3]&(1<<(i&7)));}
 void song_pick_begin(uint32_t at,uint8_t lane) BANKED {song_pick_clear();pick_anchor=at;pick_lane=lane;}
 void song_pick_box(uint32_t at,uint8_t lane,uint16_t unit) BANKED {uint32_t lo=at<pick_anchor?at:pick_anchor,hi=at>pick_anchor?at:pick_anchor;uint8_t bottom=lane<pick_lane?lane:pick_lane,top=lane>pick_lane?lane:pick_lane;uint16_t i,n=song_count();SongClip c;

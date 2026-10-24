@@ -399,7 +399,7 @@ void song_stop(void) BANKED {uint8_t original=R.origin;uint16_t bpm=R.bpm;
  *(uint8_t *)0xA475=0;*(uint8_t *)0xA4D0=0;smooth_playback_update();dirty=1;
 }
 void song_service(void) BANKED {uint32_t position,width;if(song_actual_done){song_stop();return;}fill(2);
- position=song_actual_position;if(!smooth_playback_active&&song_view.cursor!=position){song_view.cursor=position;width=(uint32_t)2<<song_view.zoom;if(song_view.zoom>2)width=(uint32_t)16<<(song_view.zoom-3);width*=32;if(position<song_view.base||position-song_view.base>=width)dirty=1;}
+ position=song_actual_position;if(!smooth_playback_active&&song_view.cursor!=position){song_view.cursor=position;width=256;if(position<song_view.base||position-song_view.base>=width)dirty=1;}
 }
 
 extern volatile uint8_t padqueue[32],padread,padwrite,padsampled;

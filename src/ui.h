@@ -81,6 +81,7 @@ void ui_channel(uint8_t c){uint8_t i;auditionstop();if(monomode||polymode){panic
 }
 /* The pixel roll borrows preview, meter and grey-font tile slots. */
 void ui_restore_seq_tiles(void){extern uint8_t seqtilesready;uint8_t tile,y,c,v,buf[16];uint16_t bit,packed;
+ if(page==SONG_PAGE)*(uint8_t *)0xBEA0=0;
  /* Publish from the local buffer: wavepixels is shared with pattern/file
     preparation, which mixfill may run before a deferred upload. */
  ui_transition_begin();
@@ -91,7 +92,7 @@ void ui_restore_seq_tiles(void){extern uint8_t seqtilesready;uint8_t tile,y,c,v,
 void ui_render(void) BANKED {uint8_t i,n,start,inv;if(page>=18)seqflushpending=1;
  if(navopen||(page!=1&&page!=2&&page!=17)||tonepresetopen)*(uint8_t *)0xA475=0;
  if(!navopen)*(uint8_t *)0xA4D0=0;
- if(navopen){HIDE_SPRITES;seqflushpending=1;ui_menu();return;}
+ if(navopen){if(page==SONG_PAGE)*(uint8_t *)0xBEA0=0;HIDE_SPRITES;seqflushpending=1;ui_menu();return;}
  /* Song owns its borrowed tiles until exit, just like the pixel roll. */
  {if(page!=18&&mixerfontdirty){if(page!=8&&page!=SONG_PAGE)ui_restore_seq_tiles();mixerfontdirty=0;}}
  if(page!=8)HIDE_SPRITES;if(page!=8&&page!=SONG_PAGE&&seqfontdirty)ui_restore_seq_tiles();

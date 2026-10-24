@@ -6,7 +6,7 @@ Branch: `THONG_MODE`, based on main `571aa38`. This is a review build, not a mai
 
 Five named pattern lanes, one sounding pattern at a time. Clips never overlap, even across lanes. New clips use the longest occupied track length of their pad. Extending a clip repeats the pad and ends at the requested offset. A gap silences the APU while the song clock continues. Adjacent same-pad plotting extends the preceding clip. LOOP defaults ON; ONCE stops at the last clip end. Editing is disabled during playback.
 
-Timeline positions and lengths are 32-bit native sixteenths. This preserves odd-length patterns without rounding their audio length to the visible grid. The display has 32 cells per page at eighth, quarter, half, 1-bar, 2-bar, 4-bar, 8-bar, 16-bar and 32-bar zooms. Song bars are fixed four-quarter units; each pad retains its own native track lengths. Zooming never changes stored clips. There is no page-count limit; natural 32-bit coordinate bounds apply. There are 158 clip records, not 158 cells: one very long repeating clip still occupies nine bytes.
+The editor uses one fixed four-quarter bar per cell and sixteen normal-sized cells per screen. There are no zoom or sub-bar controls. New clip lengths round up to whole bars; moving and resizing use whole bars. Time-signature-aware arrangement behavior is deferred by user request. Audio positions remain 32-bit native sixteenths internally, so the prepared playback engine does not need a new timing representation. There is no page-count limit; natural 32-bit coordinate bounds apply. There are 158 clip records, not 158 cells: one very long repeating clip still occupies nine bytes.
 
 ## Controls for UI review
 
@@ -16,7 +16,7 @@ Timeline positions and lengths are 32-bit native sixteenths. This preserves odd-
 - Hold A plus Left/Right on a clip to move it horizontally.
 - Hold B plus Left/Right to resize a clip. Vertical movement cannot change its pad.
 - Hold A from empty time and move the D-pad to box-select clips. Selected groups move/resize horizontally with the same modifiers. Conflicting edits are rejected before changing the arrangement.
-- Select+Up/Down changes zoom. Header controls also change zoom, LOOP/ONCE and BPM.
+- Header controls are PLAY, LOOP/ONCE and BPM. Each Left/Right move or resize is one whole bar.
 - Start+Select starts blank-screen song playback; repeat to stop.
 - Select+A or header PLAY starts graphical playback. Select+A also stops.
 - Set SYNC to OFF before playing this experimental backend. External clock/link playback is not supported here yet.
@@ -85,3 +85,11 @@ Next gate: user UI review and hardware timing/listening. Then improve any handli
 ## UI review correction: repeated blanking
 
 The first review build set seqfontdirty after each Song render, then ui_render interpreted that flag as leaving the pixel roll on the next input. ui_restore_seq_tiles called ui_transition_begin, hiding the background during every edit. Settled screenshots missed this transient failure. Song now retains borrowed tile ownership while its page is active; actual page exits still restore ordinary tiles. test_thong_redraw.py checks the LCD background bit every emulated frame during navigation, plot, move, resize, zoom and header edits, and rejects any full-page restoration during those operations. The test fails on the original build and passes with this correction. Song exit, shared mixer/roll tiles and prepared ARP/LFO audio checks also pass.
+
+## Fixed-bar grid and navigation correction
+
+User review simplified the arrangement to one bar per cell and sixteen cells per screen; all zoom/sub-bar controls were removed. The grid now uses ordinary eight-pixel outlined cells with black clip bodies. Pattern names follow the same uppercase/sanitized font mapping as the other sequencer pages. The old unsanitized lowercase glyph IDs collided with the borrowed grid tiles.
+
+Stopped navigation retains cell signatures at bank-zero BE00..BE4F, validity at BEA0 and content/cursor metadata through BEAD. These occupy inactive roll scratch beyond both group-edit staging lists (the second list ends BD2C). No WRAM was added. Input releases and an idle header no longer request another render. Cursor moves bypass clip/name scans and update only the previous/new cell tiles. Content edits and selection changes invalidate the retained raster; page/menu exits invalidate tile ownership. Full source records and ordinary playback paths remain separate.
+
+The final fixed-grid test measured about 6.3 ms maximum cursor-render time and 22.5 ms header navigation, compared with about 137 ms for the intermediate retained-tile renderer that still recomposed every lane. These are emulator CPU/render measurements, not end-to-end hardware input latency. test_thong_navigation.py checks a one-frame cursor-render budget, at most two uploaded tiles per move, label integrity and idle header/grid behavior. test_thong_bars.py checks a four-bar plus eight-bar arrangement occupies twelve cells, and extends an eight-bar clip to ten bars. Audio, blanking, overlap, group edits, storage, gaps and page-exit regressions pass on the simplified grid.
