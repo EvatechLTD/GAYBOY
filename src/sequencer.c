@@ -1,6 +1,13 @@
 #pragma bank 10
 #include "api.h"
 #include "seq_live_note.h"
+#include "smooth_playback.h"
+uint8_t editbuffer_prepare_stopped(void) BANKED;
+void eval_seq_startup_prepare(void) BANKED;
+extern volatile uint8_t drum_irq_active;
+void drum_irq_prepare(void) BANKED;
+void drum_irq_start(void) BANKED;
+void editirq_clock_reset(void) NONBANKED;
 uint8_t native_edit_flush(void) BANKED;
 uint8_t native_edit_service(void) BANKED;
 extern uint8_t seqeditpreview,seqpreviewpinned;
@@ -89,7 +96,7 @@ uint8_t seq_enabled(uint8_t c){return c<3||c==6||(c==TWINK_TRACK&&syncmode==SYNC
 void seq_off(uint8_t c){uint8_t note;eval_seq_off(c);if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
 void seq_clear_release(uint8_t track) BANKED {if(!editbuffer_reading&&editbuffer_active())return;seq_off(track);}
 
-void seq_stop(void){uint8_t c;arp_irq_reset();seq_native_launch_clear();editbuffer_reset();if(!syncmode)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
+void seq_stop(void){uint8_t c;drum_irq_active=0;arp_irq_reset();seq_native_launch_clear();editbuffer_reset();if(!syncmode)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
 uint8_t seq_audible(uint8_t c){uint8_t solos=seqsolo&(syncmode==SYNC_TWINK?111:experimental_mode?95:79);if(drumsolomask&&(!seqmode||experimental_mode))solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
 void seq_gates(void) BANKED;
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED;
@@ -142,7 +149,7 @@ void seq_pattern_release(void) BANKED {uint8_t c,busy=seqservicing;if(!syncmode)
     same-pattern continuity is handled by the ordinary handoff path. */
  for(c=0;c<SEQ_TRACKS;c++)seq_off(c);
  seqservicing=busy;}
-static void pattern_start(uint8_t preserve){uint8_t c,busy=seqservicing;arp_irq_reset();if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);if(!preserve)seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
+static void pattern_start(uint8_t preserve){uint8_t c,busy=seqservicing;drum_irq_active=0;arp_irq_reset();if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);if(!preserve)seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
 
  if(seqcachedbpm!=seqbpm)seq_gates();if(!preserve)mixer_clock_reset();if(syncmode&&(!preserve||syncslave))sync_pattern();
  seqlaunching=1;
@@ -169,7 +176,7 @@ void seq_next_deadline(void) BANKED;
 uint8_t sync_local_stop_allowed(void) BANKED;
 void eval_drum_prepare(void) BANKED;
 void storage_sorted_prepare(void) BANKED;
-void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;seq_audition_stop();if(seqplaying){if(syncmode==1&&syncslave&&!syncbusy&&!sync_local_stop_allowed())return;if(!seqservicing)seq_frame();seq_stop();return;}seq_stop();
+void seq_transport(void) BANKED {uint8_t c,oldmono=monomode,smooth=smooth_playback_requested;smooth_playback_requested=0;seq_audition_stop();if(seqplaying){if(syncmode==1&&syncslave&&!syncbusy&&!sync_local_stop_allowed())return;if(!seqservicing)seq_frame();seq_stop();smooth_playback_update();return;}seq_stop();
  if(experimental_mode){monomode=polymode=0;}else if(seqmode){if(!monomode)monoenable();}
  else {if(monomode||polymode)panic();monomode=polymode=0;if(oldmono){TAC_REG=waveengine?4:0;route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}globals();}}
  memset(seqposition,0,SEQ_TRACKS);seqclock=seqticks=seqfraction=0;if(!(TAC_REG&4)){TMA_REG=240;TIMA_REG=240;IF_REG&=~TIM_IFLAG;TAC_REG=4;}seq_gates();mixer_clock_reset();seqservicing=1;
@@ -178,12 +185,19 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode;seq_audition_stop();
  if(waveengine!=3&&seq_enabled(6)&&seq_audible(6)){uint8_t e[4];uint16_t cursor=0,bit;
   while(seq_event_next_step(6,0,&cursor,e))if(e[1]&&e[1]<=10){bit=1U<<(e[1]-1);if(!(drummutemask&bit)&&(!drumsolomask||(drumsolomask&bit))){drum_init();drum_enable();break;}}
  }
+ if(smooth){
+  smooth_playback_begin();
+  if(!editbuffer_prepare_stopped()){smooth_playback_preparing=0;seqservicing=0;smooth_playback_update();return;}
+ }
  storage_sorted_prepare();eval_drum_prepare();
- __critical {TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;}
+ if(smooth_playback_preparing&&!syncmode){editbuffer_reading=1;eval_mod_configure();eval_seq_startup_prepare();drum_irq_prepare();editbuffer_reading=0;}
+ smooth_playback_preparing=0;
+ __critical {editirq_clock_reset();TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;}
  if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}
- seq_irq_launch();
+ if(smooth_playback_active)drum_irq_start();
+ seq_irq_launch();editbuffer_reading=editbuffer_active();
  {for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);
- if(seq_enabled(6))seq_fire(6);}seq_next_deadline();seq_irq_prepare();seqservicing=0;dirty=1;
+ if(seq_enabled(6))seq_fire(6);}seq_next_deadline();seq_irq_prepare();editbuffer_reading=0;seqservicing=0;dirty=1;
 }
 /* The timer keeps elapsed time even while no event is due. Avoid rescanning
    seven gates on every audio block: wake only for the next gate or step. */
@@ -375,8 +389,8 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
   if(seqapending==4){seqaanchor=seqcursor[c];seqaoffset=seqpitch[c];}else seqaoffset=seqcursor[c]-seqaanchor;
  }
  if(seqapending){
-  if(seqapending==4){if(p&J_A){if(edge&mask)seq_group_box(edge);return;}if(!seqamoved){seqgrouptrack=255;if(seqdrawvalid)seqdrawvalid=2;dirty=1;}seqapending=0;if(!(edge&mask))return;}
-  if(seqapending==3){if(p&J_A){if(edge&mask){if(seq_group_contains(seqaanchor,seq_note_get(c,seqaanchor)-1))seq_group_move(edge);else seq_move(edge);}return;}seqapending=0;if(!(edge&mask))return;}
+  if(seqapending==4){if(p&J_A){if(edge&mask)seq_group_box(edge);return;}if(!seqamoved){if(!seqplaying&&seqgrouptrack!=c)seq_live_empty();seqgrouptrack=255;if(seqdrawvalid)seqdrawvalid=2;dirty=1;}seqapending=0;if(!(edge&mask))return;}
+  if(seqapending==3){if(p&J_A){if(edge&mask){if(seq_group_contains(seqaanchor,seq_note_get(c,seqaanchor)-1))seq_group_move(edge);else seq_move(edge);}return;}if(!seqamoved&&!seqplaying){seq_live_current(1);seq_live_release();}seqapending=0;if(!(edge&mask))return;}
   if(p&J_B){
    if(edge&(J_LEFT|J_RIGHT)){seqamoved=seqbused=1;if(seqapending==2&&seq_group_contains(seqaanchor,seq_note_get(c,seqaanchor)-1))seq_group_resize(edge&J_LEFT?-1:1);else seq_drag(edge&J_LEFT?-1:1);}
    return;
@@ -392,10 +406,11 @@ void seq_tiles(void){uint8_t tile,y,lo,hi,buf[16];
  if(seqtilesready)return;
  /* Full-height header switches use the same 5x7 letters as the UI. */
  for(tile=0;tile<8;tile++){for(y=0;y<8;y++){const uint8_t m[7]={17,27,21,21,17,17,17},s[7]={15,16,16,14,1,1,30};uint8_t glyph=y<7?(tile<4?m[y]:s[y])<<2:0;
-  lo=(tile&1)?(uint8_t)~glyph:glyph;hi=lo;
-  /* Side rails span the full bar; focus brightens the rails. */
-  if(tile&2){lo&=0x7E;hi&=0x7E;}else{lo&=0x7E;hi|=0x81;}
-  if(y==7){lo=0;hi=tile&2?0:255;}
+  /* Inactive switches share the black header; active switches invert.
+     Focus uses contrasting rails without changing the switch state. */
+  lo=(tile&1)?glyph:(uint8_t)~glyph;hi=lo;
+  if(tile&2){lo^=0x81;hi^=0x81;}
+  if(y==7&&tile&2){lo=(uint8_t)~lo;hi=lo;}
   buf[y*2]=lo;buf[y*2+1]=hi;}ui_upload_tile(244+tile,buf,0);seq_audio();}
  seqtilesready=1;previewshape=255;
 }

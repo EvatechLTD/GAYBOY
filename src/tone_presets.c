@@ -64,13 +64,13 @@ extern uint8_t navcategory,mixer_device;
 static const char * const finderpages[]={"LIVE","TONE","MOD","BANK","CC","TABLE","FX","MONOSYNTH","SEQUENCER","MASTURBATE","SEQ SETTINGS","P1","P2","WAVE","WAVE2","NOISE","SETTINGS","DRUMSYNTH","MIXER","LOAD PATTERN","SAVE PATTERN","COPY","PASTE","KITS","LOAD SONG","SAVE SONG","CLEAR PATTERN","SYNC"};
 static void finder_text(uint8_t x,uint8_t y,const char *t,uint8_t inverse){uint8_t c;while(*t&&x<20){c=*t++;canvas[(uint16_t)y*20+x++]=c-32+(inverse?96:0);if(!(x&3))mixfill();}}
 /* Finder categories keep existing page/action IDs; 28..34 jump to tracks. */
-const uint8_t finderitems[5][16]={
+const uint8_t finderitems[5][17]={
  {18,8,45,16,27,4,44,255},
- {38,21,43,22,46,51,52,42,36,37,35,26,40,41,39,47},
+ {53,38,21,43,22,46,51,52,42,36,37,35,26,40,41,39,47},
  {28,29,30,31,32,33,34,10,255},
  {11,12,13,14,15,17,7,9,1,2,3,5,6,255},
  {48,49,50,19,20,24,25,255}};
-const uint8_t findercount[5]={7,16,8,13,7};
+const uint8_t findercount[5]={7,17,8,13,7};
 const char * const findertracks[]={"P1","P2","WAVE","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
 extern uint8_t mixer_layout_dirty;
 uint8_t pageconfig;
@@ -83,7 +83,7 @@ static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finde
 void finder_first(void) BANKED {uint8_t i,item;mx.error=0;navchoice=255;for(i=0;i<finder_count();i++){item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 void finder_step(int8_t delta) BANKED {uint8_t i,n=finder_count(),tries,item;mx.error=0;for(i=0;i<n;i++)if(finder_item(i)==navchoice)break;for(tries=0;tries<n;tries++){i=delta<0?(i?i-1:n-1):(i+1)%n;item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 static const char * const finderedit[]={"CLEAR TRACK","COPY TRACK","PASTE TRACK","SELECT ALL","CLEAR SONG","COPY PATTERN","PASTE PATTERN","DELETE NOTES","CUT"};
-static const char *finder_label(uint8_t item){if(item==15||item==31)return 0;if(item==33)return "MS";if(item==48)return "LOAD KIT";if(item==49)return "SAVE KIT";if(item==50)return "LOAD SAMPLE";if(item==51)return "X2";if(item==52)return "/2";if(item==47)return "GENERATE";if(item==46)return "DUPLICATE";if(item==45)return "MIXER SETTINGS";if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
+static const char *finder_label(uint8_t item){if(item==15||item==31)return 0;if(item==33)return "MS";if(item==48)return "LOAD KIT";if(item==49)return "SAVE KIT";if(item==50)return "LOAD SAMPLE";if(item==53)return "SELECT SCREEN";if(item==51)return "X2";if(item==52)return "/2";if(item==47)return "GENERATE";if(item==46)return "DUPLICATE";if(item==45)return "MIXER SETTINGS";if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
 static const char *shortcut_label(uint8_t item);
 __at (0xA4D0) static uint8_t menuvalid;
 __at (0xA4D1) static uint8_t menucat;

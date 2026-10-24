@@ -119,6 +119,8 @@ void streamblock(void) __naked {
 void drum_timer(void) BANKED;
 void input_vblank(void);
 uint8_t editirq_elapsed(uint8_t fallback) NONBANKED;
+extern volatile uint8_t drum_irq_active;
+void drum_irq_tick(uint8_t elapsed) BANKED;
 void engine_timer(void){uint8_t n;
  sync_clock_isr();
  if(syncarmed){
@@ -128,5 +130,5 @@ void engine_timer(void){uint8_t n;
  /* Sample after the PCM upload. Delayed VBlank sampling alone can miss a
     one-frame tap; both interrupt producers run without nesting. */
  if(waveengine==3){drum_timer();input_vblank();return;}
- if(seqplaying&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));seq_irq_tick(n);seqticks+=n;}if(!power)return;
+ if(seqplaying&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);seqticks+=n;}if(!power)return;
 }

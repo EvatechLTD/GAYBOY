@@ -63,11 +63,22 @@ void seq_meterbuild(void) BANKED{uint8_t i,beat=0,within=0,steps;if(seqmeterbeat
 /* The track and region clipboards share SRAM, with explicit menu actions. */
 uint8_t seq_clip_kind(void) BANKED {uint8_t meta[16];clip_part(0,meta,16,0);return meta[0]==0xC8&&meta[11]==0x73?1:meta[0]==0xC9&&meta[11]==0x74?2:0;}
 void seq_copy_track(void) BANKED {uint8_t group=seqgrouptrack;seqgrouptrack=255;seq_copy();seqgrouptrack=group;}
-void seq_select_visible(void) BANKED {uint16_t i,end=seqlength[seqtrack];uint8_t c=seqtrack,e[4];
- for(i=0;i<seq_event_count(c);i++){seq_event_get(c,i,e);if(e[1]&&(uint16_t)e[0]+1>end)end=(uint16_t)e[0]+1;mixfill();}
- seqgrouptrack=c;seqgroupx0=0;seqgroupx1=end-1;seqgroupy1=c==6?12:127;seqgroupy0=0;
- seqcursor[c]=0;if(c==6)drumrow=0;seqapending=seqamoved=seqhead=seqfocus=0;seqdrawvalid=0;dirty=1;
+/* Tight bounds keep the existing region edit machinery usable after either
+   selection action, including notes on other pages and octaves. */
+static void select_notes(uint8_t screen){
+ uint16_t i,end=(uint16_t)seqbase+seqcols;uint8_t c=seqtrack,e[4],y,found=0;
+ uint8_t x0=255,x1=0,y0=127,y1=0,low=c==6?0:seqtop[c]+1>seqrows?seqtop[c]+1-seqrows:0;
+ for(i=0;i<seq_event_count(c);i++){
+  seq_event_get(c,i,e);if(!e[1])continue;y=c==6?DRUM_VIEW_ROW(e[1]-1):e[1]-1;
+  if(screen&&(e[0]<seqbase||e[0]>=end||(c!=6&&(y<low||y>seqtop[c]))))continue;
+  if(e[0]<x0)x0=e[0];if(e[0]>x1)x1=e[0];if(y<y0)y0=y;if(y>y1)y1=y;found=1;mixfill();
+ }
+ seqgrouptrack=found?c:255;seqgroupx0=x0;seqgroupx1=x1;seqgroupy0=y0;seqgroupy1=y1;
+ /* Preserve the viewport. Choosing a whole track must not navigate away. */
+ seqapending=seqamoved=seqhead=seqfocus=0;seqdrawvalid=0;dirty=1;
 }
+void seq_select_visible(void) BANKED {select_notes(1);}
+void seq_select_all(void) BANKED {select_notes(0);}
 void seq_clear_release(uint8_t track) BANKED;
 void seq_delete_selection(void) BANKED {uint8_t e[4],c=seqtrack;uint16_t i;
  if(seqgrouptrack!=c)return;sparse_journal_edit_barrier();sparse_finish_install();i=seq_event_count(c);

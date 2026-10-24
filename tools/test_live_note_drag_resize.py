@@ -26,6 +26,33 @@ try:
   key('b',False)
   assert len(calls)==before+1 and get('seq_live_timed') and get('seqauditionnote')==note+1
   ms=wait_silent(500);print('PASS drag retrigger and four-cell resize release',c,ms,'ms',flush=True)
+ # An unmoved A gesture auditions only on release, with the stored duration.
+ for c,note in ((0,60),(1,60),(2,24),(6,0)):
+  setup(c,note);tap('b');before=len(calls)
+  key('a',True);assert len(calls)==before,'A press auditioned before release'
+  key('a',False)
+  assert len(calls)==before+1 and get('seq_live_timed')
+  assert get('seqauditionnote')==note+1
+  print('PASS A tap release audition',c,wait_silent(125),'ms',flush=True)
+  before=len(calls);tap('a');assert len(calls)==before+1
+  wait_silent(125)
+ # Empty-cell A taps preview the current pitch and remembered length only.
+ for c,note in ((0,60),(1,60),(2,24),(6,0),(6,3)):
+  setup(c,note);word('seqdefaultdur',4,c*2);before=len(calls)
+  key('a',True);assert len(calls)==before
+  key('a',False)
+  assert len(calls)==before+1 and get('seq_live_timed')
+  assert get('seqauditionnote')==note+1 and get('seqeventcounts',c*2)==0
+  print('PASS empty-cell tap without insertion',c,note,wait_silent(500),'ms',flush=True)
+ # Empty-cell taps clear an existing selection silently; the next tap previews.
+ for c,note in ((0,60),(2,24),(6,0)):
+  setup(c,note);put('seqgrouptrack',c);put('seqgroupx0',4);put('seqgroupx1',6)
+  put('seqgroupy0',note);put('seqgroupy1',note);put('dirty',1);p.tick(30)
+  before=len(calls);tap('a')
+  assert get('seqgrouptrack')==255 and len(calls)==before
+  assert not get('seq_live_timed') and not get('seqauditionnote')
+  tap('a');assert len(calls)==before+1 and get('seq_live_timed')
+  print('PASS deselection is silent, subsequent empty tap previews',c,flush=True)
  for bpm,steps in ((60,4),(240,4),(120,2)):
   setup(2,24);word('seqbpm',bpm);word('seqglobalbpm',bpm);tap('b')
   key('b',True)

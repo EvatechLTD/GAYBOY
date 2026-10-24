@@ -36,6 +36,16 @@ void seq_live_current(uint8_t resize) BANKED {
   return;
  }
 }
+/* Audition the empty cell using the same length/velocity as a new note,
+   without touching resident events or the playback snapshot. */
+uint16_t drum_preview_length(void) BANKED;
+void seq_live_empty(void) BANKED {
+ uint8_t c=seqtrack;if(seqplaying)return;
+ resizepending=1;resizechannel=c;resizenote=c==6?drumrow:seqpitch[c];
+ resizevelocity=eval_plotvel[c];resizeduration=c==6?drum_preview_length():seqdefaultdur[c];
+ if(!resizeduration)resizeduration=256;
+ seq_live_release();
+}
 void seq_live_release(void) BANKED {
  uint8_t pending=resizepending,c=resizechannel,note=resizenote,vel=resizevelocity;uint16_t duration=resizeduration,frames;
  seq_audition_stop();if(!pending||seqplaying)return;
@@ -146,7 +156,7 @@ uint8_t finder_edit_allowed(uint8_t item) BANKED {
  if(item==21||item==42||item==43||item==46)return seqgrouptrack==seqtrack;
  if(item==22)return seq_clip_kind()==2;
  if(item==37)return seq_clip_kind()==1;
- return item==35||item==36||item==38;
+ return item==35||item==36||item==38||item==53;
 }
 uint8_t seq_region_duplicate(void) BANKED;
 uint8_t finder_edit_action(uint8_t item) BANKED {uint8_t ok=1;
@@ -160,7 +170,8 @@ uint8_t finder_edit_action(uint8_t item) BANKED {uint8_t ok=1;
  }
  if(item==36)seq_copy_track();
  if(item==37)seq_paste();
- if(item==38)seq_select_visible();
+ if(item==38)seq_select_all();
+ if(item==53)seq_select_visible();
  if(item==21||item==43){sparse_finish_install();ok=seq_region_copy(item==43);if(ok&&item==43)mixer_pattern_changed();}
  if(item==22){sparse_journal_edit_barrier();sparse_finish_install();ok=seq_region_paste(seqcursor[seqtrack],seqtrack==6?drumrow:seqpitch[seqtrack]);if(ok)mixer_pattern_changed();}
  if(item==42)seq_delete_selection();

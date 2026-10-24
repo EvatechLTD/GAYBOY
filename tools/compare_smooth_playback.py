@@ -10,7 +10,7 @@ exec(Path('tools/test_wave_saved_tempo.py').read_text().split('\ntry:')[0])
 S=symbols;notes=[];arp=[];edges=[];lastfreq=[None];low=[0]
 counts={n:0 for n in ('ui_render','ui_flush','ui_upload_tile','ui_upload_map','roll_feedback_service')}
 def key(n,down):
- mask={'select':64,'a':16}[n];(p.button_press if down else p.button_release)(n)
+ mask={'select':64,'a':16,'start':128}[n];(p.button_press if down else p.button_release)(n)
  for _ in range(1200):
   p.tick(1)
   if bool(get('lastpad')&mask)==down:return
@@ -67,8 +67,9 @@ try:
      for i,v in ((4,2),(6,div),(7,1),(8,0),(9,1)):put('globalmod',v,i)
      put('eval_moddirty',1);put('seqirqdirty',1);word('pattern_generation',u16('pattern_generation')+1)
      put('page',8);put('seqtrack',1);put('selected',1);put('seqhead',0);put('seqfocus',0);put('seqpitch',60,1);put('seqtop',67,1);put('seqcursor',0,1);put('dirty',1);put('pattern_dirty',1)
-     word('seqbpm',120);word('seqglobalbpm',120);p.tick(180+trial*7);put('smooth_playback_enabled',smooth)
-     key('select',True);key('a',True);key('a',False);key('select',False);p.tick(240)
+     word('seqbpm',120);word('seqglobalbpm',120);p.tick(180+trial*7)
+     if '_smooth_playback_enabled' in S:put('smooth_playback_enabled',smooth)
+     key('select',True);key('start' if smooth else 'a',True);key('start' if smooth else 'a',False);key('select',False);p.tick(240)
      assert get('seqplaying') and get('smooth_playback_active')==smooth
      if effect=='arp':assert get('arpirq_enabled')&2
      else:assert get('lfo_irq_mask')==7

@@ -59,6 +59,7 @@ uint8_t seq_region_copy(uint8_t cut) BANKED;
 uint8_t seq_region_paste(uint8_t step,uint8_t pitch) BANKED;
 uint8_t seq_clip_kind(void) BANKED;
 void seq_select_visible(void) BANKED;
+void seq_select_all(void) BANKED;
 void seq_delete_selection(void) BANKED;
 void seq_copy_track(void) BANKED;
 void seq_copy(void) BANKED;

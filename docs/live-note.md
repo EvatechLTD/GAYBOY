@@ -1,12 +1,32 @@
-# Live note plotting prototype
+# Stopped-note audition and selection
 
-Branch: live-note. Newly inserted notes audition immediately while playback is stopped, including A+B painting. Dragging an existing note to another cell retriggers its current pitch and velocity. Resizing queues a replay: releasing B retriggers the note for its updated grid length at the current BPM, then releases it automatically. Group operations preview the edited note under the cursor. Drum rows preview their corresponding synth/sample. Natural sample/envelope decay can be shorter than the gate.
+Plotting a note while stopped auditions it immediately, including A+B painting.
+Dragging an existing note to a new cell retriggers its new pitch and velocity.
+Resizing queues a preview: releasing B plays the edited note for its updated
+length at the current BPM, then releases it automatically. Group operations
+preview the edited note under the cursor. Drum rows preview their synth/sample.
+Natural hardware-envelope/sample decay can be shorter than the note gate.
 
-An ordinary plot/drag preview stops when its held edit button is released or on leaving via Start. Starting transport cancels a preview before sounding sequenced notes. Deletion and playing edits do not audition. Internal previews bypass MIDI performance mappings. A frame-service flag handles timed previews only when active; no sequencer note buffers or playback scheduling were changed. Nine additional bytes of temporary preview state are used.
+An A tap on a highlighted note auditions it on release for its stored length.
+An A tap on an empty cell previews that pitch using the length and velocity
+that B would plot, without inserting a note. If a selection exists, the empty
+A tap only deselects, silently. Dragging through empty cells still selects.
+Plot/drag previews end on edit-button release or leaving through Start; starting
+transport cancels outstanding previews. Playing edits and deletion do not
+start previews, and internal previews bypass MIDI pad-launch mappings.
 
-Tests pass for P1/P2/Wave and drum plots, painting, drag pitch/position, single/group resize release, 60/120/240 BPM durations, previous-preview expiry during another resize, frame-counter wrap, transport transition, MIDI pad isolation, deferred painting, sustained Wave snapshots and pending chord selection. Four cells measured 502.28 ms at 120 BPM and 251.14 ms at 240 BPM. ROM layout: 274 bytes spare WRAM, 512 bytes reserved stack. Physical hardware confirmation remains pending.
+The Edit menu contains SELECT SCREEN (current visible grid scope) and SELECT
+ALL (the whole current track, including other pages/octaves). Subsequent group
+operations use that selection. Selection itself does not change note records.
+Bounds fit selected note onsets/pitches so empty margins do not prevent moves.
 
-Latest test ROM: build/GAYBOY-live-note-drag-resize-test.gb. This is the drag/resize checkpoint. Newer Smooth Playback builds also contain these features; prior test files remain available for their running emulators.
-SHA256: 1048a48f621b0b9172244d88b53949e517e179afe9f206fad29e4b01ed1191ac
+The sequencer header shows current/total bars. M/S have black backgrounds
+when inactive and inverted backgrounds when active, with separate focus rails.
 
-Evidence: DATA/EXPERIMENTS/live-note-20261023/drag-resize. Not merged or published. Existing emulator files and unsaved sessions were not overwritten.
+Portable regression tests cover pulse, Wave, and drums; plot/paint; repeated
+A taps; silent deselection; moved pitch; single/group resize; remembered empty
+cell length; 60/120/240-BPM preview durations; pending-preview expiry; frame
+counter wrap; transport; and screen versus whole-track selection edits.
+
+See [Smooth Playback](smooth-playback.md) for the explicit Start+Select
+transport and its measured performance limits.

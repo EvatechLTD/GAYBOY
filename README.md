@@ -29,6 +29,11 @@ Five logical tracks (P1, P2, Wave, Noise and Drums) share four physical sound ch
 3. In the sequencer, move with the D-pad and plot/delete notes with **B**. **Select + A** starts/stops playback.
 4. Try **Play tutorial** in the browser for guided practice. Export saves to keep a backup.
 
+While stopped, **Start + Select** starts [Smooth Playback](docs/smooth-playback.md):
+a static stop-instruction screen with prepared playback. Start + Select stops it.
+Normal transport and pad launches keep the editor visible. Plotting, dragging,
+and tapping notes while stopped audition them; [audition and selection controls](docs/live-note.md).
+
 The stable 1.0 cartridge is **1 MiB, MBC5 with battery-backed 32 KiB RAM**, targeting DMG and Game Boy Color. Pattern-launch playback has been tested on physical hardware. Back up saves before updates. See the [development notes and controls](docs/development-notes.md) for current limitations, including timing measurements.
 
 ## User guides (draft)
@@ -45,8 +50,10 @@ These are review drafts; some features still need a final walkthrough.
 
 `main` is the tested stripped implementation. The previous experimental main is preserved as `experimental/archived-main-2026-10-21` and tag `experimental-main-2026-10-21`. See [promotion and archive notes](docs/main-promotion.md).
 
-The latest stable 1.0 update improves edit responsiveness, octave scrolling,
-and page-edge navigation. See [editor update and validation](docs/editor-navigation-promotion.md).
+The latest stable 1.0 update adds stopped-note audition, SELECT SCREEN/SELECT ALL,
+and explicit Smooth Playback with prepared synth drums and improved loop timing.
+Normal-mode timing still has [documented tradeoffs](docs/smooth-playback.md).
+Earlier [editor responsiveness and navigation improvements](docs/editor-navigation-promotion.md) remain included.
 
 ## Build from source
 

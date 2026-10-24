@@ -1,6 +1,7 @@
 #pragma bank 42
 #pragma opt_code_speed
 #include "api.h"
+#include "smooth_playback.h"
 #include "mod_bypass.h"
 #include "lfo_irq.h"
 extern uint32_t noiseleft[2];
@@ -53,15 +54,19 @@ void arp_irq_reset(void) NONBANKED;
 uint8_t arp_irq_owned(uint8_t c) NONBANKED;
 uint8_t arp_irq_valid(uint8_t c) NONBANKED;
 uint8_t arp_irq_continue(uint8_t c) BANKED;
+uint8_t arp_irq_pattern_owned(uint8_t c) NONBANKED;
 uint8_t arp_irq_prepare(uint8_t c,uint32_t period,uint16_t scale,uint16_t steps) BANKED;
-extern uint8_t eval_prepare_due;
+extern uint8_t eval_prepare_due,editbuffer_reading;
 extern uint16_t seqclock;
-void eval_chord_dirty(uint8_t c) BANKED {if(c<3){chordnext[c]=255;arpremaining[c]=0;eval_prepare_due&=~bitmasks[c];}}
+static EvalChord loopchord[3];
+static uint16_t loopgeneration[3],looplength[3];
+void eval_chord_dirty(uint8_t c) BANKED {if(c<3){loopchord[c].valid=0;chordnext[c]=255;arpremaining[c]=0;eval_prepare_due&=~bitmasks[c];}}
 /* Snapshot edits alter future onsets, not the chord currently sounding.
    Retain its natural next boundary and find any earlier newly edited onset.
    In particular, do not clear arp clocks, indices or IRQ ownership here. */
 void eval_chord_refresh(uint8_t c) BANKED {
  uint16_t i,count,next,at;uint8_t e[4],position;
+ if(c<3)loopchord[c].valid=0;
  if(c>=3||(!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY]))return;
  if(chordnext[c]==255)return;
  position=seqposition[c];next=chordnext[c]?chordnext[c]:seqlength[c];
@@ -76,7 +81,7 @@ extern uint16_t seqstepunits;
 extern uint8_t seqgate[7];
 uint32_t seq_gate_length(uint16_t units,uint8_t duration,uint8_t gate) BANKED;
 void eval_audio_reset(void) BANKED;
-static void eval_runtime_reset(void){arp_active_mask=0;arp_irq_reset();memset(arpperiod,0,sizeof(arpperiod));eval_audio_reset();
+static void eval_runtime_reset(void){memset(loopchord,0,sizeof(loopchord));arp_active_mask=0;arp_irq_reset();memset(arpperiod,0,sizeof(arpperiod));eval_audio_reset();
  eval_lfousers=eval_envusers=0;eval_moddirty=1;
  eval_prepare_due=0;memset(chordnext,0,sizeof(chordnext));memset(arpremaining,0,sizeof(arpremaining));env=stage=from=lphase=eclock=modheld=0;lfoclock=0;lfobpm=0;memset(chord,0,sizeof(chord));memset(arpcount,0,3);
  if(!evalinitialized){memset(arpclock,0,sizeof(arpclock));memset(arpindex,0,3);evalinitialized=1;}
@@ -211,16 +216,20 @@ uint8_t arp_native_sound(uint8_t c,uint8_t note,uint8_t vel,uint8_t index){uint8
  else{wave();wavepending=0;NR30_REG=128;NR31_REG=v[16];NR32_REG=v[15]<<5;NR33_REG=f;NR34_REG=128|(v[8]<<6)|(f>>8);}
  eval_audio_note(c);return 1;
 }
-static void sound(uint8_t c,uint8_t note,uint8_t vel,uint8_t index){if(c>=4)return;if(arp_native_sound(c,note,vel,index))return;if(c<2){uint8_t mask=c?0x22:0x11;route&=~mask;if(param[c][21]&1)route|=mask&15;if(param[c][21]&2)route|=mask&240;NR51_REG=route;keycount[c]=1;keystack[c][0]=note;keyvel[c][0]=vel;play(c,note,vel);}else event(0x90|c,note,vel);}
-void eval_seq_off(uint8_t c) BANKED {if(c>=3)return;arp_active_mask&=~bitmasks[c];arp_irq_cancel(c);chordnext[c]=0;eval_prepare_due&=~bitmasks[c];arpcount[c]=0;memset(chord[c],0,16);if(!c&&eval_mode(0)==2){keyevent(1,held[1],0);seqowned[1]=0;} }
+static uint8_t startup_mask,startup_note[3][3];
+static void sound(uint8_t c,uint8_t note,uint8_t vel,uint8_t index){if(c>=4)return;if(smooth_playback_preparing&&!seqplaying&&c<3){startup_mask|=1<<c;startup_note[c][0]=note;startup_note[c][1]=vel;startup_note[c][2]=index;return;}if(arp_native_sound(c,note,vel,index))return;if(c<2){uint8_t mask=c?0x22:0x11;route&=~mask;if(param[c][21]&1)route|=mask&15;if(param[c][21]&2)route|=mask&240;NR51_REG=route;keycount[c]=1;keystack[c][0]=note;keyvel[c][0]=vel;play(c,note,vel);}else event(0x90|c,note,vel);}
+void eval_seq_off(uint8_t c) BANKED {if(c>=3)return;startup_mask&=~(1<<c);arp_active_mask&=~bitmasks[c];arp_irq_cancel(c);chordnext[c]=0;eval_prepare_due&=~bitmasks[c];arpcount[c]=0;memset(chord[c],0,16);if(!c&&eval_mode(0)==2){keyevent(1,held[1],0);seqowned[1]=0;} }
 static void prepare_chord(uint8_t c,uint8_t position,EvalChord *out){uint16_t i,count,duration,remaining=1,at;uint8_t data[4],*e,low[4],rank,j,n,onset=0,total=0,*cursor;out->next=(uint8_t)seqlength[c];count=seq_event_count(c);memset(out->bits,0,16);memset(low,255,4);for(i=0;i<count;i++){seq_event_get(c,i,data);e=data;duration=e[3]?e[3]:256;{uint16_t next=out->next?out->next:256,end=e[0]+duration;if(e[0]>position&&e[0]<next)next=e[0];if(end>position&&end<next)next=end;out->next=next;}if(e[1]&&e[0]<=position&&(uint16_t)position<e[0]+duration){n=e[1]-1;if(!(out->bits[n>>3]&bitmasks[n&7])){total++;for(rank=0;rank<4&&n>low[rank];rank++);if(rank<4){for(j=3;j>rank;j--){low[j]=low[j-1];out->vel[j]=out->vel[j-1];}low[rank]=n;out->vel[rank]=e[2];if(!rank)remaining=duration-(position-e[0]);}}out->bits[n>>3]|=bitmasks[n&7];if(e[0]==position)onset=1;mixfill();}if((i&3)==3)mixfill();}
  if(out->next>=seqlength[c])out->next=0;out->count=total;out->duration=remaining;out->step=position;out->valid=1;out->onset=onset; }
 void eval_seq_prepare(void) BANKED {}
 
 uint8_t eval_seq_fire(uint8_t c) BANKED {uint16_t duration;uint8_t n,index=0,changed,vel=100,mode,previous;EvalChord current,*ready=&current;
- if(c>=3)return 0;if(!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY])return 0;if(c==1&&eval_mode(0)==2)return 1;
+ if(c>=3)return 0;if(seqplaying&&(startup_mask&(1<<c))){startup_mask&=~(1<<c);sound(c,startup_note[c][0],startup_note[c][1],startup_note[c][2]);return 1;}if(!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY])return 0;if(c==1&&eval_mode(0)==2)return 1;
+ if(arp_irq_pattern_owned(c))return 1;
  previous=arpcount[c];if(chordnext[c]!=255&&chordnext[c]!=seqposition[c])return previous||eval_mode(c)?1:0;
- prepare_chord(c,seqposition[c],ready);chordnext[c]=ready->next;changed=memcmp(ready->bits,chord[c],16)!=0;mode=eval_mode(c);
+ if(!seqposition[c]&&editbuffer_reading&&loopchord[c].valid&&loopgeneration[c]==pattern_generation&&looplength[c]==seqlength[c])memcpy(ready,&loopchord[c],sizeof(EvalChord));
+ else{prepare_chord(c,seqposition[c],ready);if(!seqposition[c]&&editbuffer_reading){memcpy(&loopchord[c],ready,sizeof(EvalChord));loopgeneration[c]=pattern_generation;looplength[c]=seqlength[c];}}
+ chordnext[c]=ready->next;changed=memcmp(ready->bits,chord[c],16)!=0;mode=eval_mode(c);
  if(mode&&ready->count)arp_active_mask|=bitmasks[c];else arp_active_mask&=~bitmasks[c];
  if(!changed&&ready->onset&&!memcmp(arpfirstvel[c],ready->vel,4)&&arp_irq_continue(c)){if(evalpatch[c][EV_RETRIGGER])arpclock[c]=0;return 1;}
  if(!changed&&arpcount[c]&&!ready->onset)return 1;
@@ -261,7 +270,7 @@ uint16_t eval_arp_wait(void) BANKED {uint8_t c;uint16_t next=65535,wait;
 /* Publish timer ownership after foreground catch-up has consumed its local
    ticks. The preparer accounts for IRQ time accumulated during packet work. */
 void eval_arp_prepare(void) BANKED {uint8_t c;uint16_t scale;uint32_t period;
- if(!experimental_mode||!seqplaying)return;
+ if(!experimental_mode||(!seqplaying&&!smooth_playback_preparing))return;
  for(c=0;c<3;c++)if(evalpatch[c][EV_MODE]==1&&arpcount[c]&&!arp_irq_valid(c)&&chordnext[c]!=255){if(evalpatch[c][EV_ORDER]==3||evalpatch[c][EV_ORDER]==7||evalpatch[c][EV_ORDER]==8||evalpatch[c][EV_ORDER]==9)continue;period=arp_period(c,&scale);if(arp_irq_prepare(c,period,scale,chordnext[c]?chordnext[c]-seqposition[c]:seqlength[c]-seqposition[c]))arpremaining[c]=0;}
 }
 static void arp_foreground_tick(uint8_t c,uint16_t ticks){uint16_t scale;uint32_t period;
@@ -295,3 +304,9 @@ void eval_drum_prepare(void) BANKED {uint8_t occupied[4][32],e[4],group,mask,all
 }
 uint8_t eval_drum_allowed(uint16_t index) BANKED {eval_drum_prepare();return index<256&&!!(drumallowed[index>>3]&bitmasks[index&7]);}
 
+
+/* Silent startup warmup: populate packets while musical time is stopped. */
+void eval_seq_startup_prepare(void) BANKED {uint8_t c,solos=seqsolo&95;if(drumsolomask)solos|=64;
+ startup_mask=0;for(c=0;c<3;c++)if(eval_mode(c)==1&&!(seqmuted&(1<<c))&&(!solos||(solos&(1<<c))))eval_seq_fire(c);
+ eval_arp_prepare();
+}

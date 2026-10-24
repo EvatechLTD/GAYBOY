@@ -1,65 +1,74 @@
-# Smooth Playback experiment - 2026-10-23
+# Smooth Playback
 
-Branch: live-note. Settings has SMOOTH PLAYBACK (default OFF). The preference
-is stored in reserved global root bytes125/126 with an S marker, outside
-pattern data. With it enabled, starting transport blanks the display and skips
-rendering, UI flushes, feedback drawing, and automatic OAM DMA. LCD timing and
-VBlank remain enabled so clocks and input sampling continue. Editing/navigation
-are ignored while blank. Select+A stops and redraws the editor; Select+Start
-panics. Existing MIDI/link/audio services continue, with unchanged modulation
-settings and playback engines. Live-note plotting/drag/resize remain available
-when stopped. No engine or modulation setting is silently changed.
+While the sequencer is stopped, press **Start+Select** to start Smooth Playback.
+Either button order works. The screen displays `START+SELECT TO STOP` once;
+the display and complete note snapshot finish before musical time starts.
+Press Start+Select again to stop and restore the editor. Select+A also stops.
+Normal Select+A transport and mixer/pad launches remain graphical playback.
+There is no Settings toggle; the former saved Smooth preference is ignored.
 
-Functional tests verify actual Settings input, default OFF, persisted preference
-after reboot, audible Wave playback, one-color display, no render/upload calls
-or VRAM changes, ignored editing, and display/OAM restoration on stop.
+Smooth leaves LCD timing, VBlank, input, and audio services running. During
+playback it skips rendering, flushes, feedback, sprites, and automatic OAM DMA.
+Grid editing/navigation is ignored. It does not provide pad-launch controls.
 
-Matched DMG tests use the same build and musical data with Smooth OFF/ON:
-120 BPM, P1 quarter notes, synth hats every16th plus snares, sustained Wave,
-and separately a P2 three-note ARP or shared square LFO on three voices (fine
-and coarse pitch). Rates1/16 and1/32, three distinct start phases, 900-frame
-(~15.07 s) measurement windows after warmup. Register-write probes measure
-actual APU note triggers and pitch edges, rather than only logical counters.
-Both modes have zero native IRQ underruns. All Smooth windows have zero
-render/flush/tile/map/feedback calls. Normal playback retains frame/UI work.
-No user input occurs during the measured playback window.
+## Timing changes
 
-Worst absolute error across the three starts, milliseconds:
+A retrigger resets the arpeggio position, not its unchanged source data. The
+prepared timer can now repeat a supported step-zero chord including its rest,
+without rescanning/rebuilding that chord at every loop. Other chord layouts
+and synthesis modes retain their existing paths. Cached step-zero chord data
+invalidates when its snapshot, generation, or track length changes.
 
-| Measurement | Graphics ON | Smooth |
-| --- | ---: | ---: |
-| Sustained ARP1/16 edges |0.352859|0.201225|
-| Sustained ARP1/32 edges |0.360489|0.201225|
-| LFO1/16 edges |0.567436|0.410080|
-| LFO1/32 edges |0.587463|0.412941|
-| Note onsets, ARP1/16 looping fixture |0.398636|0.244141|
-| Note onsets, ARP1/32 looping fixture |0.393867|0.234604|
-| Note onsets, LFO1/16 |3.223419|0.242233|
-| Note onsets, LFO1/32 |0.392914|0.235558|
+Prepared melodic playback supports the full 256-step length. Hash collisions
+are filtered by lane and actual step, preventing another lane's note from
+being used. Wave is not automatically excluded merely because drums exist;
+runtime PCM/channel ownership checks still apply.
 
-The32-step looping ARP fixture still has occasional long intervals in both
-modes: maximum interval errors128.864/128.904 ms at1/16 and62.501/66.406 ms
-at1/32 (graphics/Smooth). These were retained in the raw results. A separate
-256-step sustained ARP control avoids its own loop boundary within the test
-window and produces the ARP edge figures above, with no>1 ms edge errors.
-Blanking improves steady playback precision but does not resolve that looping
-ARP behavior. Not every individual start/interval improves; these are bounded
-emulator observations, not hardware qualification or a universal guarantee.
+Supported unmodulated synth drums in Smooth Playback use a prepared step table
+in the inactive note-buffer allocation. It fits 256 eight-byte packets plus
+spare space without allocating another full note buffer. The timer commits
+drums before melodic IRQ work. The table is prepared only while stopped;
+generation/tone changes invalidate the consumer before RAM can be reused.
+PCM, externally synchronized playback, shared P1 notes, and modulated drum
+setups retain the normal dispatcher. Existing logical-voice ownership remains
+protected. At exact compatible grids (including 120/240 BPM) the timer retains
+256 Hz; otherwise the supported drum path uses 1024 Hz to reduce quantization.
+Starting prepared melodic playback no longer resets the continuous DIV epoch.
 
-Total36 measurement windows:24 looping ARP/LFO cases and12 sustained ARP
-controls. Raw reports, screenshots, logs and frozen ROM are preserved in
-DATA/EXPERIMENTS/live-note-20261023/smooth-playback. Regression checks cover
-live plotting/painting, drag/resize audition timing, MIDI pad isolation and
-sustained Wave snapshot publication.
+## Validation and limits
 
-Test ROM: build/GAYBOY-smooth-playback-test.gb. Canonical build/GAYBOY.gb
-matches this image. ROM layout:270 bytes spare WRAM,512 bytes reserved stack.
-SHA256: fa16d924568bd3ea213312c8305a09c249c1d775859a68dbb1c16d938414c05a
+Actual APU-register probes on a 120-BPM pattern with a rested P2 chord,
+128-step Wave bassline, hats every sixteenth, snare, and pulse kick measured:
 
-Not merged or published. Prior emulator ROMs/saves remain untouched.
+| Drum measurement | Worst interval error |
+| --- | ---: |
+| Earlier foreground path, repeat boundary | 12.64 ms |
+| Prepared drums, retrigger on, including startup | 0.20 ms |
+| Prepared drums, retrigger off, including startup | 0.18 ms |
 
-Follow-up: sequencer header now shows current bar / total bars at the cursor,
-including a partially filled final bar (for example 1/2 BAR and 2/2 BAR).
-The existing header width uses compact BAR/B suffixes for large values.
-Validated28 cases across P1/P2/Wave/drums, odd meters, partial bars and256 bars.
-Latest display build: build/GAYBOY-bar-position-test.gb; SHA256 a37bf43493180c07f44e7a1b17602117d03ba284ac19d72bc1e139691abf9a7a.
+Each prepared run covered about 70 seconds with all expected attacks and zero
+underruns. These are emulator observations, not hardware qualification or a
+universal guarantee. Private captured saves and raw reports remain local in
+DATA/EXPERIMENTS/smooth-loop-20261023; no user save is part of the release.
+
+Normal playback still has editing/modulation tradeoffs. A matched dense
+180-BPM drums/LFO editor workload measured worst note errors of roughly
+0.5-1.0 ms before these loop changes versus 0.9-1.4 ms afterward, with some
+editing input medians about one video frame slower. Both had zero underruns.
+Smooth gains do not imply every normal-mode workload improves.
+
+The linked build retains 139 bytes spare WRAM below the audio tables and
+512 bytes reserved stack. Portable tests cover shortcut ordering, ignored old
+preferences, complete startup preparation, no ongoing VRAM writes, recovery,
+drum register/pitch order, stop/restart, unchanged notes/kits, safe fallback,
+256-step cross-lane hash collisions, live audition, and editing gestures.
+
+Run the focused checks from MAIN:
+
+```powershell
+python tools/test_smooth_playback.py
+python tools/test_prepared_drums.py
+python tools/test_prepared_long_tracks.py
+python tools/test_live_note_drag_resize.py
+python tools/test_select_screen_all.py
+```

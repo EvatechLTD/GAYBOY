@@ -4,6 +4,7 @@
 #include "mod_bypass.h"
 #include "lfo_irq.h"
 #include "mixer_shared.h"
+extern volatile uint8_t drum_irq_active;
 extern uint8_t editbuffer_valid,editbuffer_irq_mask,arpirq_enabled;
 extern uint8_t arp_active_mask;
 void arp_irq_tick(uint8_t elapsed) NONBANKED;
@@ -25,13 +26,14 @@ extern uint8_t linkstate;
 uint16_t editirq_attacks,editirq_underruns;
 /* Unsupported synthesis modes retain the original foreground dispatcher. */
 uint8_t editirq_owned(uint8_t c) NONBANKED {
- if(c>=3||!seqplaying||!(editirq_enabled&editbuffer_irq_mask&(1<<c))||seqrecordtrack==c||seqlength[c]>64)return 0;
+ if(c>=3||!seqplaying||!(editirq_enabled&editbuffer_irq_mask&(1<<c))||seqrecordtrack==c)return 0;
  return (!evalpatch[c][EV_MODE]&&!evalpatch[c][EV_CHORD_HISTORY]);
 }
 /* DIV measures wall time even if a register commit spans a TIMA overflow.
    All enabled paths sample more often than DIV's 15.625 ms wrap interval. */
+void editirq_clock_reset(void) NONBANKED {divider_last=DIV_REG;divider_fraction=0;}
 uint8_t editirq_elapsed(uint8_t fallback) NONBANKED {uint8_t now=DIV_REG,delta,n;
- if(!seqplaying||(!arpirq_enabled&&!editirq_running&&!lfo_irq_mask)){divider_last=now;divider_fraction=0;return fallback;}
+ if(!seqplaying||(!arpirq_enabled&&!editirq_running&&!lfo_irq_mask&&!drum_irq_active)){divider_last=now;divider_fraction=0;return fallback;}
  delta=now-divider_last;divider_last=now;if(delta>editirq_max_gap)editirq_max_gap=delta;n=(delta&15)+divider_fraction;divider_fraction=n&15;return (delta>>4)+(n>>4);
 }
 void editirq_commit(void) NONBANKED {
@@ -144,7 +146,7 @@ void seq_irq_prepare(void) BANKED {
  if(!changed&&prepared_bpm==seqbpm&&(editirq_running||prepared_frame==(uint8_t)sys_time)&&editirq_enabled==prepared_mask&&prepared_buffer==editbuffer_irq_mask&&prepared_wave==waveengine&&prepared_kick==!!pulsekickleft&&prepared_owner==mono_owned&&prepared_record==seqrecordtrack&&prepared_power==power)return;
  prepared_frame=(uint8_t)sys_time;prepared_buffer=editbuffer_irq_mask;prepared_wave=waveengine;prepared_kick=!!pulsekickleft;prepared_owner=mono_owned;prepared_record=seqrecordtrack;prepared_power=power;
  for(c=0;c<3;c++){
-  if(!power||seqlength[c]>64||seqrecordtrack==c||mono_owned&(1<<c))continue;
+  if(!power||seqrecordtrack==c||mono_owned&(1<<c))continue;
   if(evalpatch[c][EV_MODE]||evalpatch[c][EV_CHORD_HISTORY]||((coarsepitch[c][0]||(!mod_bypass&&(evalpatch[c][EV_DEPTH]||coarsepitch[c][1])))&&!lfo_irq_owned(c))||MOD_LEVEL(c)||finepitch[c]||bend[c]||tablemode[c]||param[c][9]||param[c][22])continue;
   if(c==0&&pulsekickleft||c==2&&(waveengine||evalwaveactive))continue;
   patch[c][0]=(param[c][0]<<6)|param[c][7];patch[c][1]=(param[c][2]<<3)|param[c][3];patch[c][2]=128|(param[c][8]<<6);patch[c][3]=(param[0][4]<<4)|(param[0][5]<<3)|param[0][6];patch[c][5]=param[2][16];patch[c][6]=(mx.pan[c]&1?1<<c:0)|(mx.pan[c]&2?16<<c:0);
@@ -162,6 +164,6 @@ void seq_irq_prepare(void) BANKED {
  for(c=0;c<3;c++){position[c]=seqposition[c];gate[c]=(seqgateleft[c]+units-1)/units;}
  prepared_bpm=seqbpm;prepared_mask=want;
  __critical{for(c=0;c<3;c++)if(want&(1<<c))memcpy(irq_patch[c],patch[c],7);if(want&4)memcpy(wavebytes,image,16);
-  start=seqclock+seqticks*seqbpm;while(start>=15360U){start-=15360U;for(c=0;c<3;c++)if(++position[c]>=seqlength[c])position[c]=0;}editirq_phase=start;divider_last=DIV_REG;divider_fraction=0;editirq_enabled=want;editirq_running=1;
+  start=seqclock+seqticks*seqbpm;while(start>=15360U){start-=15360U;for(c=0;c<3;c++)if(++position[c]>=seqlength[c])position[c]=0;}editirq_phase=start;/* DIV remains in the continuous transport epoch. */editirq_enabled=want;editirq_running=1;
  }
 }
