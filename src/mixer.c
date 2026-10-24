@@ -2,7 +2,6 @@
 #pragma opt_code_speed
 #include "api.h"
 #include "midi_input.h"
-#include "smooth_playback.h"
 #include "ui_fields.h"
 void roll_clear_transition(void) BANKED;
 void eval_chord_dirty(uint8_t c) BANKED;
@@ -167,12 +166,6 @@ void mixer_midi_launch_set(uint8_t enabled) BANKED {
 }
 static uint8_t midi_pad_held(void){uint8_t c;if(midi_pad_target>=5)return 0;for(c=0;c<16;c++)if(midi_pad_keys[c]&(1<<midi_pad_target))return 1;return 0;}
 static void held_rearm(void){
- uint8_t target=255;
- if(smooth_playback_active&&!(padsampled&(J_SELECT|J_START))){
-  if((padsampled&J_A)&&(padsampled&(J_UP|J_DOWN)))target=mx.slot;
-  else if(padsampled&smooth_playback_button)target=smooth_playback_target;
-  if(target==mx.slot&&mx.quant&&mx.pending==255&&!mx.error&&!(linkpair&&MIXER_LINK_AVAILABLE)){mx.pending=target;mx.openempty=0;}
- }
  if(midi_launch_enabled&&midi_pad_target==mx.slot&&midi_pad_held()&&mx.quant&&mx.pending==255&&!mx.error&&!(linkpair&&MIXER_LINK_AVAILABLE)){mx.pending=mx.slot;mx.openempty=0;}
  /* Re-arm the live pad before testing this boundary. Holding A repeats at
     every eligible interval, including one-step LONG patterns. Retriggers use

@@ -1,13 +1,13 @@
 """Matched DMG audible-register timing: graphics ON versus Smooth Playback."""
 from pathlib import Path
 from io import BytesIO
-import ast,json,statistics,sys,hashlib
+import ast,json,statistics,sys
 import pyboy
 from arp_probe_helpers import hook_attacks
 steady='--steady-arp' in sys.argv
 if steady:sys.argv.remove('--steady-arp')
 exec(Path('tools/test_wave_saved_tempo.py').read_text().split('\ntry:')[0])
-S=symbols;rom_sha256=hashlib.sha256(rom.read_bytes()).hexdigest();notes=[];arp=[];edges=[];lastfreq=[None];low=[0]
+S=symbols;notes=[];arp=[];edges=[];lastfreq=[None];low=[0]
 counts={n:0 for n in ('ui_render','ui_flush','ui_upload_tile','ui_upload_map','roll_feedback_service')}
 def key(n,down):
  mask={'select':64,'a':16}[n];(p.button_press if down else p.button_release)(n)
@@ -77,6 +77,5 @@ try:
      if smooth:assert not any(counts.values()),row
      assert not row['irq_underruns'],row
      row['nonlooping_arp_control']=steady
-     row['rom_sha256']=rom_sha256
      reports.append(row);Path('build/smooth-playback-'+('steady-arp-' if steady else '')+'comparison.json').write_text(json.dumps(reports,indent=2));print(json.dumps(row),flush=True)
 finally:p.stop(save=False)

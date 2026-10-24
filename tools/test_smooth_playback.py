@@ -5,7 +5,7 @@ import numpy as np
 exec(Path('tools/test_wave_saved_tempo.py').read_text().split('\ntry:')[0])
 
 def key(n,down):
- mask={'a':16,'b':32,'right':1,'up':4,'select':64,'start':128}[n]
+ mask={'a':16,'b':32,'right':1,'up':4,'select':64}[n]
  (p.button_press if down else p.button_release)(n)
  for _ in range(1200):
   p.tick(1)
@@ -32,16 +32,16 @@ try:
   a=symbols['_'+n];p.hook_register(a>>16,a&65535,hit,n)
  key('select',True);tap('a');key('select',False);p.tick(12)
  assert get('seqplaying') and get('smooth_playback_active')
- assert p.memory[0xff40]&0x81==0x81 and not p.memory[0xff40]&0x22
+ assert p.memory[0xff40]&0x80 and not p.memory[0xff40]&0x23
  assert not p.memory[symbols['__shadow_OAM_base']]
  counts={n:0 for n in counts};vram=bytes(p.memory[0x8000:0xa000]);cursor=get('seqcursor',2)
- tap('a');tap('start');p.tick(120)
+ key('b',True);tap('right');key('b',False);p.tick(120)
  assert get('seqcursor',2)==cursor and get('seqeventcounts',4)==1
  assert not any(counts.values()),counts
  assert bytes(p.memory[0x8000:0xa000])==vram,'Blank playback modified VRAM'
- assert len(np.unique(p.screen.ndarray.reshape(-1,4),axis=0))>1,'Static launcher not visible'
+ assert len(np.unique(p.screen.ndarray.reshape(-1,4),axis=0))==1,'Display not blank'
  assert p.memory[0xff26]&4,'Blank playback lost Wave audio'
- p.screen.image.save('build/smooth-playback-legend.png')
+ p.screen.image.save('build/smooth-playback-blank.png')
  key('select',True);tap('a');key('select',False);p.tick(120)
  assert not get('seqplaying') and not get('smooth_playback_active')
  assert p.memory[0xff40]&1 and p.memory[symbols['__shadow_OAM_base']]
@@ -50,5 +50,5 @@ try:
  battery=b''.join(bytes(p.memory[b,0xa000:0xbfff])+bytes([p.memory[b,0xbfff]]) for b in range(4));p.stop(save=False)
  p=PyBoy(str(rom),window='null',sound_emulated=True,cgb=False,ram_file=BytesIO(battery));p.set_emulation_speed(0)
  enter_app(p,symbols);assert get('smooth_playback_enabled'),'Preference did not survive reboot'
- print('PASS default OFF, Settings persistence, static legend, zero idle graphics/VRAM writes and Select+A recovery')
+ print('PASS default OFF, Settings toggle/persistence, blank display, zero graphics/VRAM writes, ignored editing and Select+A recovery')
 finally:p.stop(save=False)
