@@ -1,41 +1,39 @@
-"""Embed a sparse demo save for fresh cartridge initialization (bank 46)."""
+"""Embed five resident patterns, their song, kits and presets in a demo ROM."""
 from pathlib import Path
-from binascii import crc_hqx
 
 
 def generate(battery, output):
     data = Path(battery).read_bytes()
-    if len(data) != 32768:
-        raise ValueError('Expected a 32 KiB battery image')
-    pages = bytearray(data[8192:16384] + data[16384:22528] + data[24576:29696])
-    if pages[:4] != b'GBD1':
-        raise ValueError('Seed is not a sparse save')
-    # Normal library capacity is unaffected by this single-ROM-bank payload.
-    end = len(pages)
-    while end > 256 and not any(pages[end - 64:end]):
-        end -= 64
-    pages = pages[:end]
-    if len(pages) > 12000:
-        raise ValueError('Demo fixture is too large for seed ROM bank 46')
-    for offset in (0, 128):
-        pages[offset + 6] = 1
-        pages[offset + 8] = 4  # Fresh demo starts with 1/1 launch quantization.
-        pages[offset + 126:offset + 128] = crc_hqx(pages[offset:offset + 126], 65535).to_bytes(2, 'little')
-    rows = [','.join(str(v) for v in pages[i:i + 32]) for i in range(0, len(pages), 32)]
-    source = '#pragma bank 46\n#include "../src/api.h"\nstatic const uint8_t seed[]={\n' + ',\n'.join(rows) + '\n};\n'
-    source += '''uint8_t sparse_seed_install(void) BANKED {
- uint16_t page;uint8_t copy,at,n,buf[16],zero=0,commit='G';
- for(page=4;page<sizeof(seed)/64;page++){
-  if(!(page&15))ui_loading(3+(page*6)/(sizeof(seed)/64),12);
-  for(at=0;at<64;at+=16){memcpy(buf,seed+page*64+at,16);pool_page_write(page,at,buf,16);}
+    if len(data) != 32768 or data[32768-128:32768-124] != b'GSR1':
+        raise ValueError('Expected a 32 KiB GSR1 resident battery image')
+    # Include the song fragments inside the five resident records. Exclude
+    # volatile renderer/audio scratch and both editing clipboards.
+    root = bytearray(data[-128:])
+    root[7] = 0  # Start on pad one; all five patterns remain available.
+    root[9] = 0  # No pattern clipboard is included in this demo.
+    segments = [(1, 0xA000, data[8192:16384]),
+                (2, 0xA000, data[16384:19712]),
+                (3, 0xA000, data[24576:26656]),
+                (3, 0xBF80, root)]
+    source = '#pragma bank 4\n#include "api.h"\n'
+    for i, (_, _, payload) in enumerate(segments):
+        rows = [','.join(str(v) for v in payload[j:j+32])
+                for j in range(0, len(payload), 32)]
+        source += f'static const uint8_t seed{i}[]={{\n' + ',\n'.join(rows) + '\n};\n'
+    source += '''static void install(uint8_t bank,uint16_t address,const uint8_t *data,uint16_t size){
+ uint16_t at;uint8_t buf[16];
+ for(at=0;at<size;at+=16){
+  memcpy(buf,data+at,16);
+  __critical{SWITCH_RAM_MBC5(bank);memcpy((void *)(address+at),buf,16);SWITCH_RAM_MBC5(0);}
  }
- for(copy=0;copy<2;copy++){
-  pool_page_write(copy*2,0,&zero,1);
-  for(at=1;at<64;at+=n){n=64-at>16?16:64-at;memcpy(buf,seed+(uint16_t)copy*128+at,n);pool_page_write(copy*2,at,buf,n);}
-  for(at=0;at<64;at+=16){memcpy(buf,seed+(uint16_t)copy*128+64+at,16);pool_page_write(copy*2+1,at,buf,16);}
-  pool_page_write(copy*2,0,&commit,1);
- }
- return 1;
+}
+void sparse_seed_install(void) BANKED {
+'''
+    # Root is last, so an interrupted install is retried on the next boot.
+    for i, (bank, address, payload) in enumerate(segments[:-1]):
+        source += f' install({bank},{address},seed{i},sizeof(seed{i}));\n'
+    source += ''' install(3,0xBF90,seed3+16,sizeof(seed3)-16);
+ install(3,0xBF80,seed3,16);
 }
 '''
     Path(output).write_text(source)

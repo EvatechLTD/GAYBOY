@@ -22,6 +22,7 @@ names += ['intro_damage'+str(stage) for stage in range(1,11)]
 if options.demo_seed:
  from make_sparse_seed import generate
  generate(options.demo_seed,root/'build/sparse_seed.c')
+ names.append('sparse_seed')
 from generate_startup_font import generate as generate_startup_font
 generate_startup_font(root/'src/ui_tiles.h',root/'src/ui_startup_font.h')
 headers=b''.join(p.read_bytes() for p in sorted((root/'src').glob('*.h')))
@@ -35,7 +36,7 @@ def source_dependencies(source):
   path=pending.pop().resolve()
   if path in seen:continue
   seen.add(path);data=path.read_bytes()
-  parts.append((path.relative_to(root).as_posix(),data))
+  parts.append((path.relative_to(root).as_posix() if path.is_relative_to(root) else path.as_posix(),data))
   for name in re.findall(rb'^\s*#\s*include\s*"([^"\r\n]+)"',data,re.M):
    child=path.parent/name.decode()
    if not child.exists():child=root/'src'/name.decode()
@@ -43,13 +44,15 @@ def source_dependencies(source):
  return b''.join(name.encode()+b'\0'+data+b'\0' for name,data in sorted(parts))
 def compile_one(name):
  src=root/('build/sparse_seed.c' if name=='sparse_seed' and options.demo_seed else 'src/'+name+'.c');obj=out/(name+'.o');stamp=out/(name+'.sha256')
- toolchain=str(compiler.stat().st_mtime_ns).encode()+str(flags).encode()
+ source_flags=flags+(['-DRESIDENT_DEMO_SEED'] if name=='resident' and options.demo_seed else [])
+ if name=='sparse_seed':source_flags+=['-I'+str(root/'src')]
+ toolchain=str(compiler.stat().st_mtime_ns).encode()+str(source_flags).encode()
  digest=hashlib.sha256(b'deps-v1\0'+source_dependencies(src)+toolchain).hexdigest()
  # Migrate a verified old cache entry without changing its object code.
  legacy=hashlib.sha256(src.read_bytes()+headers+toolchain).hexdigest()
  if obj.exists() and stamp.exists() and stamp.read_text()==legacy:stamp.write_text(digest)
  if obj.exists() and stamp.exists() and stamp.read_text()==digest:return
- r=subprocess.run([str(compiler),*flags,'-c','-o',str(obj),str(src)],cwd=root,capture_output=True,text=True)
+ r=subprocess.run([str(compiler),*source_flags,'-c','-o',str(obj),str(src)],cwd=root,capture_output=True,text=True)
  if r.stdout:print(r.stdout,end='',flush=True)
  if r.stderr:print(r.stderr,end='',file=sys.stderr,flush=True)
  if r.returncode:raise RuntimeError('Compilation failed: '+name)

@@ -205,7 +205,17 @@ uint8_t sparse_restore(uint8_t slot) BANKED {if(slot>=5||sparse_enabled!=1)retur
 uint8_t sparse_activate(uint8_t slot) BANKED {uint8_t busy=seqservicing;if(slot>=5)return 0;seqservicing=1;if(!sparse_restore(slot)){seqservicing=busy;return 0;}mx.pending=255;mx.padcache=0;seqdrawvalid=0;if(seqplaying)seq_pattern_handoff();seqservicing=busy;dirty=1;return 1;}
 void sparse_request(uint8_t slot,uint8_t edit) BANKED {if(slot>=5)return;firstready=0;if(edit&&slot==mx.slot){page=8;seq_open();dirty=1;return;}if(pattern_dirty)sparse_snapshot(mx.slot);sparse_prepare_invalidate();launchslot=slot;mx.pending=slot;mx.openempty=edit;mx.cachevalid=0;if(!seqplaying||!mx.quant){mx.pending=255;mixer_activate(slot,edit);}dirty=1;}
 void sparse_service(void) BANKED {sparse_prepare_service();if(!io_busy&&pattern_dirty&&!seqservicing&&!seqplaying&&padread==padwrite&&(uint16_t)(sys_time-last_edit)>30)sparse_snapshot(mx.slot);}
-uint8_t sparse_boot(void) BANKED {uint8_t i,magic[4];io(3,0xBF80,magic,4,0);sparse_enabled=1;if(memcmp(magic,"GSR1",4)){if(magic[0]!=0&&magic[0]!=255){sparse_enabled=2;return 1;}{uint8_t z=0;uint16_t at;for(at=0;at<2080;at+=64)io(3,0xA000U+at,&z,1,1);}memset(pool_root,0,128);memcpy(pool_root,"GSR1",4);pool_root[8]=4;io(3,0xBF80,pool_root,128,1);mx.slot=0;defaults();eval_defaults();for(i=0;i<5;i++){mx.slot=i;mx.name[0]='P';mx.name[1]='1'+i;mx.name[2]=0;sparse_snapshot(i);}mx.slot=0;}else io(3,0xBF80,pool_root,128,0);for(i=0;i<8;i++)sparse_slots[i]=sparse_tones[i]=i<5?i:65535U;return 1;}
+#ifdef RESIDENT_DEMO_SEED
+void sparse_seed_install(void) BANKED;
+#endif
+uint8_t sparse_boot(void) BANKED {uint8_t i,magic[4];io(3,0xBF80,magic,4,0);sparse_enabled=1;
+#ifdef RESIDENT_DEMO_SEED
+ /* Test-ROM demo initialization only. Never replace an existing battery. */
+ if(memcmp(magic,"GSR1",4)&&(magic[0]==0||magic[0]==255)){
+  sparse_seed_install();io(3,0xBF80,magic,4,0);
+ }
+#endif
+if(memcmp(magic,"GSR1",4)){if(magic[0]!=0&&magic[0]!=255){sparse_enabled=2;return 1;}{uint8_t z=0;uint16_t at;for(at=0;at<2080;at+=64)io(3,0xA000U+at,&z,1,1);}memset(pool_root,0,128);memcpy(pool_root,"GSR1",4);pool_root[8]=4;io(3,0xBF80,pool_root,128,1);mx.slot=0;defaults();eval_defaults();for(i=0;i<5;i++){mx.slot=i;mx.name[0]='P';mx.name[1]='1'+i;mx.name[2]=0;sparse_snapshot(i);}mx.slot=0;}else io(3,0xBF80,pool_root,128,0);for(i=0;i<8;i++)sparse_slots[i]=sparse_tones[i]=i<5?i:65535U;return 1;}
 void sparse_finish_install(void) BANKED {}
 uint8_t resident_first_note(uint8_t c,uint8_t *e) BANKED {if(!firstready||c>=6)return 2;if(!launchnotes[c][1])return 0;memcpy(e,launchnotes[c],4);return 1;}
 void resident_first_clear(void) BANKED {firstready=0;}
