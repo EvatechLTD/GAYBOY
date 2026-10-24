@@ -1,5 +1,7 @@
 #include "api.h"
 #include "link_control.h"
+#include "song_link.h"
+#include "song_mode.h"
 extern volatile uint8_t linkbits[16],linkbitread,linkbitqueued;
 extern volatile uint8_t link_rx_ready,link_peer_capable,link_alive,link_rx_dropped;
 volatile uint8_t link_claiming;
@@ -41,6 +43,7 @@ link_bit_done$:
 /* Native-only ISR. Raw protocols continue to use the original serial_isr.
    A due clock is started BEFORE copying a reply into the foreground ring. */
 void link_serial_isr(void) NONBANKED {uint8_t b=SB_REG,n;
+ if(song_link_active||(b==0xFD&&page==SONG_PAGE&&!seqplaying)){song_link_receive(b);return;}
  if(!syncslave){
   if(link_claiming&&((b>=0x80&&b<0xF0)||b==0xF1||b==0xFA||b==0xF5||b==0xF7))linkcollision=1;
   if(syncstart&&synctxbyte==0xFA)syncstart=0;

@@ -4,6 +4,7 @@
 #include "mixer_shared.h"
 #include "resident.h"
 #include "song_mode.h"
+#include "song_link.h"
 #include "smooth_playback.h"
 extern uint8_t seqselectused,seqtilesready;
 __at (0xA4ED) SongView song_view;
@@ -42,19 +43,31 @@ static void cursor_cell(uint8_t lane,uint8_t col,uint8_t on){uint8_t index,state
 static void header(void){
  memset(canvas,0,40);memset(canvas,96,20);
  text(0,0,"SONG",song_view.head!=1);text(6,0,song_loop()?"LOOP":"ONCE",song_view.head!=2);text(12,0,"BPM",song_view.head!=3);song_number(16,0,seqbpm);
- text(0,1,song_playing?"PLAYING":"STOPPED",0);text(10,1,"16 BARS",0);
+ text(0,1,song_playing?"PLAYING":song_link_active||smooth_playback_preparing?"BUFFERING":"STOPPED",0);text(10,1,"16 BARS",0);
+}
+void song_status(uint8_t ready) BANKED {
+ if(smooth_playback_active){if(ready)smooth_playback_ready();return;}
+ header();memset(canvas+20,0,10);text(0,1,ready?"PLAYING":"BUFFERING",0);
+ memset(canvas+320,0,20);text(0,16,ready?"SELECT+A TO STOP":"BUFFERING",0);
+ ui_upload_map(0x9820U,canvas+20,20);memcpy(visible+20,canvas+20,20);
+ ui_upload_map(0x9A00U,canvas+320,20);memcpy(visible+320,canvas+320,20);CONTENTDIRTY=1;
 }
 static void view(void){song_view.base=song_view.cursor&~255UL;}
 void song_open(void) BANKED {TILEVALID=0;if(seqplaying)seq_transport();if(song_view.used!=84){memset(&song_view,0,sizeof(song_view));song_view.reserved=0;song_view.selected=SONG_NONE;song_view.used=84;}song_view.reserved=0;song_view.cursor&=~15UL;if(song_view.head>3)song_view.head=3;song_view.error=0;song_view.selected=SONG_NONE;song_view.gesture=0;song_pick_clear();view();seqdrawvalid=0;dirty=1;}
 void song_input(uint8_t p,uint8_t edge) BANKED {uint32_t unit=16,old=song_view.cursor;SongClip c;uint16_t found;uint8_t directions=edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN);
  if((p&(J_START|J_SELECT))==(J_START|J_SELECT)&&(edge&(J_START|J_SELECT))){navblocked=seqselectused=1;if(song_playing)song_stop();else song_start(1);return;}
  if(song_playing){if((p&J_SELECT)&&(edge&J_A))song_stop();return;}
+ if(song_link_active){if((p&J_SELECT)&&(edge&J_A))song_start(0);return;}
  if((lastpad&J_B)&&!(p&J_B)&&song_view.gesture==2){song_delete(song_view.selected);song_pick_clear();song_view.selected=SONG_NONE;song_view.gesture=0;dirty=1;}
  if((lastpad&J_A)&&!(p&J_A)&&song_view.selected!=SONG_NONE){song_view.selected=SONG_NONE;CONTENTDIRTY=1;dirty=1;}
  /* Release completes a gesture; it does not require another full redraw. */
  if(!edge){if(!(p&J_A)&&song_view.gesture==4)song_view.gesture=0;if(!p)song_view.gesture=0;return;}
  if((p&J_SELECT)&&(edge&J_A)){seqselectused=1;song_start(0);return;}
- if(p&J_SELECT){seqselectused=1;return;}
+ if(p&J_SELECT){seqselectused=1;
+  if(edge&J_LEFT){song_view.cursor=0;song_view.head=0;view();dirty=1;}
+  else if((edge&J_RIGHT)&&song_view.cursor+256UL>=song_view.cursor){song_view.cursor+=256UL;song_view.head=0;view();dirty=1;}
+  return;
+ }
  if(!song_view.head&&((p&(J_A|J_B))||(edge&(J_A|J_B))))CONTENTDIRTY=1;
  if(song_view.head){
   if((p&(J_A|J_B))&&(directions||(edge&(J_A|J_B)))){
@@ -118,8 +131,8 @@ void song_render(void) BANKED {uint8_t cells[5][16],lane,col,i,tile,a,index,cur;
    tile=lane*16+i;tile=tile<32?64+tile:128+tile;canvas[(uint16_t)(4+lane*2)*20+4+i]=tile;
   }
  }
- text(0,14,"1 CELL = 1 BAR",0);text(0,15,"B PLOT  A MOVE",0);text(0,16,"B+LR LENGTH",0);text(0,17,"START+SELECT SMOOTH",0);
- if(song_view.error){static const char * const errors[]={"","EMPTY SONG","AUDIO CACHE FULL","UNSUPPORTED PATCH","PCM NOT PREPARED","P1 / KICK SHARED","STOP PATTERN FIRST","SYNC OFF REQUIRED","CLIPS CANNOT OVERLAP","SONG MEMORY FULL","PAST SONG END"};memset(canvas+300,0,40);text(0,15,errors[song_view.error<11?song_view.error:3],0);}
+ text(0,14,"1 CELL = 1 BAR",0);text(0,15,"B PLOT  A MOVE",0);text(0,16,song_playing?"SELECT+A TO STOP":song_link_active?"BUFFERING":"B+LR LENGTH",0);text(0,17,"START+SELECT SMOOTH",0);
+ if(song_view.error){static const char * const errors[]={"","EMPTY SONG","AUDIO CACHE FULL","UNSUPPORTED PATCH","PCM NOT PREPARED","P1 / KICK SHARED","STOP PATTERN FIRST","SYNC OFF REQUIRED","CLIPS CANNOT OVERLAP","SONG MEMORY FULL","PAST SONG END","LINK NOT READY"};memset(canvas+300,0,40);text(0,15,errors[song_view.error<12?song_view.error:3],0);}
  LASTBASE=song_view.base;LASTCOL=cur;LASTLANE=song_view.lane;LASTHEAD=song_view.head;LASTSELECT=song_view.selected;LASTPLAY=song_playing;LASTERROR=song_view.error;CONTENTDIRTY=0;
  TILEVALID=1;seqfontdirty=1;seqtilesready=0;*(uint8_t *)0xAD80=0;seqdrawvalid=0;seqflushpending=1;
 }

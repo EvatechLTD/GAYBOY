@@ -15,13 +15,20 @@ void smooth_playback_begin(void) BANKED {
  smooth_playback_preparing=smooth_playback_active=1;
  /* Leave LCD/VBlank running; upload the entire static screen before music. */
  _shadow_OAM_base=0;LCDC_REG&=~0x23;
- memset(canvas,0,360);{const char *text="START+SELECT TO STOP";for(row=0;text[row];row++)canvas[160+row]=text[row]-32;}
+ memset(canvas,0,360);{const char *text="BUFFERING";for(row=0;text[row];row++)canvas[160+row]=text[row]-32;}
  for(row=0;row<18;row++){ui_upload_map(0x9800U+(uint16_t)row*32,canvas+(uint16_t)row*20,20);mixfill();}
  memcpy(visible,canvas,360);LCDC_REG|=1;
  /* Two VBlanks guarantee a complete visible scanout, whichever scanline
     the upload finished on. Musical time remains stopped throughout. */
  __critical{frame=sys_time;}
  do{mixfill();__critical{now=sys_time;}}while((uint16_t)(now-frame)<2);
+}
+void smooth_playback_ready(void) BANKED {uint8_t i;uint16_t frame,now;const char *text="START+SELECT TO STOP";
+ if(!smooth_playback_active)return;
+ memset(canvas+160,0,20);for(i=0;text[i];i++)canvas[160+i]=text[i]-32;
+ ui_upload_map(0x9900U,canvas+160,20);memcpy(visible+160,canvas+160,20);
+ /* Finish this last status upload before arming the musical clock. */
+ __critical{frame=sys_time;}do{mixfill();__critical{now=sys_time;}}while((uint16_t)(now-frame)<2);
 }
 void smooth_playback_update(void) BANKED {
  if(seqplaying||smooth_playback_preparing){

@@ -4,6 +4,8 @@
 #include "mixer_shared.h"
 #include "smooth_playback.h"
 #include "mod_bypass.h"
+#include "song_mode.h"
+#include "song_link.h"
 extern uint16_t editbuffer_base,editbuffer_swaps,pattern_generation,seqclock,seqstepunits,seqdeadline;
 extern uint8_t editbuffer_reading;
 extern uint32_t noiseleft[2];
@@ -114,6 +116,7 @@ static void arm(uint8_t attack){
   if(step>=lengths[active_table])step=0;drum_timer_clock=last_tick=0;drum_irq_active=1;if(attack)drum_irq_emit();deadline(1);}
 }
 void drum_irq_service(void) BANKED {uint8_t budget=2,reading,busy;
+ if(song_playing||song_link_active)return;
  if(!drum_irq_pending||ready)return;
  if(!smooth_playback_preparing&&(!seqplaying||seqservicing||padread!=padwrite||seqticks>=seqdeadline||seqdeadline-seqticks<4))return;
  do{

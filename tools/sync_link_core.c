@@ -7,6 +7,8 @@
 #include "browser_bootrom.h"
 static GB_gameboy_t machines[2];
 static uint64_t clocks[2], target;
+static int drift_ppm;
+static uint64_t drift_remainder;
 static uint32_t pixels[2][160*144];
 static bool outgoing[2];
 static bool cable_connected=true;
@@ -40,6 +42,7 @@ static void event(GB_gameboy_t *gb,unsigned tag,unsigned value){
  events[i].ticks=GB_safe_read_memory(gb,watch_ticks)|(GB_safe_read_memory(gb,watch_ticks+1)<<8);
 }
 static bool writes(GB_gameboy_t *gb,uint16_t addr,uint8_t value){
+ if(addr==0xff0f&&!(value&4)&&(GB_safe_read_memory(gb,0xff0f)&4)&&ui_hold_address&&GB_safe_read_memory(gb,ui_hold_address)&&(GB_safe_read_memory(gb,0xff07)&4))event(gb,0x780,gb->pc);
  if(watch_event_cache&&addr==watch_event_cache)event(gb,0x721,value);
  if(watch_both_launch&&rx_base&&addr>=rx_base&&addr<rx_base+256)event(gb,0x725,value);
  if(watch_servicing&&addr==watch_servicing&&value!=GB_safe_read_memory(gb,addr))event(gb,0x720,(value?0x80000000u:0)|(gb->mbc_rom_bank<<16)|gb->pc);
@@ -57,6 +60,12 @@ static bool writes(GB_gameboy_t *gb,uint16_t addr,uint8_t value){
  if(id(gb)==1&&rx_base&&addr>=rx_base&&addr<rx_base+256)event(gb,0x705,value);
  if(addr==0xffc7)event(gb,0x500,value); /* Oscillator clock due, before wire arbitration. */
  if((addr==0xff14||addr==0xff19||addr==0xff1e||addr==0xff23)&&(value&128))event(gb,addr,value);
+ if((value&128)&&(addr==0xff14||addr==0xff19||addr==0xff1e||addr==0xff23)){
+  unsigned c=addr==0xff14?0:addr==0xff19?1:addr==0xff1e?2:3;
+  unsigned volume=GB_safe_read_memory(gb,c==0?0xff12:c==1?0xff17:c==2?0xff1c:0xff21);
+  unsigned mask=c==2?0x60:0xf0;
+  if((volume&mask)&&(GB_safe_read_memory(gb,0xff25)&((1u<<c)|(16u<<c))))event(gb,0x740+c,volume);
+ }
  if(watch_drum_on){unsigned side=id(gb);
   if(addr>=watch_drum_on&&addr<watch_drum_on+2&&value==1)pcm_pending[side]|=1u<<(addr-watch_drum_on);
   if(addr==0xff1e&&(value&128)&&gb->pc>=0x4000&&gb->mbc_rom_bank==(watch_drum_mix>>16)){
@@ -124,8 +133,14 @@ EMSCRIPTEN_KEEPALIVE void link_run(unsigned frames){
   if(watch_both_launch)for(unsigned j=0;j<4;j++)if(watch_launch_detail[j]&&address==watch_launch_detail[j])event(&machines[i],0x310+j,0);
   if(watch_both_launch)for(unsigned j=0;j<3;j++)if(watch_launch_transport[j]&&address==watch_launch_transport[j])event(&machines[i],0x314+j,0);
   if(watch_positions&&machines[i].sp<min_sp[i])min_sp[i]=machines[i].sp;
-  unsigned delta=GB_run(&machines[i]);clocks[i]+=delta;if(profiling&&i==profile_side&&clocks[i]>=profile_from&&(!profile_until||clocks[i]<profile_until)&&pc<0x8000&&bank<64)profile[bank*1024+((pc&0x3fff)>>4)]+=delta;}
+  unsigned delta=GB_run(&machines[i]);
+  if(i&&drift_ppm){uint64_t scaled=(uint64_t)delta*1000000+drift_remainder;unsigned divisor=1000000+drift_ppm;clocks[i]+=scaled/divisor;drift_remainder=scaled%divisor;}
+  else clocks[i]+=delta;
+  if(profiling&&i==profile_side&&clocks[i]>=profile_from&&(!profile_until||clocks[i]<profile_until)&&pc<0x8000&&bank<64)profile[bank*1024+((pc&0x3fff)>>4)]+=delta;}
 }
+EMSCRIPTEN_KEEPALIVE void link_set_drift(int ppm){drift_ppm=ppm;drift_remainder=0;}
+EMSCRIPTEN_KEEPALIVE void link_battery_load(unsigned side,const uint8_t *data,unsigned length){size_t size;uint8_t *ram=GB_get_direct_access(&machines[side],GB_DIRECT_ACCESS_CART_RAM,&size,NULL);if(length<=size)memcpy(ram,data,length);}
+EMSCRIPTEN_KEEPALIVE unsigned link_cart_read(unsigned side,unsigned offset){size_t size;uint8_t *ram=GB_get_direct_access(&machines[side],GB_DIRECT_ACCESS_CART_RAM,&size,NULL);return offset<size?ram[offset]:0xff;}
 EMSCRIPTEN_KEEPALIVE void link_watch_events(unsigned boundary,unsigned launch,unsigned positions,unsigned ticks,unsigned clock){watch_boundary=boundary;watch_launch=launch;watch_positions=positions;watch_ticks=ticks;watch_clock=clock;event_count=0;wire_unarmed_edges=0;}
 EMSCRIPTEN_KEEPALIVE unsigned link_event_count(void){return event_count;}
 EMSCRIPTEN_KEEPALIVE void link_watch_both_launch(unsigned enabled){watch_both_launch=enabled!=0;}

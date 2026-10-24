@@ -5,6 +5,8 @@
 #include "mixer_shared.h"
 #include "resident.h"
 #include "smooth_playback.h"
+#include "song_mode.h"
+#include "song_link.h"
 void eval_chord_dirty(uint8_t c) BANKED;
 void drum_irq_changed(uint8_t mask) BANKED;
 void arp_irq_pattern_changed(uint8_t c) NONBANKED;
@@ -56,6 +58,7 @@ static void eb_notify_foreground(void){uint8_t c,mask,reading,busy;if(!eb_notify
  if(mask&64)eval_drum_dirty();drum_irq_changed(mask);editbuffer_reading=reading;seqservicing=busy;
 }
 void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*head,v,amp,budget=16;uint16_t at,f,scaled,longest;
+ if(song_playing||song_link_active)return;
  if((!seqplaying&&!smooth_playback_preparing)||mx.slot!=eb_slot){if(editbuffer_valid)seq_irq_launch();editbuffer_valid=editbuffer_ready=eb_building=0;eb_slot=mx.slot;}
  eb_notify_foreground();
  if(!smooth_playback_preparing&&(!seqplaying||seqservicing||padread!=padwrite||seqticks>=seqdeadline||seqdeadline-seqticks<4))return;

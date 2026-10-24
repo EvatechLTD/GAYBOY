@@ -69,14 +69,14 @@ const uint8_t finderitems[5][17]={
  {53,38,21,43,22,46,51,52,42,36,37,35,26,40,41,39,47},
  {28,29,30,31,32,33,34,10,255},
  {11,12,13,14,15,17,7,9,1,2,3,5,6,255},
- {48,49,50,19,20,24,25,255}};
-const uint8_t findercount[5]={8,17,8,13,7};
+ {48,49,50,255}};
+const uint8_t findercount[5]={8,17,8,13,3};
 const char * const findertracks[]={"P1","P2","WAVE","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
 extern uint8_t mixer_layout_dirty;
 uint8_t pageconfig;
 static uint8_t pageslot;
 __at (0xA4EC) uint8_t theorytrack;
-uint8_t finder_allowed(uint8_t item){if(item==54)return pageconfig!=2;if(item==15||item==31)return 0;if(item==33)return syncmode==SYNC_TWINK;if(item==48||item==49)return pageconfig!=2&&drum_file_context()&&!drum_file_sample_context();if(item==50)return pageconfig!=2&&drum_file_sample_context();if(item==23)return 0;if(item==47)return page==8&&(theorytrack<4||theorytrack==6);if(item==255||item==7||item==9||item==14||item==32||item==33||item==5||item==6)return 0;if(item>=28&&item<=34&&!eval_visible(item-28))return 0;if(page==18&&MIXER_LINK_VIEW&&(item==19||item==20))return 0;if(item==45)return 1;if(pageconfig==2)return item!=18&&item!=8&&item!=16;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
+uint8_t finder_allowed(uint8_t item){if(item==19||item==20||item==24||item==25)return 0;if(item==54)return pageconfig!=2;if(item==15||item==31)return 0;if(item==33)return syncmode==SYNC_TWINK;if(item==48||item==49)return pageconfig!=2&&drum_file_context()&&!drum_file_sample_context();if(item==50)return pageconfig!=2&&drum_file_sample_context();if(item==23)return 0;if(item==47)return page==8&&(theorytrack<4||theorytrack==6);if(item==255||item==7||item==9||item==14||item==32||item==33||item==5||item==6)return 0;if(item>=28&&item<=34&&!eval_visible(item-28))return 0;if(page==18&&MIXER_LINK_VIEW&&(item==19||item==20))return 0;if(item==45)return 1;if(pageconfig==2)return item!=18&&item!=8&&item!=16;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
 static void page_defaults(void);
 static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?12:findercount[navcategory];}
 static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==2?54:i==3?16:pool_root[100+i-4];}
@@ -115,7 +115,7 @@ void ui_menu(void) BANKED {uint8_t i,row=4,inv,rank=0,n=0,start,full,item,index;
 #define PAGE_ITEMS (pool_root+100)
 static void page_defaults(void){uint8_t i,j,changed=0;
  if(pool_root[108]!='P'||pool_root[109]!=1){memset(PAGE_ITEMS,255,8);changed=1;}
- for(i=0;i<8;i++){if(PAGE_ITEMS[i]==255)continue;if(PAGE_ITEMS[i]<1||PAGE_ITEMS[i]>46||PAGE_ITEMS[i]==23||PAGE_ITEMS[i]==18||PAGE_ITEMS[i]==8||PAGE_ITEMS[i]==16||PAGE_ITEMS[i]==44){PAGE_ITEMS[i]=255;changed=1;continue;}for(j=0;j<i;j++)if(PAGE_ITEMS[i]==PAGE_ITEMS[j]){PAGE_ITEMS[i]=255;changed=1;break;}}
+ for(i=0;i<8;i++){if(PAGE_ITEMS[i]==255)continue;if(PAGE_ITEMS[i]<1||PAGE_ITEMS[i]>46||PAGE_ITEMS[i]==19||PAGE_ITEMS[i]==20||PAGE_ITEMS[i]==24||PAGE_ITEMS[i]==25||PAGE_ITEMS[i]==23||PAGE_ITEMS[i]==18||PAGE_ITEMS[i]==8||PAGE_ITEMS[i]==16||PAGE_ITEMS[i]==44){PAGE_ITEMS[i]=255;changed=1;continue;}for(j=0;j<i;j++)if(PAGE_ITEMS[i]==PAGE_ITEMS[j]){PAGE_ITEMS[i]=255;changed=1;break;}}
  pool_root[108]='P';pool_root[109]=1;if(changed)mixer_layout_dirty=1;
 }
 static const char *shortcut_label(uint8_t item){static const char * const tracks[]={"SEQ P1","SEQ P2","SEQ WAVE","SEQ NOISE","SEQ MONOSYNTH","SEQ WAVE2","SEQ DRUMSYNTH"};return item==33?"SEQ MS":item>=28&&item<=34?tracks[item-28]:finder_label(item);}

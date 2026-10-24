@@ -87,10 +87,10 @@ static void transmit(void){uint8_t budget=16,b;
  __critical {if(linktxread<linktxsize&&syncr==syncw&&!syncdue&&!(SC_REG&0x80)&&!(IF_REG&(SIO_IFLAG|TIM_IFLAG|VBL_IFLAG))){SB_REG=linktx[linktxread++];SC_REG=0x81;}}
 }
 void link_wire_service(void) BANKED {transmit();}
-void link_clock_abort(void) NONBANKED {
+void link_clock_abort(void) BANKED {
  if(linktxread<linktxsize||linkbitqueued){linktxread=0;linkbitcursor=0;memset((void *)linkbits,0,16);linkbitread=linkbitwrite=linkbitqueued=0;}
 }
-void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED {
+void link_clock_decode(uint8_t b,uint8_t delta) BANKED {
  uint8_t value;
  if(delta!=1){bitshift=bitcount=bitreceiving=0;if(!link_rx_ready)rxsize=rxread=0;return;}
  if((b&63)>=48)return;

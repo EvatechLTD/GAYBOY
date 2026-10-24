@@ -4,6 +4,7 @@
 #include "mixer_shared.h"
 #include "resident.h"
 #include "song_audio.h"
+#include "song_link.h"
 #include "smooth_playback.h"
 #include "mod_bypass.h"
 extern const uint16_t notes[140];
@@ -36,6 +37,11 @@ void song_cache_get(uint16_t at,uint8_t *p,uint8_t n) BANKED {uint8_t b[16];
  /* Destination may itself be bank-zero SRAM. Stage through WRAM before
     restoring its bank; a direct memcpy would write the wrong RAM bank. */
  __critical{SWITCH_RAM_MBC5(2);memcpy(b,(void *)(CACHE_BASE+at),n);SWITCH_RAM_MBC5(0);}memcpy(p,b,n);
+}
+/* Group headers and LFO points are exactly two bytes. Avoid two generic
+   memcpy calls and a banked out-parameter for these frequent reads. */
+static uint16_t cache_pair(uint16_t at){uint8_t lo,hi;const uint8_t *p=(const uint8_t *)(CACHE_BASE+at);
+ __critical{SWITCH_RAM_MBC5(2);lo=*p++;hi=*p;SWITCH_RAM_MBC5(0);}return lo|((uint16_t)hi<<8);
 }
 __at (0xA3C0) volatile uint8_t song_qread;
 __at (0xA3C1) volatile uint8_t song_qwrite;
@@ -158,8 +164,8 @@ static uint16_t arp_wait(uint8_t c){SongScene *s=current_scene;SongVoice *v=(Son
  if(s->arprest[c]>v->residual){n++;v->residual+=s->arpscale[c]-s->arprest[c];}else v->residual-=s->arprest[c];return n?n:1;
 }
 static void off(uint8_t c){R.voice[c].note=0;R.voice[c].volume=0;if(c==0){put_reg(0x12,8);put_reg(0x14,128);}else if(c==1){put_reg(0x17,8);put_reg(0x19,128);}else put_reg(0x1a,0);}
-static uint16_t pitch(uint8_t c,uint8_t note,uint16_t ordinary){uint8_t point[2];int16_t n,f;SongScene *s=current_scene;
- if(!(s->lfo&(1<<c)))return ordinary;song_cache_get(s->points[c]+(uint16_t)(R.lfophase>>2)*2,point,2);n=note+(int8_t)point[1];if(n<0)n=0;if(n>127)n=127;if(c==2)n+=12;f=notes[n]+(int8_t)point[0];return f<0?0:f>2047?2047:f;
+static uint16_t pitch(uint8_t c,uint8_t note,uint16_t ordinary){uint16_t point;int16_t n,f;SongScene *s=current_scene;
+ if(!(s->lfo&(1<<c)))return ordinary;point=cache_pair(s->points[c]+(uint16_t)(R.lfophase>>2)*2);n=note+(int8_t)(point>>8);if(n<0)n=0;if(n>127)n=127;if(c==2)n+=12;f=notes[n]+(int8_t)point;return f<0?0:f>2047?2047:f;
 }
 void song_emit(uint8_t c,uint8_t index) BANKED {SongVoice *v=(SongVoice *)&R.voice[c];SongScene *s=current_scene;uint8_t *p=v->tones[index],i,vol=p[1],*h=s->patch[c];uint16_t f= pitch(c,p[0]-1,p[2]|((uint16_t)p[3]<<8));
  v->note=p[0];v->volume=vol;v->pitch=f;route=(route&~((1<<c)|(16<<c)))|h[4];put_reg(0x25,route);
@@ -167,9 +173,9 @@ void song_emit(uint8_t c,uint8_t index) BANKED {SongVoice *v=(SongVoice *)&R.voi
  else if(c==1){put_reg(0x16,h[1]);put_reg(0x17,vol?vol|h[2]:8);put_reg(0x18,f);put_reg(0x19,h[3]|(f>>8));}
  else{put_reg(0x1a,0);for(i=0;i<16;i++)put_reg(0x30+i,s->wave[i]);put_reg(0x1b,h[1]);put_reg(0x1c,vol);put_reg(0x1a,128);put_reg(0x1d,f);put_reg(0x1e,h[3]|(f>>8));}
 }
-static void group(uint8_t c){SongVoice *v=(SongVoice *)&R.voice[c];SongScene *s=current_scene;uint8_t h[2],previous=v->count;
- if(v->cursor>=s->end[c])return;song_cache_get(v->cursor,h,2);if(h[0]!=v->step)return;
- v->cursor+=2;v->count=h[1];if(!v->count){off(c);v->wait=65535U;return;}
+static void group(uint8_t c){SongVoice *v=(SongVoice *)&R.voice[c];SongScene *s=current_scene;uint16_t h;uint8_t previous=v->count;
+ if(v->cursor>=s->end[c])return;h=cache_pair(v->cursor);if((uint8_t)h!=v->step)return;
+ v->cursor+=2;v->count=h>>8;if(!v->count){off(c);v->wait=65535U;return;}
  song_cache_get(v->cursor,(uint8_t *)v->tones,v->count*4);v->cursor+=v->count*4;
  if(!s->mode[c]||s->retrig[c]||!previous){v->index=0;v->residual=0;song_emit(c,s->mode[c]?rank_next(c):0);v->wait=s->mode[c]?arp_wait(c):65535U;}
 }
@@ -407,24 +413,70 @@ static void fill(uint8_t budget){while(budget--&&!R.done&&((song_qwrite+1)&7)!=s
  R.clock+=R.wait;begin_frame();song_audio_due();plan_prefetch();finish_frame();
 }}
 void song_timer(void) NONBANKED {song_irq_tick(1);}
-void song_start(uint8_t smooth) BANKED {uint8_t original=mx.slot,mask=0,c,err;uint16_t i,n,used=0,bpm=seqbpm;uint32_t start=smooth?0:song_view.cursor&~15UL;SongClip clip;
- dirty=1;if(song_playing){song_stop();return;}if(seqplaying){song_view.error=6;return;}if(syncmode){song_view.error=7;return;}
- n=song_count();if(!n){song_view.error=1;return;}if(start>=song_end()){song_view.error=10;return;}
+/* Short linked-slave-only wrapper. The master's IRQ remains song_timer.
+   Account for the period that just finished, then reset the next reload. */
+void song_slave_timer(void) NONBANKED __naked {__asm
+ ld a,(#_song_link_reload)
+ ld b,a
+ ldh a,(#0x06)
+ ld (#_song_link_reload),a
+ ld a,#252
+ ldh (#0x06),a
+ ld a,b
+ cp #252
+ jr z,song_slave_tick$
+ ld hl,#_song_link_trim
+ jr c,song_slave_slow$
+ inc (hl)
+ jr nz,song_slave_tick$
+ inc hl
+ inc (hl)
+ jr song_slave_tick$
+song_slave_slow$:
+ ld a,(hl)
+ dec (hl)
+ or a,a
+ jr nz,song_slave_tick$
+ inc hl
+ dec (hl)
+song_slave_tick$:
+ ld a,#1
+ jp _song_irq_tick
+ __endasm;}
+void song_arm(void) BANKED {
+ remove_TIM(engine_timer);song_link_reload=252;add_TIM(song_link_active&&syncslave?song_slave_timer:song_timer);editirq_clock_reset();TAC_REG=0;TMA_REG=TIMA_REG=252;IF_REG&=~TIM_IFLAG;
+}
+void song_go(void) BANKED {
+ if(song_link_active)DIV_REG=0;
+ TIMA_REG=252;IF_REG&=~TIM_IFLAG;seqplaying=song_playing=1;smooth_playback_preparing=0;TAC_REG=4;song_audio_commit();
+}
+void song_start(uint8_t smooth) BANKED {
+ dirty=1;if(song_playing){song_stop();return;}if(song_link_active){song_link_finish();return;}
+ if(seqplaying){song_view.error=6;return;}if(syncmode==1){song_link_request(smooth);return;}if(syncmode){song_view.error=7;return;}
+ if(song_prepare(smooth,seqbpm,smooth?0:song_view.cursor&~15UL)){
+  song_status(1);__critical{song_arm();song_go();}
+ }
+}
+uint8_t song_prepare(uint8_t smooth,uint16_t bpm,uint32_t start) BANKED {uint8_t original=mx.slot,mask=0,c,err;uint16_t i,n,used=0;SongClip clip;
+ n=song_count();if(!n){song_view.error=1;return 0;}if(start>=song_end()){song_view.error=10;return 0;}
+ if(smooth)smooth_playback_begin();else {smooth_playback_preparing=1;song_status(0);}
  song_pick_clear();seq_audition_stop();if(pattern_dirty)sparse_snapshot(original);panic();memset((void *)&R,0,sizeof(R));R.origin=original;R.scene=255;R.bpm=bpm;R.units=15360U/bpm;R.remainder=15360U-R.units*bpm;
- for(i=0;i<n;i++){song_read(i,&clip);if(clip.pad>=5||!clip.length||clip.start+clip.length<clip.start){song_view.error=8;return;}mask|=1<<clip.pad;}
- if(smooth)smooth_playback_begin();else smooth_playback_preparing=1;
+ for(i=0;i<n;i++){song_read(i,&clip);if(clip.pad>=5||!clip.length||clip.start+clip.length<clip.start){song_view.error=8;smooth_playback_preparing=0;smooth_playback_update();return 0;}mask|=1<<clip.pad;}
  for(c=0;c<5;c++)if(mask&(1<<c)){if(!sparse_restore(c)){R.error=3;break;}seqbpm=bpm;if(!compile_scene(c,&used))break;}
  err=R.error;sparse_restore(original);seqbpm=bpm;smooth_playback_preparing=0;editbuffer_reset();arp_irq_reset();editirq_enabled=editirq_running=lfo_irq_mask=drum_irq_active=0;seqirqdirty=seqirqready=seqirqfired=0;
- if(err){song_view.error=err;smooth_playback_update();return;}
+ if(err){song_view.error=err;smooth_playback_update();return 0;}
+ /* The link may wait many frames after compiling while the peer buffers.
+    Keep Smooth ownership until the shared GO, not merely the local fill. */
+ smooth_playback_preparing=song_link_active;
  R.end=song_end();R.total=n;R.loop=song_loop();song_read(0,(SongClip *)&R.first);
- song_qread=song_qwrite=0;song_qpointer=0xa500;song_hwclock=0;song_hwwait=1;song_actual_done=0;song_actual_scene=255;song_actual_position=0;song_underruns=0;memset(SIM,0,48);
+ song_qread=song_qwrite=0;song_qpointer=0xa500;song_hwclock=0;song_hwwait=1;song_actual_done=0;song_actual_scene=255;song_actual_position=0;song_underruns=0;SIM[0x11]=0;
  R.clock=R.last=R.phase=0;R.lfoleft=8;R.stepleft=R.units+(R.remainder!=0);R.prepared=mask;R.wait=R.stepleft;song_view.error=0;
  begin_frame();seek_position(start);deadline(0);finish_frame();fill(6);
- __critical{remove_TIM(engine_timer);add_TIM(song_timer);editirq_clock_reset();TMA_REG=TIMA_REG=252;IF_REG&=~TIM_IFLAG;seqplaying=song_playing=1;TAC_REG=4;song_audio_commit();}
- dirty=1;
+ dirty=1;return 1;
 }
 void song_stop(void) BANKED {uint8_t original=R.origin;uint16_t bpm=R.bpm;uint32_t position,end=R.end;
- __critical{TAC_REG=0;remove_TIM(song_timer);add_TIM(engine_timer);song_playing=0;seqplaying=0;position=song_actual_position;}song_view.cursor=(position>=end&&end?end-1:position)&~15UL;NR12_REG=NR22_REG=NR42_REG=8;NR14_REG=NR24_REG=NR44_REG=128;NR30_REG=0;panic();editbuffer_reset();storage_sorted_dirty();sparse_restore(original);wave_cache_invalidate();seqbpm=bpm;seqirqdirty=1;seqdrawvalid=seqtilesready=0;song_view.selected=SONG_NONE;song_view.error=0;song_pick_clear();rd=wr;st=count=0;
+ if(song_link_active)song_link_finish();
+ __critical{TAC_REG=0;remove_TIM(song_timer);remove_TIM(song_slave_timer);add_TIM(engine_timer);song_playing=0;seqplaying=0;position=song_actual_position;}song_view.cursor=(position>=end&&end?end-1:position)&~15UL;NR12_REG=NR22_REG=NR42_REG=8;NR14_REG=NR24_REG=NR44_REG=128;NR30_REG=0;panic();editbuffer_reset();storage_sorted_dirty();sparse_restore(original);wave_cache_invalidate();seqbpm=bpm;seqirqdirty=1;seqdrawvalid=seqtilesready=0;song_view.selected=SONG_NONE;song_view.error=0;song_pick_clear();rd=wr;st=count=0;
  *(uint8_t *)0xA475=0;*(uint8_t *)0xA4D0=0;smooth_playback_update();dirty=1;
 }
 void song_service(void) BANKED {uint32_t position,width;if(song_actual_done){song_stop();return;}fill(2);
@@ -433,7 +485,7 @@ void song_service(void) BANKED {uint32_t position,width;if(song_actual_done){son
 
 extern volatile uint8_t padqueue[32],padread,padwrite,padsampled;
 void song_run(void) BANKED {uint8_t p,edge;uint16_t frame=sys_time;
- while(song_playing){song_service();if(!song_playing)break;
+ while(song_playing){if(song_link_active)song_link_service();song_service();if(!song_playing)break;
   while(padread!=padwrite){p=padqueue[padread];padread=(padread+1)&31;edge=p&~lastpad;song_input(p,edge);lastpad=p;if(!song_playing)break;}
   if(!song_playing)break;
   if(frame!=sys_time){frame=sys_time;lastframe=frame;

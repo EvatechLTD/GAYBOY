@@ -280,3 +280,22 @@ Before merging, compare the exact same musical fixtures against `57cc9c7` or the
 6. Workspace-private `DATA/EXPERIMENTS/smooth-loop-20261023` contains captured user state and loop probes; `DATA/SAVES/stress-testing/arptest-original.sav` is preserved test input. Never overwrite originals. Ignored build JSON/logs are local evidence, not guaranteed to exist on another team's machine; the test source and this brief must remain sufficient to reproduce a comparison.
 
 The repeated lesson: **keep unchanged sound running; prepare only real changes; publish them before their deadline; let controls draw promptly; prove the result at the APU and at the screen.**
+
+
+## Songlink hardware qualification ? October 24, 2026
+
+The user played the completed KILLING demo simultaneously on two real DMGs over a link cable and reported extremely tight sync with barely audible phasing. Preserve `GAYBOY-SONGLINK-DEMO.gb` as the hardware reference. This qualifies GAYBOY-to-GAYBOY Song Mode; it does not resolve the separate TWINK/Monosimp late-attack issue or qualify live-pattern sync.
+
+Both machines compile their own arrangements and fill their APU queues while stopped. BUFFERING remains visible until both are ready; a shared GO serial completion establishes the playback epoch. Smooth's final stop legend is fully scanned out before GO, and Smooth ownership must remain held while waiting for the peer after local compilation finishes.
+
+Master playback uses the unchanged song timer handler. After GO, master SIO receive interrupts are masked; optional timestamp transmission happens in foreground only with audio headroom. Two bytes carry an arbitrary hardware-clock point plus quarter-tick phase. The slave timestamps byte one, then corrects oscillator drift by altering one future TMA reload (251/253 versus normal 252). Phase math stays in foreground; the short slave IRQ wrapper resets TMA and accounts for completed corrections. Never write TIMA or DIV to correct an already-running song.
+
+Critical discovered race: a foreground `IF_REG &= ~SIO_IFLAG` can erase a timer request that arrives between its read and write. An unsafe build lost 14 pending audio timer interrupts in a 60-second reverse-master stress run. Steady clock transmission must not clear IF. Fixed runs lost zero requests.
+
+Failed approaches included whole-musical-tick corrections (audible jitter), direct TIMA correction (overflow/reload hazards, potentially ~62 ms gaps), averaged checkpoints (worse response), and foreground messages that assumed exact wakeup intervals (skipped checkpoints and drift). The retained protocol timestamps whenever a safe sending opportunity actually occurs.
+
+Qualification evidence: completed demo with +1000 ppm oscillator mismatch, zero queue underruns and no Smooth VRAM writes; maximum paired-device attack separation 0.470 ms. A 240 BPM ARP/LFO stress run at -1000 ppm had zero underruns and maximum separation 1.282 ms. Reverse-master 137 BPM tests stayed within existing 1.3 ms note-timing gates. Cable-loss/start cancellation/restart tests preserve resident notes and arrangements. These emulator bounds are fixture-specific, not hardware guarantees. Ordinary playback's seven-phase editing benchmark passed with zero underruns and maximum measured drum grid error 0.343 ms.
+
+The project stays 32 KiB: five fixed 2 KiB pad records and one arrangement per SRM. Pattern/song archive menus were removed; the 128 KiB library experiment was abandoned and archived outside the active source tree. Do not compact or relocate working pads or reduce playback preparation to add storage. The completed sanitized demo source and reproducible build command live in `assets/demo/`.
+
+Live-pattern sync still follows the old received-clock/foreground path and disables several prepared IRQ paths. Rework it only on LIVELINKREWORK: preserve this Songlink implementation, the fixed SRAM map, PCM accounting, launch quantization, and remote control behavior. A local free-running slave clock plus bounded phase correction is the intended experiment; timing bytes must not directly execute musical steps or source scans.

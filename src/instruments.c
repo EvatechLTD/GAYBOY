@@ -1,3 +1,5 @@
+#include "song_link.h"
+#include "song_mode.h"
 #pragma bank 12
 #include "api.h"
 #include "mixer_shared.h"
@@ -30,6 +32,7 @@ uint8_t ui_repeat(uint8_t p,uint8_t edge) BANKED {uint8_t axis,interval,resetmas
  else if(page==8||page==9||page==10){axis=p&(J_UP|J_DOWN|J_LEFT|J_RIGHT);if((p&J_SELECT)||!axis||(axis&(axis-1))){repeataxis=0;return edge;}}
  else if(page==7){axis=p&(J_UP|J_DOWN);resetmask|=J_LEFT|J_RIGHT;if((!(p&J_B)&&!monoedit)||(p&J_SELECT)||(axis!=J_UP&&axis!=J_DOWN)){repeataxis=0;return edge;}}
  else if(page==18){axis=p&(J_UP|J_DOWN);resetmask|=J_LEFT|J_RIGHT;if(!(p&(J_A|J_B))||(p&J_SELECT)||(axis!=J_UP&&axis!=J_DOWN)){repeataxis=0;return edge;}}
+ else if(page==29){axis=p&(J_LEFT|J_RIGHT);resetmask|=J_UP|J_DOWN;if(seqplaying||song_link_active||(p&J_SELECT)||(axis!=J_LEFT&&axis!=J_RIGHT)){repeataxis=0;return edge;}}
  else{axis=p&(J_LEFT|J_RIGHT);resetmask|=J_UP|J_DOWN;if(!(page==1||page==2||page==5||page==6)||(axis!=J_LEFT&&axis!=J_RIGHT)){repeataxis=0;return edge;}}
  if(navopen||(p&J_START)||(edge&resetmask)){repeataxis=0;mixphase=0;return edge;}
  if(axis!=repeataxis||(edge&axis)){repeataxis=axis;repeatstart=repeatlast=now;mixphase=0;return edge;}
@@ -57,7 +60,7 @@ uint8_t seqgestureblocked,seqgesturepressed;
 static uint8_t seqgesturepage;
 uint8_t roll_preview_finish(void) BANKED;
 /* A427 is dedicated input state; B4E3 overlaps the retained grid tiles. */
-void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i,head=seqhead,gesture,tracking,c=seqtrack,oldcursor,oldpitch,oldtop,oldbase,stop;int16_t top;if(smooth_playback_active){if(((p&J_SELECT)&&(edge&J_A))||((p&(J_SELECT|J_START))==(J_SELECT|J_START)&&(edge&(J_SELECT|J_START)))){navopen=0;navblocked=seqselectused=1;seq_transport();}return;}*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();
+void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i,head=seqhead,gesture,tracking,c=seqtrack,oldcursor,oldpitch,oldtop,oldbase,stop;int16_t top;if(page==SONG_PAGE&&song_link_active&&!song_playing){song_input(p,edge);return;}if(smooth_playback_active){if(((p&J_SELECT)&&(edge&J_A))||((p&(J_SELECT|J_START))==(J_SELECT|J_START)&&(edge&(J_SELECT|J_START)))){navopen=0;navblocked=seqselectused=1;seq_transport();}return;}*(uint8_t *)0xA427=1;if(sparse_enabled&&edge&&!(page==18&&!navopen&&mx.focus>=30&&mx.focus<38&&!(p&(J_A|J_B|J_START|J_SELECT))))sparse_finish_install();if(seqrecordtrack!=255&&(!(p&J_B)||page!=8||navopen||(p&(J_START|J_SELECT))))seq_record_finish();
  seqgesturepressed=edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN);
  gesture=page==8&&!navopen&&!seqhead&&!seqfocus&&seqapending&&
   !(p&(J_START|J_SELECT))&&((p&(J_A|J_B))==J_A||(p&(J_A|J_B))==J_B);

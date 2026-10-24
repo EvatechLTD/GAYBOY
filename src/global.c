@@ -86,7 +86,7 @@ void native_input(uint8_t p,uint8_t edge) BANKED {
  }else {if(edge&J_UP)cursor[1]=cursor[1]?cursor[1]-1:native_counts[selected];if(edge&J_DOWN)cursor[1]=(cursor[1]+1)%(native_counts[selected]+1);if(edge&J_A){if(cursor[1]==native_counts[selected])tone_preset_open();else {play(selected,60,100);auditionvoice=selected;}}}dirty=1;
 }
 
-uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==7||item==9||item==14||item==5||item==6)return 0;if(item==2)return 1;if(item==27)return 1;if(item==26)return clear_available();if(item==24||item==25)return 0;if(item==23)return 1;if(item>=21)return page==8;if(!experimental_mode&&(item==2||item==5||item==6||item==7||item==9||item==14))return 0;return item&&(!(item>=1&&item<=6)||page<7);}
+uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==7||item==9||item==14||item==5||item==6)return 0;if(item==2)return 1;if(item==27)return 1;if(item==26)return clear_available();if(item==19||item==20||item==24||item==25)return 0;if(item==23)return 1;if(item>=21)return page==8;if(!experimental_mode&&(item==2||item==5||item==6||item==7||item==9||item==14))return 0;return item&&(!(item>=1&&item<=6)||page<7);}
 
 void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint16_t magnitude=wheel<0?-wheel:wheel,result;uint8_t range=param[c][25];result=(magnitude>>6)*range+(((magnitude&63)*range)>>6);bend[c]=wheel<0?-(int16_t)result:result;updatepitch(c);if(!syncmode)seq_irq_refresh(c);}
 

@@ -26,7 +26,8 @@ void eval_global_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;int16_t d
  dirty=1;
 }
 
-void seq_track_view(void) BANKED{uint8_t c=seqtrack,e[4],low=255,maximum=seq_note_maximum(c);uint16_t i,n;if(c==6)return;n=seq_event_count(c);for(i=0;i<n;i++){seq_event_get(c,i,e);if(e[1]&&e[1]-1<low)low=e[1]-1;if(!(i&15))mixfill();}if(low==255)low=36;if(low<SEQ_NOTE_MINIMUM(c))low=SEQ_NOTE_MINIMUM(c);if(low>maximum)low=maximum;seqpitch[c]=low;seqtop[c]=low>maximum-(seqrows-1)?maximum:low+seqrows-1;seqdrawvalid=0;}
+extern uint8_t seqviewinitialized;
+void seq_track_view(void) BANKED{uint8_t c=seqtrack,e[4],low=255,maximum=seq_note_maximum(c);uint16_t i,n;if(c==6||(seqviewinitialized&(1<<c)))return;seqviewinitialized|=1<<c;n=seq_event_count(c);for(i=0;i<n;i++){seq_event_get(c,i,e);if(e[1]&&e[1]-1<low)low=e[1]-1;if(!(i&15))mixfill();}if(low==255)low=36;if(low<SEQ_NOTE_MINIMUM(c))low=SEQ_NOTE_MINIMUM(c);if(low>maximum)low=maximum;seqpitch[c]=low;seqtop[c]=low>maximum-(seqrows-1)?maximum:low+seqrows-1;seqdrawvalid=0;}
 
 
 extern uint8_t pulsekickpatch[8],noisepatch[2][5];

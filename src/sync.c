@@ -55,8 +55,8 @@ __at (0xFFC8) volatile uint8_t syncstart;
 __at (0xFFC9) volatile uint8_t synctxbyte;
 static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE","TWINK"};
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
-void link_clock_abort(void) NONBANKED;
-void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED;
+void link_clock_abort(void) BANKED;
+void link_clock_decode(uint8_t b,uint8_t delta) BANKED;
 void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=midi_launch_enabled=0;syncmode=0;syncslave=0;}
 void sync_control_service(void) BANKED {
  __critical {
