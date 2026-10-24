@@ -9,6 +9,8 @@
 #include "mixer_shared.h"
 #include "midi_input.h"
 #include "smooth_playback.h"
+#include "song_mode.h"
+void song_run(void) BANKED;
 extern volatile uint8_t drum_irq_pending;
 void drum_irq_service(void) BANKED;
 #include "notes.h"
@@ -109,7 +111,7 @@ void midi(uint8_t b){if(syncmode==SYNC_TWINK)return;if(syncmode&&sync_receive(b)
 /* Frame-clock macros update pitch/duty without retriggering hardware envelopes. */
 void service_frame(void) BANKED;
 void roll_feedback_service(void) BANKED;
-void service(void){uint8_t b,budget=8;mixfill();while(syncmode!=SYNC_TWINK&&rd!=wr&&budget--){b=rx[rd++];midi(b);mixfill();}if(lastframe!=sys_time)service_frame();}
+void service(void){if(song_playing){song_run();return;}uint8_t b,budget=8;mixfill();while(syncmode!=SYNC_TWINK&&rd!=wr&&budget--){b=rx[rd++];midi(b);mixfill();}if(lastframe!=sys_time)service_frame();}
 void exp_fetch(uint8_t bank,uint16_t offset,uint8_t *dst) NONBANKED {uint8_t saved=CURRENT_BANK;SWITCH_ROM(bank);memcpy(dst,(const void *)(0x4000+offset),16);SWITCH_ROM(saved);}
 extern uint16_t seqdeadline;
 void mixer_prepare_service(void) BANKED;
@@ -120,7 +122,7 @@ extern uint8_t mixer_layout_dirty;
 void mixer_layout_service(void) BANKED;
 void mixer_poll_input(void) BANKED;
 void eval_audio_resume_wave(void) BANKED;
-void mixfill(void){if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(!smooth_playback_active&&page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode!=SYNC_TWINK&&rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
+void mixfill(void){if(song_playing)return;if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(!smooth_playback_active&&page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode!=SYNC_TWINK&&rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */

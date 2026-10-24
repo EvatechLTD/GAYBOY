@@ -65,25 +65,25 @@ static const char * const finderpages[]={"LIVE","TONE","MOD","BANK","CC","TABLE"
 static void finder_text(uint8_t x,uint8_t y,const char *t,uint8_t inverse){uint8_t c;while(*t&&x<20){c=*t++;canvas[(uint16_t)y*20+x++]=c-32+(inverse?96:0);if(!(x&3))mixfill();}}
 /* Finder categories keep existing page/action IDs; 28..34 jump to tracks. */
 const uint8_t finderitems[5][17]={
- {18,8,45,16,27,4,44,255},
+ {18,8,54,45,16,27,4,44,255},
  {53,38,21,43,22,46,51,52,42,36,37,35,26,40,41,39,47},
  {28,29,30,31,32,33,34,10,255},
  {11,12,13,14,15,17,7,9,1,2,3,5,6,255},
  {48,49,50,19,20,24,25,255}};
-const uint8_t findercount[5]={7,17,8,13,7};
+const uint8_t findercount[5]={8,17,8,13,7};
 const char * const findertracks[]={"P1","P2","WAVE","NOISE","MONOSYNTH","WAVE2","DRUMSYNTH"};
 extern uint8_t mixer_layout_dirty;
 uint8_t pageconfig;
 static uint8_t pageslot;
 __at (0xA4EC) uint8_t theorytrack;
-uint8_t finder_allowed(uint8_t item){if(item==15||item==31)return 0;if(item==33)return syncmode==SYNC_TWINK;if(item==48||item==49)return pageconfig!=2&&drum_file_context()&&!drum_file_sample_context();if(item==50)return pageconfig!=2&&drum_file_sample_context();if(item==23)return 0;if(item==47)return page==8&&(theorytrack<4||theorytrack==6);if(item==255||item==7||item==9||item==14||item==32||item==33||item==5||item==6)return 0;if(item>=28&&item<=34&&!eval_visible(item-28))return 0;if(page==18&&MIXER_LINK_VIEW&&(item==19||item==20))return 0;if(item==45)return 1;if(pageconfig==2)return item!=18&&item!=8&&item!=16;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
+uint8_t finder_allowed(uint8_t item){if(item==54)return pageconfig!=2;if(item==15||item==31)return 0;if(item==33)return syncmode==SYNC_TWINK;if(item==48||item==49)return pageconfig!=2&&drum_file_context()&&!drum_file_sample_context();if(item==50)return pageconfig!=2&&drum_file_sample_context();if(item==23)return 0;if(item==47)return page==8&&(theorytrack<4||theorytrack==6);if(item==255||item==7||item==9||item==14||item==32||item==33||item==5||item==6)return 0;if(item>=28&&item<=34&&!eval_visible(item-28))return 0;if(page==18&&MIXER_LINK_VIEW&&(item==19||item==20))return 0;if(item==45)return 1;if(pageconfig==2)return item!=18&&item!=8&&item!=16;if(item==21||item==22||item==26||item>=35)return finder_edit_allowed(item);if(item>=28)return experimental_mode||!(item==32||item==33);return ui_menu_allowed(item);}
 static void page_defaults(void);
-static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?11:findercount[navcategory];}
-static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==2?16:pool_root[100+i-3];}
+static uint8_t finder_count(void){return navcategory==0&&pageconfig!=2?12:findercount[navcategory];}
+static uint8_t finder_item(uint8_t i){if(navcategory||pageconfig==2)return finderitems[navcategory][i];page_defaults();return i==0?18:i==1?8:i==2?54:i==3?16:pool_root[100+i-4];}
 void finder_first(void) BANKED {uint8_t i,item;mx.error=0;navchoice=255;for(i=0;i<finder_count();i++){item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 void finder_step(int8_t delta) BANKED {uint8_t i,n=finder_count(),tries,item;mx.error=0;for(i=0;i<n;i++)if(finder_item(i)==navchoice)break;for(tries=0;tries<n;tries++){i=delta<0?(i?i-1:n-1):(i+1)%n;item=finder_item(i);if(finder_allowed(item)){navchoice=item;break;}}}
 static const char * const finderedit[]={"CLEAR TRACK","COPY TRACK","PASTE TRACK","SELECT ALL","CLEAR SONG","COPY PATTERN","PASTE PATTERN","DELETE NOTES","CUT"};
-static const char *finder_label(uint8_t item){if(item==15||item==31)return 0;if(item==33)return "MS";if(item==48)return "LOAD KIT";if(item==49)return "SAVE KIT";if(item==50)return "LOAD SAMPLE";if(item==53)return "SELECT SCREEN";if(item==51)return "X2";if(item==52)return "/2";if(item==47)return "GENERATE";if(item==46)return "DUPLICATE";if(item==45)return "MIXER SETTINGS";if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
+static const char *finder_label(uint8_t item){if(item==54)return "SONG MODE";if(item==15||item==31)return 0;if(item==33)return "MS";if(item==48)return "LOAD KIT";if(item==49)return "SAVE KIT";if(item==50)return "LOAD SAMPLE";if(item==53)return "SELECT SCREEN";if(item==51)return "X2";if(item==52)return "/2";if(item==47)return "GENERATE";if(item==46)return "DUPLICATE";if(item==45)return "MIXER SETTINGS";if(item==44||item==255)return "EMPTY SLOT";if(item>=35)return finderedit[item-35];if(item>=28)return findertracks[item-28];return finderpages[item];}
 static const char *shortcut_label(uint8_t item);
 __at (0xA4D0) static uint8_t menuvalid;
 __at (0xA4D1) static uint8_t menucat;

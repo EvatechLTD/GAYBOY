@@ -26,6 +26,12 @@ def audit(rom):
   for a,b in zip(feedback_regions,feedback_regions[1:]):assert a[1]<=b[0]
   assert feedback_regions[-1][1]<=0xAC00
   feedback_bytes=sum(end-start for start,end,_ in feedback_regions)
+ if '_song_playing' in s:
+  assert s['_song_scenes']==0xA000 and s['_song_runtime']==0xA300
+  assert s['_song_view']==0xA4ED and s['_song_qread']==0xA3C0 and s['_song_qpointer']==0xA3CE
+  assert 5*104<=0x300 and 0xA300+162<=0xA3B0
+  assert 0xA500+8*192==0xAB00 and 8+158*9<=5*288
+  assert 128+352==480 and 480+288==768
  ordinary=heap-0xC000;fixed_bytes=sum(z for _,z in fixed);unused=8192-ordinary-fixed_bytes-512
  return {'rom':str(rom),'cartridge_ram_bytes':32768,'resident_patterns':5,'notes_per_pattern':256,'resident_note_payload_bytes':5120,'resident_pattern_records_bytes':10240,'user_preset_records_bytes':2048,'user_bank_names_bytes':32,'user_drum_kit_records_bytes':1280,'global_settings_bytes':128,'clipboard_reserved_bytes':2064,'wram_ordinary_bytes':ordinary,'wram_fixed_runtime_bytes':fixed_bytes,'wram_unused_total_bytes':unused,'wram_unused_below_audio_tables_bytes':0xD800-heap,'wram_minimum_reserve_bytes':384,'stack_reserved_bytes':512,'stack_minimum_reserve_bytes':512,'evaluation_chord_cache_bytes':0,'visual_feedback_cartridge_ram_bytes':feedback_bytes,'event_address_index_bytes':index_bytes,'wave_upload_shadow_bytes':16 if index_bytes else 0,'note_install_cache_bytes':0,'launch_packet_cache_bytes':0}
 if __name__=='__main__':
