@@ -45,11 +45,12 @@ static void header(void){
  text(0,1,song_playing?"PLAYING":"STOPPED",0);text(10,1,"16 BARS",0);
 }
 static void view(void){song_view.base=song_view.cursor&~255UL;}
-void song_open(void) BANKED {TILEVALID=0;if(seqplaying)seq_transport();if(song_view.used!=84){memset(&song_view,0,sizeof(song_view));song_view.reserved=0;song_view.selected=SONG_NONE;song_view.used=84;}song_view.reserved=0;song_view.cursor&=~15UL;if(song_view.head>3)song_view.head=3;song_view.error=0;song_pick_clear();view();seqdrawvalid=0;dirty=1;}
+void song_open(void) BANKED {TILEVALID=0;if(seqplaying)seq_transport();if(song_view.used!=84){memset(&song_view,0,sizeof(song_view));song_view.reserved=0;song_view.selected=SONG_NONE;song_view.used=84;}song_view.reserved=0;song_view.cursor&=~15UL;if(song_view.head>3)song_view.head=3;song_view.error=0;song_view.selected=SONG_NONE;song_view.gesture=0;song_pick_clear();view();seqdrawvalid=0;dirty=1;}
 void song_input(uint8_t p,uint8_t edge) BANKED {uint32_t unit=16,old=song_view.cursor;SongClip c;uint16_t found;uint8_t directions=edge&(J_LEFT|J_RIGHT|J_UP|J_DOWN);
  if((p&(J_START|J_SELECT))==(J_START|J_SELECT)&&(edge&(J_START|J_SELECT))){navblocked=seqselectused=1;if(song_playing)song_stop();else song_start(1);return;}
  if(song_playing){if((p&J_SELECT)&&(edge&J_A))song_stop();return;}
  if((lastpad&J_B)&&!(p&J_B)&&song_view.gesture==2){song_delete(song_view.selected);song_pick_clear();song_view.selected=SONG_NONE;song_view.gesture=0;dirty=1;}
+ if((lastpad&J_A)&&!(p&J_A)&&song_view.selected!=SONG_NONE){song_view.selected=SONG_NONE;CONTENTDIRTY=1;dirty=1;}
  /* Release completes a gesture; it does not require another full redraw. */
  if(!edge){if(!(p&J_A)&&song_view.gesture==4)song_view.gesture=0;if(!p)song_view.gesture=0;return;}
  if((p&J_SELECT)&&(edge&J_A)){seqselectused=1;song_start(0);return;}
@@ -88,7 +89,7 @@ void song_input(uint8_t p,uint8_t edge) BANKED {uint32_t unit=16,old=song_view.c
  if(!(p&(J_A|J_B))){if(edge&J_UP){if(song_view.lane)song_view.lane--;else song_view.head=1;}if(edge&J_DOWN&&song_view.lane<4)song_view.lane++;}
  if(edge&J_A){song_view.selected=found;}
  if(edge&J_B){if(found!=SONG_NONE){song_read(found,&c);if(c.pad==song_view.lane){song_view.selected=found;song_view.gesture=2;}}
-  else {c.start=song_view.cursor&~15UL;c.length=(song_pattern_length(song_view.lane)+15)&~15UL;c.pad=song_view.lane;found=c.start?song_find(c.start-1):SONG_NONE;if(found!=SONG_NONE){SongClip previous;song_read(found,&previous);if(previous.pad==c.pad&&previous.start+previous.length==c.start){c.start=previous.start;c.length+=previous.length;}else found=SONG_NONE;}song_pick_clear();if(song_put(found,&c)){song_view.selected=song_find(c.start);song_view.error=0;}else song_view.error=song_count()>=SONG_CAPACITY?9:8;}
+  else {c.start=song_view.cursor&~15UL;c.length=(song_pattern_length(song_view.lane)+15)&~15UL;c.pad=song_view.lane;found=c.start?song_find(c.start-1):SONG_NONE;if(found!=SONG_NONE){SongClip previous;song_read(found,&previous);if(previous.pad==c.pad&&previous.start+previous.length==c.start){c.start=previous.start;c.length+=previous.length;}else found=SONG_NONE;}song_pick_clear();if(song_put(found,&c)){song_view.selected=SONG_NONE;song_view.gesture=1;song_view.error=0;}else song_view.error=song_count()>=SONG_CAPACITY?9:8;}
  }
  if(!p)song_view.gesture=0;view();dirty|=!!edge;
 }
@@ -104,7 +105,7 @@ void song_render(void) BANKED {uint8_t cells[5][16],lane,col,i,tile,a,index,cur;
  text(0,2,"BAR",0);song_number(4,2,song_view.base/16+1);text(11,2,"TO",0);song_number(14,2,(right>>4)+!!(right&15));
  n=song_count();for(at=0;at<n;at++){song_read(at,&c);if(c.start>=right)break;if(c.start+c.length<=song_view.base||c.pad>=5)continue;
   first=c.start>song_view.base?(c.start-song_view.base)>>4:0;last=((c.start+c.length<right?c.start+c.length:right)-song_view.base+15)>>4;if(last>16)last=16;
-  for(col=first;col<last;col++)cells[c.pad][col]|=1|((song_view.selected==at||song_pick_has(at))&&!song_playing?8:0);
+  for(col=first;col<last;col++)cells[c.pad][col]|=1|((((lastpad&J_A)&&song_view.selected==at)||song_pick_has(at))&&!song_playing?8:0);
   if(c.start>=song_view.base)cells[c.pad][first]|=2;if(c.start+c.length<=right&&last)cells[c.pad][last-1]|=4;
  }
  cur=!song_playing&&!song_view.head?(song_view.cursor-song_view.base)>>4:255;
