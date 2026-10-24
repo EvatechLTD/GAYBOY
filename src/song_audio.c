@@ -183,8 +183,10 @@ static void quiet(void){off(0);off(1);off(2);put_reg(0x21,8);put_reg(0x23,128);R
 static void scene(uint8_t pad){uint8_t c;SongScene *s;
  R.scene=pad;if(pad>=5){quiet();return;}s=&song_scenes[pad];current_scene=s;put_reg(0x26,s->power?128:0);put_reg(0x24,s->master);
  if(R.kickleft){put_reg(0x12,8);put_reg(0x14,128);R.kickleft=0;}
- R.drumstep=0;R.drumcursor=s->begin[3];song_drum_emit();
+ R.drumstep=0;R.drumcursor=s->begin[3];
  for(c=0;c<3;c++){R.voice[c].step=R.voice[c].count=R.voice[c].index=0;R.voice[c].residual=0;R.voice[c].wait=65535U;R.voice[c].cursor=s->begin[c];group(c);}
+ /* Empty P1 groups silence pulse 1. Apply its drum owner afterwards. */
+ song_drum_emit();
 }
 /* Cold seek before starting the timer. Read only compiled events up to each
    track's local position; never replay the whole song or add IRQ work. */
@@ -228,8 +230,9 @@ static void step(void){uint8_t c;SongScene *s;
   if(!R.need&&R.prefetch<R.total&&R.position==R.next.start){uint8_t same=R.scene==R.next.pad&&R.current.start+R.current.length==R.next.start;next_clip();if(!same)return;}
  }
  if(R.scene>=5)return;s=current_scene;
- if((uint16_t)R.drumstep+1>=s->length[3]){R.drumstep=0;R.drumcursor=s->begin[3];}else R.drumstep++;song_drum_emit();
+ if((uint16_t)R.drumstep+1>=s->length[3]){R.drumstep=0;R.drumcursor=s->begin[3];}else R.drumstep++;
  for(c=0;c<3;c++){if((uint16_t)R.voice[c].step+1>=s->length[c]){R.voice[c].step=0;R.voice[c].cursor=s->begin[c];}else R.voice[c].step++;group(c);}
+ song_drum_emit();
 }
 static void deadline(uint8_t boundary){uint16_t wait,phase=R.phase;uint8_t c;
  if(boundary){R.stepleft=R.units;while(phase>=R.bpm){phase-=R.bpm;R.stepleft--;}R.stepleft+=R.remainder>phase;}

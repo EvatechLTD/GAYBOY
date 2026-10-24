@@ -248,7 +248,9 @@ uint8_t eval_seq_fire(uint8_t c) BANKED {uint16_t duration;uint8_t n,index=0,cha
 static uint32_t arp_period(uint8_t c,uint16_t *scale){uint8_t *p=evalpatch[c],division,key[5];int16_t value=0;uint32_t threshold;
  if(arpperiod[c]&&arpratebpm[c]==seqbpm&&arprategeneration[c]==pattern_generation){*scale=arpscale[c];return arpperiod[c];}
  key[0]=p[EV_CLOCK];key[1]=p[EV_DIV];key[2]=p[EV_TIMING];key[3]=p[6];key[4]=p[7];
- if(arpratebpm[c]==seqbpm&&!memcmp(arpratekey[c],key,5)){arprategeneration[c]=pattern_generation;*scale=arpscale[c];return arpperiod[c];}
+ /* Patch restore invalidates the computed period without changing the rate
+    key. A matching key is reusable only while its calculation still exists. */
+ if(arpperiod[c]&&arpratebpm[c]==seqbpm&&!memcmp(arpratekey[c],key,5)){arprategeneration[c]=pattern_generation;*scale=arpscale[c];return arpperiod[c];}
  if(!p[EV_CLOCK]){value+=p[EV_DIV];division=value<(p[EV_TIMING]==1?4:3)?(p[EV_TIMING]==1?4:3):value>16?16:value;threshold=960UL<<division;*scale=seqbpm;if(p[EV_TIMING]==1)threshold=threshold*2/3;else if(p[EV_TIMING]==2)threshold=threshold*3/2;}
  else {int32_t ms=((uint16_t)p[6]|((uint16_t)p[7]<<8))+(int32_t)value;if(ms<63)ms=63;if(ms>1000)ms=1000;threshold=(uint32_t)ms*1024;*scale=1000;}
  arprategeneration[c]=pattern_generation;memcpy(arpratekey[c],key,5);arpratebpm[c]=seqbpm;arpscale[c]=*scale;arpperiod[c]=threshold;arpwhole[c]=threshold/(*scale);arpremainder[c]=threshold%(*scale);arpremaining[c]=0;return threshold;

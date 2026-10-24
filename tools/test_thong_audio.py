@@ -20,6 +20,24 @@ def attack(kind):
  if p.register_file.A&128 and p.memory[reg]& (0x60 if kind=='wave' else 0xf0):
   hits[kind].append({'cycle':p._cycles()+12,'scene':p.memory[runtime+152],'position':int.from_bytes(bytes(p.memory[runtime+28:runtime+32]),'little')})
 wave_shadow=[0]*16
+cancelled_kicks=[]
+
+def check_kick_survives(_):
+ # A trigger alone is insufficient: a later empty P1 group used to silence
+ # the kick in the very same packet, before it could produce an attack.
+ at=(p.register_file.D<<8)|p.register_file.E;count=p.register_file.A
+ env=p.memory[0xff12];pan=p.memory[0xff25];kick=False
+ for i in range(count):
+  reg,value=p.memory[at+i*2:at+i*2+2]
+  if reg==0x12:env=value
+  elif reg==0x25:pan=value
+  elif reg==0x14 and value&128 and env&0xf0:kick=True
+ if kick and (not env&0xf0 or not pan&0x11):
+  q=0xa500+get('song_qread')*192
+  cancelled_kicks.append((p.memory[q+3],int.from_bytes(bytes(p.memory[q+4:q+8]),'little'),env,pan))
+
+a=S['_song_program'];p.hook_register(a>>16,a&65535,check_kick_survives,None)
+
 def programmed(_):
  reg=p.register_file.C
  if 0x30<=reg<=0x3f:wave_shadow[reg-0x30]=p.register_file.A
@@ -84,6 +102,7 @@ try:
  key('select',True);key('start',True);key('start',False);key('select',False)
  assert get('song_playing') and get('smooth_playback_active'),('start failed',get('song_view',15),clips())
  graphics.clear();p.tick(5400)
+ assert not cancelled_kicks,('Kicks cancelled inside their attack packets',cancelled_kicks[:12])
  assert not graphics,graphics[:5]
  assert get('song_playing')
  for slot,before in enumerate(protected):
