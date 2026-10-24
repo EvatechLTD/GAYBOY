@@ -231,7 +231,13 @@ void sparse_name(uint8_t slot,char *name) BANKED {resident_read(slot,16,(uint8_t
 void sparse_library_name(uint8_t slot,char *name) BANKED {sparse_name(slot,name);} void sparse_get_song_name(uint8_t song,char *name) BANKED {(void)song;memcpy(name,"STRIPPED",9);}
 uint8_t sparse_save_song(uint8_t song) BANKED {(void)song;return sparse_snapshot(mx.slot);}uint8_t sparse_load_song(uint8_t song) BANKED {(void)song;return 1;}uint8_t sparse_delete_song(uint8_t song) BANKED {(void)song;return 0;}uint16_t sparse_song_size(void) BANKED {return 5;}
 uint8_t sparse_clear_slot(uint8_t slot) BANKED {uint8_t b[14]={0};if(slot>=5)return 0;resident_write(slot,32,b,14);if(slot==mx.slot){memset(seqeventcounts,0,14);memset(seqeventoffsets,0,14);}return 1;}
-uint8_t sparse_load_pattern(uint8_t slot) BANKED {return sparse_restore(slot);}uint8_t sparse_save_pattern(uint8_t slot) BANKED {return sparse_snapshot(slot);}uint8_t sparse_save_pad_pattern(uint8_t pad,uint8_t index,const char *name) BANKED {(void)index;resident_write(pad,16,(uint8_t *)name,16);return pad==mx.slot?sparse_snapshot(pad):1;}
+uint8_t sparse_load_pattern(uint8_t slot) BANKED {return sparse_restore(slot);}uint8_t sparse_save_pattern(uint8_t slot) BANKED {return sparse_snapshot(slot);}uint8_t sparse_save_pad_pattern(uint8_t pad,uint8_t index,const char *name) BANKED {
+ (void)index;if(pad>=RESIDENT_PATTERNS||sparse_enabled!=1||io_busy)return 0;
+ /* The snapshot writes mx.name with the rest of the live metadata. Commit
+    the staged filename there first, so it cannot overwrite the new name. */
+ if(pad==mx.slot){memcpy(mx.name,name,16);mx.name[16]=0;return sparse_snapshot(pad);}
+ resident_write(pad,16,(const uint8_t *)name,16);return 1;
+}
 uint8_t sparse_copy_pad(uint8_t slot) BANKED {uint8_t b[16];uint16_t at;if(slot>=5)return 0;if(slot==mx.slot)sparse_snapshot(slot);for(at=0;at<2048;at+=16){if(at>=480&&at<768)memset(b,0,16);else resident_read(slot,at,b,16);io(3,0xAA00U+at,b,16,1);}pool_root[9]=1;pool_commit();return 1;}
 uint8_t sparse_paste_pad(uint8_t slot) BANKED {uint8_t b[16];uint16_t at;if(slot>=5||!pool_root[9])return 0;for(at=0;at<2048;at+=16){if(at>=480&&at<768)continue;io(3,0xAA00U+at,b,16,0);resident_write(slot,at,b,16);}if(slot==mx.slot)sparse_restore(slot);return 1;}
 uint16_t pool_reference(uint8_t offset) BANKED {return offset==POOL_PATTERN_CLIP&&pool_root[9]?0:65535U;}uint8_t sparse_clear_working_song(void) BANKED {uint8_t i;for(i=0;i<5;i++)sparse_clear_slot(i);return 1;}
