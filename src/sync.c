@@ -57,7 +57,7 @@ static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE","
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
 void link_clock_abort(void) NONBANKED;
 void link_clock_decode(uint8_t b,uint8_t delta) NONBANKED;
-void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=midi_launch_enabled=0;syncmode=1;syncslave=1;}
+void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=midi_launch_enabled=0;syncmode=0;syncslave=0;}
 void sync_control_service(void) BANKED {
  __critical {
   if(syncmode==SYNC_TWINK&&twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
