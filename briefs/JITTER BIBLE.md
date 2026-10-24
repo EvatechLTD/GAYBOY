@@ -299,3 +299,16 @@ Qualification evidence: completed demo with +1000 ppm oscillator mismatch, zero 
 The project stays 32 KiB: five fixed 2 KiB pad records and one arrangement per SRM. Pattern/song archive menus were removed; the 128 KiB library experiment was abandoned and archived outside the active source tree. Do not compact or relocate working pads or reduce playback preparation to add storage. The completed sanitized demo source and reproducible build command live in `assets/demo/`.
 
 Live-pattern sync still follows the old received-clock/foreground path and disables several prepared IRQ paths. Rework it only on LIVELINKREWORK: preserve this Songlink implementation, the fixed SRAM map, PCM accounting, launch quantization, and remote control behavior. A local free-running slave clock plus bounded phase correction is the intended experiment; timing bytes must not directly execute musical steps or source scans.
+
+
+## LIVELINKREWORK first experiment (unmerged)
+
+Main/published reference is `9e04d59`, ROM SHA256 `dc2eb1973f3713e06964648c703ba052cae4f8059248dbefffa1c77bf4625e16`. Live website emulator, downloads and the hardware-tested Songlink ROM are identical. Experiments below are isolated on LIVELINKREWORK and must not be published as completed live sync.
+
+The first experiment restores prepared melodic-note and drumsynth IRQ ownership on the native GAYBOY master only. It ticks prepared drums in the already-armed master timer path and keeps TMA at252 while native sync owns that timer. Retaining the standalone240 reload here would slow the existing serial oscillator by four. Slave clock behavior and its disabled native paths remain unchanged. Legacy HRAM onset flags still alias the sync FIFO and must keep their guards; the restored edit IRQ uses its existing WRAM state instead.
+
+A real two-machine SameBoy cable probe, `tools/test_live_link.cjs`, loads the completed demo's pad5, opts into native sync through UI and records routed positive-volume APU attacks for30 seconds with graphics on after a four-second startup exclusion. It does not inject serial bytes/registers. Baseline master maximum grid errors were kick30.960ms, P2/ARP20.761ms, Wave25.482ms, noise30.514ms. Prototype master: kick1.168ms, P2/ARP30.639ms, Wave0.511ms, noise1.065ms. The slave still shows approximately25..31ms errors. Thus this is a partial master-path improvement, not a successful clock rework. Timing is compared to the1/32 grid at120BPM; complete data lives in `briefs/live-link-first-pass.json`.
+
+The same pad with sync OFF also has P2/chord-transition errors around15..17ms despite drums/Wave below0.42ms. Do not attribute every complex-chord late transition to the wire or claim the live clock alone fixes it. Startup readiness/shared GO, locally running slave time, bounded timestamp correction, PCM behavior, live launches and remote mixer commands remain to implement/qualify. Raw index-paired skew is not a reliable phase result when attack counts/sequences differ; keep that caveat in any report.
+
+The prototype passes default-OFF/native opt-in/discovery/play/stop, and the ordinary seven-phase ARP/LFO editing benchmark with zero underruns. No SRAM layouts, pad count or queue capacities were changed. The high-error measurement runs use explicit `--measure-only`; the default timing gates remain strict and must not be relaxed to label the prototype ready.

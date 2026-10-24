@@ -142,7 +142,7 @@ void seq_irq_prepare(void) BANKED {
  if(changed)drum_irq_configure();
  if((eval_lfousers&7)||lfo_irq_mask)lfo_irq_prepare(changed);if(arp_active_mask)eval_arp_prepare();
  seqirqdirty=0;
- if((syncmode&&linkstate==2)||!editbuffer_active()||monomode||polymode||seqswing!=50||seqmode||syncmode&&syncslave){if(editirq_running)seq_irq_launch();return;}
+ if((syncmode!=1&&syncmode&&linkstate==2)||!editbuffer_active()||monomode||polymode||seqswing!=50||seqmode||syncmode&&syncslave){if(editirq_running)seq_irq_launch();return;}
  /* A page change does not change sound. Validate again on real changes or
     ownership transitions; cache an ineligible result for at most one frame. */
  if(!changed&&prepared_bpm==seqbpm&&(editirq_running||prepared_frame==(uint8_t)sys_time)&&editirq_enabled==prepared_mask&&prepared_buffer==editbuffer_irq_mask&&prepared_wave==waveengine&&prepared_kick==!!pulsekickleft&&prepared_owner==mono_owned&&prepared_record==seqrecordtrack&&prepared_power==power)return;

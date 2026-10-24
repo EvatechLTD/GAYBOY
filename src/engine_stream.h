@@ -124,7 +124,7 @@ void drum_irq_tick(uint8_t elapsed) NONBANKED;
 void engine_timer(void){uint8_t n;
  sync_clock_isr();
  if(syncarmed){
-  if(waveengine!=3&&seqplaying){n=editirq_elapsed(1);seqticks+=n;if(!syncslave)seq_irq_tick(n);}
+  if(waveengine!=3&&seqplaying){n=editirq_elapsed(1);seqticks+=n;if(!syncslave){if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);}}
   syncsub++;if(syncsub<syncdivider)return;syncsub=0;
  }
  /* Sample after the PCM upload. Delayed VBlank sampling alone can miss a

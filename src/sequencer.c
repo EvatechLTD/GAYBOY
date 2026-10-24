@@ -191,7 +191,7 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode,smooth=smooth_playba
  if(smooth)smooth_playback_begin();else smooth_playback_preparing=1;
  if(!editbuffer_prepare_stopped()){smooth_playback_preparing=0;seqservicing=0;smooth_playback_update();return;}
  storage_sorted_prepare();eval_drum_prepare();
- if(smooth_playback_preparing&&!syncmode){editbuffer_reading=1;eval_mod_configure();eval_seq_startup_prepare();drum_irq_prepare();editbuffer_reading=0;}
+ if(smooth_playback_preparing&&(!syncmode||(syncmode==1&&!syncslave))){editbuffer_reading=1;eval_mod_configure();eval_seq_startup_prepare();drum_irq_prepare();editbuffer_reading=0;}
  smooth_playback_preparing=0;if(smooth)smooth_playback_ready();
  seq_clock_epoch();
  if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}

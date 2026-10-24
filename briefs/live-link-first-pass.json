@@ -1,0 +1,392 @@
+{
+  "live-baseline-steady": {
+    "linked": true,
+    "graphics": true,
+    "master": 0,
+    "drift": 0,
+    "frames": 2461,
+    "status": [
+      {
+        "pc": "1af7",
+        "page": 8,
+        "playing": 1,
+        "slave": 0,
+        "link": 2,
+        "pending": 0,
+        "ticks": 17,
+        "position": [
+          4,
+          20,
+          20,
+          0,
+          0,
+          0,
+          4
+        ],
+        "drums": 0,
+        "notes": 0,
+        "arp": 2,
+        "lfo": 0,
+        "overflow": 0
+      },
+      {
+        "pc": "4b5e",
+        "page": 8,
+        "playing": 1,
+        "slave": 1,
+        "link": 2,
+        "pending": 0,
+        "ticks": 86,
+        "position": [
+          2,
+          18,
+          18,
+          0,
+          0,
+          0,
+          2
+        ],
+        "drums": 0,
+        "notes": 0,
+        "arp": 0,
+        "lfo": 0,
+        "overflow": 0
+      }
+    ],
+    "channels": [
+      {
+        "channel": 0,
+        "hits": [
+          106,
+          105
+        ],
+        "masterMaxGridMs": 30.9600830078125,
+        "slaveMaxGridMs": 31.113624572753906,
+        "skewMinMs": 23.99158477783203,
+        "skewMaxMs": 257.4310302734375,
+        "firstSkewMs": 31.33678436279297,
+        "lastSkewMs": 232.6526641845703
+      },
+      {
+        "channel": 1,
+        "hits": [
+          241,
+          239
+        ],
+        "masterMaxGridMs": 20.761489868164062,
+        "slaveMaxGridMs": 24.40357208251953,
+        "skewMinMs": 18.428802490234375,
+        "skewMaxMs": 246.46472930908203,
+        "firstSkewMs": 18.428802490234375,
+        "lastSkewMs": 246.46472930908203
+      },
+      {
+        "channel": 2,
+        "hits": [
+          15,
+          15
+        ],
+        "masterMaxGridMs": 25.482177734375,
+        "slaveMaxGridMs": 29.288291931152344,
+        "skewMinMs": 27.967453002929688,
+        "skewMaxMs": 238.95835876464844,
+        "firstSkewMs": 27.967453002929688,
+        "lastSkewMs": 238.95835876464844
+      },
+      {
+        "channel": 3,
+        "hits": [
+          211,
+          209
+        ],
+        "masterMaxGridMs": 30.513763427734375,
+        "slaveMaxGridMs": 31.141281127929688,
+        "skewMinMs": 20.995140075683594,
+        "skewMaxMs": 257.14778900146484,
+        "firstSkewMs": 28.86676788330078,
+        "lastSkewMs": 255.50079345703125
+      }
+    ],
+    "lostTimerRequests": [
+      0,
+      0
+    ],
+    "minSP": [
+      56985,
+      57027
+    ],
+    "graphicsWrites": [
+      20,
+      339
+    ],
+    "underruns": [
+      0,
+      0
+    ],
+    "aborts": 0,
+    "unarmed": 0,
+    "measurementOnly": true,
+    "startupExcluded": true,
+    "indexSkewRequiresMatchingAttackSequence": true
+  },
+  "live-master-steady": {
+    "linked": true,
+    "graphics": true,
+    "master": 0,
+    "drift": 0,
+    "frames": 2465,
+    "status": [
+      {
+        "pc": "1b47",
+        "page": 8,
+        "playing": 1,
+        "slave": 0,
+        "link": 2,
+        "pending": 0,
+        "ticks": 51,
+        "position": [
+          5,
+          21,
+          21,
+          0,
+          0,
+          0,
+          5
+        ],
+        "drums": 1,
+        "notes": 1,
+        "arp": 2,
+        "lfo": 0,
+        "overflow": 0
+      },
+      {
+        "pc": "69cd",
+        "page": 8,
+        "playing": 1,
+        "slave": 1,
+        "link": 2,
+        "pending": 0,
+        "ticks": 0,
+        "position": [
+          0,
+          16,
+          16,
+          0,
+          0,
+          0,
+          0
+        ],
+        "drums": 0,
+        "notes": 0,
+        "arp": 0,
+        "lfo": 0,
+        "overflow": 0
+      }
+    ],
+    "channels": [
+      {
+        "channel": 0,
+        "hits": [
+          105,
+          104
+        ],
+        "masterMaxGridMs": 1.1682510375976562,
+        "slaveMaxGridMs": 30.991554260253906,
+        "skewMinMs": -288.70487213134766,
+        "skewMaxMs": 544.1017150878906,
+        "firstSkewMs": -288.70487213134766,
+        "lastSkewMs": 544.1017150878906
+      },
+      {
+        "channel": 1,
+        "hits": [
+          241,
+          237
+        ],
+        "masterMaxGridMs": 30.638694763183594,
+        "slaveMaxGridMs": 24.83654022216797,
+        "skewMinMs": 25.444984436035156,
+        "skewMaxMs": 481.17637634277344,
+        "firstSkewMs": 25.444984436035156,
+        "lastSkewMs": 481.17637634277344
+      },
+      {
+        "channel": 2,
+        "hits": [
+          15,
+          15
+        ],
+        "masterMaxGridMs": 0.51116943359375,
+        "slaveMaxGridMs": 31.179428100585938,
+        "skewMinMs": 129.2877197265625,
+        "skewMaxMs": 659.5897674560547,
+        "firstSkewMs": 129.2877197265625,
+        "lastSkewMs": 659.5897674560547
+      },
+      {
+        "channel": 3,
+        "hits": [
+          210,
+          207
+        ],
+        "masterMaxGridMs": 1.0652542114257812,
+        "slaveMaxGridMs": 29.870033264160156,
+        "skewMinMs": -160.25447845458984,
+        "skewMaxMs": 551.2247085571289,
+        "firstSkewMs": -160.25447845458984,
+        "lastSkewMs": 551.2247085571289
+      }
+    ],
+    "lostTimerRequests": [
+      0,
+      0
+    ],
+    "minSP": [
+      56985,
+      57027
+    ],
+    "graphicsWrites": [
+      20,
+      339
+    ],
+    "underruns": [
+      0,
+      0
+    ],
+    "aborts": 0,
+    "unarmed": 0,
+    "measurementOnly": true,
+    "startupExcluded": true,
+    "indexSkewRequiresMatchingAttackSequence": true
+  },
+  "live-standalone-steady": {
+    "linked": false,
+    "graphics": true,
+    "master": 0,
+    "drift": 0,
+    "frames": 2360,
+    "status": [
+      {
+        "pc": "1a0a",
+        "page": 8,
+        "playing": 1,
+        "slave": 0,
+        "link": 0,
+        "pending": 0,
+        "ticks": 72,
+        "position": [
+          6,
+          22,
+          22,
+          0,
+          0,
+          0,
+          6
+        ],
+        "drums": 1,
+        "notes": 1,
+        "arp": 2,
+        "lfo": 0,
+        "overflow": 0
+      },
+      {
+        "pc": "1abe",
+        "page": 8,
+        "playing": 1,
+        "slave": 0,
+        "link": 0,
+        "pending": 0,
+        "ticks": 64,
+        "position": [
+          2,
+          18,
+          18,
+          0,
+          0,
+          0,
+          2
+        ],
+        "drums": 1,
+        "notes": 1,
+        "arp": 2,
+        "lfo": 0,
+        "overflow": 0
+      }
+    ],
+    "channels": [
+      {
+        "channel": 0,
+        "hits": [
+          105,
+          105
+        ],
+        "masterMaxGridMs": 0.35381317138671875,
+        "slaveMaxGridMs": 0.3948211669921875,
+        "skewMinMs": 127.27642059326172,
+        "skewMaxMs": 377.8228759765625,
+        "firstSkewMs": 127.49004364013672,
+        "lastSkewMs": 127.49290466308594
+      },
+      {
+        "channel": 1,
+        "hits": [
+          241,
+          241
+        ],
+        "masterMaxGridMs": 17.055511474609375,
+        "slaveMaxGridMs": 15.411376953125,
+        "skewMinMs": -14.565467834472656,
+        "skewMaxMs": 18.880844116210938,
+        "firstSkewMs": 6.396293640136719,
+        "lastSkewMs": -1.2302398681640625
+      },
+      {
+        "channel": 2,
+        "hits": [
+          15,
+          15
+        ],
+        "masterMaxGridMs": 0.41294097900390625,
+        "slaveMaxGridMs": 0.41103363037109375,
+        "skewMinMs": 502.4881362915039,
+        "skewMaxMs": 502.8200149536133,
+        "firstSkewMs": 502.49195098876953,
+        "lastSkewMs": 502.4909973144531
+      },
+      {
+        "channel": 3,
+        "hits": [
+          211,
+          211
+        ],
+        "masterMaxGridMs": 0.35381317138671875,
+        "slaveMaxGridMs": 0.37097930908203125,
+        "skewMinMs": 2.4862289428710938,
+        "skewMaxMs": 127.86197662353516,
+        "firstSkewMs": 2.5377273559570312,
+        "lastSkewMs": 2.4938583374023438
+      }
+    ],
+    "lostTimerRequests": [
+      0,
+      0
+    ],
+    "minSP": [
+      56999,
+      56999
+    ],
+    "graphicsWrites": [
+      20,
+      20
+    ],
+    "underruns": [
+      0,
+      0
+    ],
+    "aborts": 0,
+    "unarmed": 0,
+    "measurementOnly": true,
+    "startupExcluded": true,
+    "indexSkewRequiresMatchingAttackSequence": true
+  }
+}
