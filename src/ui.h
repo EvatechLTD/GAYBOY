@@ -92,8 +92,9 @@ void ui_render(void) BANKED {uint8_t i,n,start,inv;if(page>=18)seqflushpending=1
  if(navopen||(page!=1&&page!=2&&page!=17)||tonepresetopen)*(uint8_t *)0xA475=0;
  if(!navopen)*(uint8_t *)0xA4D0=0;
  if(navopen){HIDE_SPRITES;seqflushpending=1;ui_menu();return;}
- {if(page!=18&&mixerfontdirty){if(page!=8)ui_restore_seq_tiles();mixerfontdirty=0;}}
- if(page!=8)HIDE_SPRITES;if(page!=8&&seqfontdirty)ui_restore_seq_tiles();
+ /* Song owns its borrowed tiles until exit, just like the pixel roll. */
+ {if(page!=18&&mixerfontdirty){if(page!=8&&page!=SONG_PAGE)ui_restore_seq_tiles();mixerfontdirty=0;}}
+ if(page!=8)HIDE_SPRITES;if(page!=8&&page!=SONG_PAGE&&seqfontdirty)ui_restore_seq_tiles();
  if(tonepresetopen){tone_preset_render();return;}
  if(page==SONG_PAGE){song_render();return;}if(page==26){clear_render();return;}if(page==23){kits_render();return;}if(page==28){mixer_settings_render();return;}if(page==27){sync_render();return;}
  if(page>=18){seqflushpending=1;mixer_render();return;}if(page==17||page==1||page==2){eval_render();return;}if(page==16){global_render();return;}if(page==10){seq_settings_render();return;}if(page==8){seq_render();return;}

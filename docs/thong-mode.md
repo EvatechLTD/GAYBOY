@@ -81,3 +81,7 @@ Song checks: `test_thong_mode.py`, `test_thong_storage.py`, `test_thong_gaps.py`
 Ordinary playback regression checks passed: Smooth Playback, prepared drums, normal prepared drums, ARP loop edit isolation, long prepared tracks, stopped plot audition, drag/resize audition, shared UI tiles, Wave pad isolation, MIDI launch, PCM gate restart, and `benchmark_normal_playback.py --verify` with and without `--lfo`. After the final Wave-cache fix, the audition test, ordinary LFO benchmark and all Song checks passed again.
 
 Next gate: user UI review and hardware timing/listening. Then improve any handling issues, then tune graphical song playback without edits. Do not merge this experimental backend to main or publish it as the stable build before review.
+
+## UI review correction: repeated blanking
+
+The first review build set seqfontdirty after each Song render, then ui_render interpreted that flag as leaving the pixel roll on the next input. ui_restore_seq_tiles called ui_transition_begin, hiding the background during every edit. Settled screenshots missed this transient failure. Song now retains borrowed tile ownership while its page is active; actual page exits still restore ordinary tiles. test_thong_redraw.py checks the LCD background bit every emulated frame during navigation, plot, move, resize, zoom and header edits, and rejects any full-page restoration during those operations. The test fails on the original build and passes with this correction. Song exit, shared mixer/roll tiles and prepared ARP/LFO audio checks also pass.
