@@ -214,10 +214,8 @@ void sync_raw_tick(void) BANKED {uint16_t stamp;uint8_t ticks=pulsequot;
 remainder+=pulserem;if(remainder>=pulsebpm){remainder-=pulsebpm;ticks++;}seqticks+=ticks;if(drum_irq_active)drum_irq_tick(ticks);seq_irq_tick(ticks);}
 /* Native follow uses a local hardware clock. Incoming numbered clocks
    steer future units at most1tick/16ms; they never dispatch notes directly. */
-uint8_t sync_native_elapsed(uint8_t ticks) BANKED __naked {ticks;__asm
- ; BANKED GBDK arguments follow the six-byte trampoline return frame.
- ldhl sp,#6
- ld a,(hl)
+uint8_t sync_native_elapsed(uint8_t ticks) NONBANKED __naked {ticks;__asm
+ ; NONBANKED byte argument/result use A; preserve the caller BC pair.
  push bc
  ld b,a
  ldh a,(_syncsub)

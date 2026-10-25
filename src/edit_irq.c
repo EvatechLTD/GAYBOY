@@ -31,6 +31,16 @@ uint8_t editirq_owned(uint8_t c) NONBANKED {
  if(c>=3||!seqplaying||!(editirq_enabled&editbuffer_irq_mask&(1<<c))||seqrecordtrack==c)return 0;
  return (!evalpatch[c][EV_MODE]&&!evalpatch[c][EV_CHORD_HISTORY]);
 }
+/* Native transport has already proved playback is active. Share the exact
+   DIV accumulator without repeating every synthesis eligibility test. */
+uint8_t editirq_elapsed_active(uint8_t fallback) NONBANKED __naked {fallback;__asm
+ push bc
+ ld e,a
+ ldh a,(#0x04)
+ ld b,a
+ jp _editirq_elapsed_calculate
+ __endasm;
+}
 /* DIV measures wall time even if a register commit spans a TIMA overflow.
    All enabled paths sample more often than DIV's 15.625 ms wrap interval. */
 void editirq_clock_reset(void) NONBANKED {divider_last=DIV_REG;divider_fraction=0;}
@@ -58,6 +68,7 @@ uint8_t editirq_elapsed(uint8_t fallback) NONBANKED __naked {fallback;__asm
  ld a,(_sync_raw_ready)
  or a,c
  jr z,elapsed_fallback$
+_editirq_elapsed_calculate:
  ld a,(_divider_last)
  ld c,a
  ld a,b

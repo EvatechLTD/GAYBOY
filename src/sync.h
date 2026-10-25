@@ -23,7 +23,7 @@ extern uint8_t sync_raw_ready;
 void sync_raw_configure(void) BANKED;
 void sync_raw_tick(void) BANKED;
 void sync_control_service(void) BANKED;
-void sync_clock_isr(void) BANKED;
+void sync_clock_isr(void) NONBANKED;
 void sync_timer_config(void) BANKED;
 void sync_pattern(void) BANKED;
 void sync_init(void) BANKED;

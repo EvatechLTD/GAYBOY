@@ -5,11 +5,11 @@ void twink_tx_tick(void) BANKED;
 extern uint8_t twink_v2;
 void twink_v2_irq(void) BANKED;
 void sync_raw_sample(void) BANKED;
-/* Banked interrupt-only clock, entered through the GBDK preserving trampoline.
+/* Fixed-ROM clock; only the negotiated TWINK delivery uses a bank trampoline.
    Phase uses elapsed DIV /16 times64 times BPM, not interrupt invocations.
    Reloads are selected outside the IRQ; there is no division in this kernel.
    Limits are 0x028000 (24 PPQN), 0x0f0000 (4), or 0x1e0000 (2). */
-void sync_clock_isr(void) BANKED __naked { __asm
+void sync_clock_isr(void) NONBANKED __naked { __asm
  ldh a,(_synctxwait)
  or a
  jr z,sync_clock_active$
@@ -53,8 +53,9 @@ sync_clock_running$:
  or a
  jr z,twink_v1_queue$
 sync_twink_v2_pump$:
- ; Same-bank naked kernel: avoid a second saving trampoline on every tick.
- call _twink_v2_irq
+ ld e,#b_twink_v2_irq
+ ld hl,#_twink_v2_irq
+ call ___sdcc_bcall_ehl
  pop bc
  ret
 twink_v1_queue$:
