@@ -82,7 +82,7 @@ static uint8_t scheduled_event(const uint8_t *e){uint8_t b[9];uint16_t target=sc
  if(!frame(3,b,9))return 0;event_sequence=(event_sequence+1)&63;return 1;
 }
 static void event_flush(void){__critical{rd=wr=0;twink_event_left=twink_event_pending=0;twink_ack=last_admission=255;wire_sequence=event_sequence;event_window=(wire_sequence+1)&63;}}
-static void fill(uint32_t through){uint8_t e[4],budget=4,at;uint16_t length=seqlength[5],error;
+static void fill(uint32_t through){uint8_t e[4],budget=16,at;uint16_t length=seqlength[5],error;
  if(!length||(twink_reply==0xD4||twink_reply==0xD5))return;
  while(scan_step<through&&budget--){
   if(twink_staging&&(uint8_t)(rd-wr-1)<(twink_v2==2?10:14))return;
