@@ -1,5 +1,6 @@
 #include "api.h"
 extern volatile uint8_t twink_guard,twink_ended_div;
+void twink_tx_tick(void) BANKED;
 /* Fixed-ROM, interrupt-only clock. Phase uses CPU cycles / 64 times BPM.
    Reloads are selected outside the IRQ; there is no division or bank switch.
    Limits are 0x028000 (24 PPQN), 0x0f0000 (4), or 0x1e0000 (2). */
@@ -17,6 +18,22 @@ sync_clock_active$:
  or a
  ret nz
  push bc
+ ldh a,(_syncmode)
+ cp #6
+ jr nz,twink_queue_done$
+ ldh a,(_syncdue)
+ or a
+ jr nz,twink_queue_pump$
+ ldh a,(_syncr)
+ ld b,a
+ ldh a,(_syncw)
+ cp a,b
+ jr z,twink_queue_done$
+twink_queue_pump$:
+ ld e,#b_twink_tx_tick
+ ld hl,#_twink_tx_tick
+ call ___sdcc_bcall_ehl
+twink_queue_done$:
  ld hl,#_syncirqphase
  ldh a,(_syncincrement)
  add a,(hl)

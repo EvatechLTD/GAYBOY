@@ -1,5 +1,6 @@
 #include "smooth_playback.h"
 #include "song_mode.h"
+#include "song_link.h"
 extern __at (0xA433) uint8_t mixerfontdirty;
 #include "user_presets.h"
 #include "tones.h"
@@ -128,7 +129,7 @@ void ui_loading_prepare(void) BANKED {if(seqfontdirty)ui_restore_seq_tiles();}
 void auditionstop(void){if(auditionvoice<4)stop(auditionvoice);auditionvoice=255;}
 void auditionstart(void){auditionstop();play(selected,60,127);auditionvoice=selected;}
 void browse(int8_t d){int16_t n=(int16_t)program[selected]+d;if(n<0)n+=100;if(n>=100)n-=100;choice=n;if(polymode)polyload(n);else load(selected,n);edited[selected]=0;if(lastpad&J_B)auditionstart();}
-void ui_action(uint8_t p,uint8_t edge) BANKED {if(page==SONG_PAGE&&(song_playing||((p&(J_START|J_SELECT))==(J_START|J_SELECT)))){song_input(p,edge);return;}if((p&(J_SELECT|J_START))==(J_SELECT|J_START)&&(edge&(J_SELECT|J_START))){navopen=0;navblocked=seqselectused=1;if(seqplaying)panic();else{panic();smooth_playback_start();}overflow=0;dirty=1;return;}
+void ui_action(uint8_t p,uint8_t edge) BANKED {if(song_playing||song_link_active||(page==SONG_PAGE&&((p&(J_START|J_SELECT))==(J_START|J_SELECT)))){song_input(p,edge);return;}if((p&(J_SELECT|J_START))==(J_SELECT|J_START)&&(edge&(J_SELECT|J_START))){navopen=0;navblocked=seqselectused=1;if(seqplaying)panic();else{panic();smooth_playback_start();}overflow=0;dirty=1;return;}
  if(((lastpad&J_A)&&!(p&J_A))||(edge&J_START)){seq_audition_stop();if(auditionvoice!=255)auditionstop();}
  if((lastpad&J_B)&&!(p&J_B)){seq_live_release();auditionstop();}
  if(!(p&J_START))navblocked=0;

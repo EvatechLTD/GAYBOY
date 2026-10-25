@@ -234,7 +234,7 @@ void sync_input(uint8_t edge) BANKED {int8_t delta;
  if(!(edge&(J_LEFT|J_RIGHT)))return;
  if(seqplaying)seq_transport();if(syncmode==SYNC_TWINK){twink_panic();while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}delta=edge&J_LEFT?-1:1;
  __critical {remove_SIO(syncmode==1?link_serial_isr:serial_isr);SC_REG=0;IF_REG&=~SIO_IFLAG;syncr=syncw=0;rd=wr;st=count=0;}
- if(!focus)syncmode=(syncmode+(delta<0?6:1))%7;
+ if(!focus){do{syncmode=(syncmode+(delta<0?6:1))%7;}while(syncmode==4);}
  else if(syncmode==1)syncrole=(syncrole+(delta<0?2:1))%3;
  else if(syncmode!=SYNC_TWINK)syncslave^=1;
  if(syncmode==SYNC_TWINK)syncslave=0;
@@ -265,6 +265,6 @@ void sync_ui_input(uint8_t p,uint8_t edge) BANKED {if(!edge)return;int8_t d=0,ta
  }
  if((edge&(J_A|J_B))&&!(p&(J_UP|J_DOWN|J_LEFT|J_RIGHT))&&focus&&syncmode!=1){sync_input(J_RIGHT);return;}
  if(!(p&(J_A|J_B))){if(edge&(J_UP|J_DOWN))focus=(focus+(edge&J_UP?2:1))%3;}
- else{d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;if(d){current=!focus?syncmode:syncmode==1?syncrole:syncslave;target=current+d;if(target<0)target=0;if(target>(!focus?6:syncmode==1?2:1))target=!focus?6:syncmode==1?2:1;while(current!=target){sync_input(current<target?J_RIGHT:J_LEFT);current+=current<target?1:-1;}}}
+ else{d=edge&J_UP?1:edge&J_DOWN?-1:edge&J_RIGHT?10:edge&J_LEFT?-10:0;if(d){current=!focus?syncmode:syncmode==1?syncrole:syncslave;target=current+d;if(target<0)target=0;if(target>(!focus?6:syncmode==1?2:1))target=!focus?6:syncmode==1?2:1;if(!focus&&target==4)target=d>0?5:3;while(current!=target){sync_input(current<target?J_RIGHT:J_LEFT);current=!focus?syncmode:syncmode==1?syncrole:syncslave;}}}
  dirty=1;
 }

@@ -12,6 +12,14 @@ static uint8_t session=1,busy;
 static uint8_t crc(uint8_t t,uint8_t a,uint8_t b){uint8_t i,j,c=0,v[3];v[0]=t;v[1]=a;v[2]=b;for(j=0;j<3;j++)for(i=0;i<7;i++){uint8_t top=(c^v[j])&64;c=(c<<1)&127;if(top)c^=9;v[j]<<=1;}return c;}
 static uint8_t put(uint8_t b){uint8_t next=(syncw+1)&31;if(next==syncr){overflow=1;return 0;}__critical {twinktx[syncw]=b;syncw=next;}return 1;}
 static uint8_t packet(uint8_t type,uint8_t a,uint8_t b){uint8_t w=syncw;if(((syncr-w-1)&31)<5){overflow=1;return 0;}twinktx[w]=0xF3;w=(w+1)&31;twinktx[w]=type;w=(w+1)&31;twinktx[w]=a;w=(w+1)&31;twinktx[w]=b;w=(w+1)&31;twinktx[w]=crc(type,a,b);__critical {syncw=(w+1)&31;}return 1;}
+/* IRQ consumer: drain one prebuilt byte without depending on a UI pass.
+   No __critical calls here: their EI epilogue would nest interrupts. */
+void twink_tx_tick(void) BANKED {
+ if(twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
+ if(synctxwait||(SC_REG&0x80)||(IF_REG&SIO_IFLAG)||twink_guard)return;
+ if(syncdue){syncdue=0;SB_REG=0x80|synctick;SC_REG=0x81;}
+ else if(syncr!=syncw){synctxbyte=twinktx[syncr];SB_REG=synctxbyte;syncr=(syncr+1)&31;SC_REG=0x81;}
+}
 void twink_reset(void) BANKED {twink_ready=0;busy=0;twink_guard=synctxwait=0;session=(session+1)&127;if(!session)session=1;bpm=0;hello=heartbeat=sys_time-120;seen=serviced=sys_time;}
 void twink_panic(void) BANKED {if(syncmode!=SYNC_TWINK)return;seqplaying=0;if(syncarmed){__critical {syncarmed=syncdue=0;TMA_REG=TIMA_REG=syncreload;}}__critical {syncw=syncr;}put(0xFF);sync_control_service();}
 void twink_transport(uint8_t playing) BANKED {if(syncmode!=SYNC_TWINK)return;if(!playing){__critical {syncw=syncr;}put(0xFC);sync_control_service();return;}packet(1,session,1);packet(2,seqbpm>>7,seqbpm&127);bpm=seqbpm;put(0xFA);sync_control_service();}

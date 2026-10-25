@@ -31,7 +31,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  if(receiverMenu)chooseReceiver(12);else for(let n=0;n<5;n++)press(1,'select');
  assert.equal(v(1,'synthview'),5);press(1,'a');assert.equal(v(1,'twink_input'),1);
  // Select TWINK through GAYBOY's real sync settings.
- choose(27);core._link_key(0,5,1);until(()=>v(0,'lastpad')&32);for(let n=0;n<5;n++)press(0,'up');core._link_key(0,5,0);until(()=>!(v(0,'lastpad')&32));assert.equal(v(0,'syncmode'),6);assert.equal(v(0,'syncslave'),0);
+ choose(27);core._link_key(0,5,1);until(()=>v(0,'lastpad')&32);for(let n=0;n<8&&v(0,'syncmode')!==6;n++)press(0,'up');core._link_key(0,5,0);until(()=>!(v(0,'lastpad')&32));assert.equal(v(0,'syncmode'),6);assert.equal(v(0,'syncslave'),0);
  until(()=>v(0,'twink_ready')&&v(1,'twink_link'));assert.equal(word(1,'twink_bpm'),120);
  const stopped=word(1,'twink_pulses');run(180);assert(v(1,'twink_link'));assert.equal(word(1,'twink_pulses'),stopped,'Stopped heartbeat must not advance phase');
  // MS title navigation is reachable from the DRUM sequencer.
