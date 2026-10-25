@@ -14,7 +14,6 @@ __at (0xFFDA) uint8_t syncmode;
 __at (0xFFDB) uint8_t syncslave;
 __at (0xFFDC) uint8_t syncpending;
 __at (0xFFDD) uint8_t syncbusy;
-__at (0xFF98) volatile uint8_t synctx[32];
 extern volatile uint8_t twinktx[32],twink_guard,twink_ended_div;
 __at (0xFFD8) volatile uint8_t syncr;
 __at (0xFFD9) volatile uint8_t syncw;
@@ -43,7 +42,7 @@ extern volatile uint8_t padsampled;
 volatile uint8_t native_peer_running;
 static uint8_t native_claimed;
 static uint16_t native_claim_time;
-static uint16_t native_peer_frame;
+volatile uint16_t native_peer_frame;
 extern volatile uint8_t link_claiming;
 __at (0xFFB8) volatile uint8_t syncirqphase[3];
 __at (0xFFBB) volatile uint16_t syncincrement;
@@ -62,15 +61,22 @@ static const char * const modes[]={"OFF","GAYBOY","LSDJ","ARDUBOY","PO","GATE","
 static uint16_t frames(void){uint16_t t;__critical {t=sys_time;}return t;}
 void link_clock_abort(void) BANKED;
 void link_clock_decode(uint8_t b,uint8_t delta) BANKED;
+uint8_t link_clock_byte(uint8_t b) NONBANKED;
+/* Master pulsequot/pulsebpm are otherwise slave-only. Here they hold elapsed
+   units and the last fine anchor. Timestamp at SC start, not queue insertion. */
+static void native_stamp(void){uint8_t at=(syncr+1)&31;uint16_t div=(uint8_t)(DIV_REG-*(volatile uint8_t *)0xFFE8)+*(volatile uint8_t *)0xFFE9;
+ uint16_t stamp=((pulsequot+(div>>4))<<2)+((div&15)>>2);twinktx[at]=stamp&127;twinktx[(at+1)&31]=(stamp>>7)&63;
+}
 void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=midi_launch_enabled=0;syncmode=0;syncslave=0;}
 void sync_control_service(void) BANKED {
  __critical {
   if(syncmode==SYNC_TWINK&&twink_v2){if(!syncarmed)twink_v2_irq();}
   else if(syncmode==SYNC_TWINK&&twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
   if(!(syncmode==SYNC_TWINK&&twink_v2)&&!synctxwait&&!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)&&(syncmode!=SYNC_TWINK||!twink_guard)){
-   if(syncmode==SYNC_TWINK&&syncdue){syncdue=0;SB_REG=0x80|synctick;SC_REG=0x81;}
-   else if(syncr!=syncw){if(syncmode==1)link_clock_abort();
-    if(syncmode==SYNC_TWINK){synctxbyte=twinktx[syncr];}else synctxbyte=synctx[syncr];
+   if(syncdue&&(syncmode==SYNC_TWINK||(syncmode==1&&native_prepare==6))){syncdue=0;if(syncmode==1)SB_REG=link_clock_byte(0x80|synctick);else SB_REG=0x80|synctick;SC_REG=0x81;}
+   else if(syncr!=syncw){
+    synctxbyte=twinktx[syncr];
+    if(syncmode==1){if(synctxbyte==0xF9&&native_prepare==6){native_stamp();tempo_state=8;}else if(tempo_state>=8){tempo_state=tempo_state+1;if(tempo_state==10)tempo_state=0;}else link_clock_abort();}
     SB_REG=synctxbyte;syncr=(syncr+1)&31;SC_REG=0x81;
    }
   }
@@ -79,7 +85,7 @@ void sync_control_service(void) BANKED {
 
 void editirq_clock_reset(void) NONBANKED;
 static void send(uint8_t b){uint8_t next=(syncw+1)&31;
- __critical {if(next==syncr)overflow=1;else {synctx[syncw]=b;syncw=next;}}
+ __critical {if(next==syncr)overflow=1;else {twinktx[syncw]=b;syncw=next;}}
  sync_control_service();
 }
 static uint16_t pulse_units(void){return syncmode==4?30720U:syncmode==5?15360U:2560U;}
@@ -96,6 +102,9 @@ static void tempo(void){uint16_t increment;if(!seqglobalbpm)seqglobalbpm=seqbpm;
   increment=64U*seqbpm;
   __critical {syncincrement=increment;}
   if(syncmode==1){send(0xF1);send(seqbpm>>7);send(seqbpm&127);}sentbpm=seqbpm;
+ }
+ if(syncmode==1&&!syncslave&&native_prepare==6&&syncarmed){uint8_t at;uint16_t stamp;__critical{stamp=pulsequot;}
+  if((uint16_t)(stamp-pulsebpm)>=256&&((syncr-syncw-1)&31)>=3){pulsebpm=stamp;at=syncw;twinktx[at]=0xF9;at=(at+1)&31;twinktx[at]=0;at=(at+1)&31;twinktx[at]=0;__critical{syncw=(at+1)&31;}sync_control_service();}
  }
 }
 void sync_pattern(void) BANKED {uint32_t phase,elapsed;uint16_t position,part;uint8_t tick;
@@ -124,7 +133,7 @@ static uint8_t prepare_peer(void){uint8_t at=wr,b,wait=0,ready=0,i;uint16_t sinc
   send(0);while(syncr!=syncw||SC_REG&0x80||IF_REG&SIO_IFLAG)sync_control_service();
   while(at!=wr){b=rx[at++];if(b==NATIVE_READY)ready=1;}rd=at;
  }
- native_prepare=0;if(!wait||ready)return 1;
+ native_prepare=0;if(!wait||ready){if(ready)native_prepare=6;return 1;}
  send(0xFC);while(syncr!=syncw||SC_REG&0x80||IF_REG&SIO_IFLAG)sync_control_service();seqplaying=0;linkstate=4;dirty=1;return 0;
 }
 void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte,guard,reply;
@@ -160,7 +169,7 @@ void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte
  }
  if(!syncslave)sync_raw_ready=0;
  if(syncmode==1&&syncslave&&playing&&sync_raw_ready&&!native_peer_running){native_prepare=2;smooth_playback_preparing=1;seqplaying=0;return;}
- if(syncmode==1&&syncslave&&playing&&sync_raw_ready){__critical{syncreload=TMA_REG;syncarmed=1;syncstart=0;TMA_REG=TIMA_REG=252;}return;}
+ if(syncmode==1&&syncslave&&playing&&sync_raw_ready){__critical{syncreload=TMA_REG;syncarmed=1;DIV_REG=0;TMA_REG=TIMA_REG=252;IF_REG&=~TIM_IFLAG;seqticks=0;editirq_clock_reset();syncstart=0;}return;}
  if(!syncmode||syncslave||!playing)return;
  /* No musical clock is armed yet. A short explicit claim distinguishes
     simultaneous local starts from ordinary full-duplex byte echoes. */
@@ -182,13 +191,13 @@ void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte
   if(linkcollision){link_reset();linkstate=4;syncslave=1;seqplaying=0;native_claimed=native_peer_running=0;__critical {rd=wr;SB_REG=0;SC_REG=0x80;}dirty=1;return;}
   if((byte&1)&&!prepare_peer())return;
  }
+ if(syncmode==1)link_begin();
  limit=(uint32_t)pulse_units()<<6;
  __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synclimit[0]=limit;synclimit[1]=limit>>8;synclimit[2]=limit>>16;synctick=0;syncstart=syncmode==1;if(syncmode==SYNC_TWINK)syncstart=1;syncarmed=1;synctxwait=0;}
  sync_timer_config();sentbpm=0;tempo();
  if(syncmode==1){send(0xFA);while(syncstart==1)sync_control_service();}
  if(syncmode==SYNC_TWINK){twink_transport(1);while(syncstart==1)sync_control_service();}
- __critical {syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synctick=0;seqticks=0;if(!(syncmode==SYNC_TWINK&&twink_v2)){*(volatile uint8_t *)0xFFE8=DIV_REG;*(volatile uint8_t *)0xFFE9=0;}editirq_clock_reset();syncstart=0;}
- if(syncmode==1)link_begin();
+ __critical {if(syncmode==1){DIV_REG=0;TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;}syncirqphase[0]=syncirqphase[1]=syncirqphase[2]=0;synctick=0;seqticks=0;if(!(syncmode==SYNC_TWINK&&twink_v2)){*(volatile uint8_t *)0xFFE8=DIV_REG;*(volatile uint8_t *)0xFFE9=0;pulsequot=0;pulsebpm=0;}editirq_clock_reset();syncstart=0;}
 }
 uint16_t sync_advance(uint16_t ticks) BANKED {uint16_t result=0,unit,part;uint8_t n;
  if(!syncmode)return ticks;
@@ -215,6 +224,7 @@ void sync_raw_tick(void) BANKED {uint16_t stamp;uint8_t ticks=pulsequot;
 remainder+=pulserem;if(remainder>=pulsebpm){remainder-=pulsebpm;ticks++;}seqticks+=ticks;if(drum_irq_active)drum_irq_tick(ticks);seq_irq_tick(ticks);}
 /* Native follow uses a local hardware clock. Incoming numbered clocks
    steer future units at most1tick/16ms; they never dispatch notes directly. */
+extern volatile uint8_t editirq_fraction;
 uint8_t sync_native_elapsed(uint8_t ticks) BANKED __naked {ticks;__asm
  ; BANKED GBDK arguments follow the six-byte trampoline return frame.
  ldhl sp,#6
@@ -226,6 +236,9 @@ uint8_t sync_native_elapsed(uint8_t ticks) BANKED __naked {ticks;__asm
  and #15
  ldh (_syncsub),a
  jr nz,native_elapsed_sum$
+ ldh a,(_syncirqphase+2)
+ bit 6,a
+ jr nz,native_elapsed_fine$
  ldh a,(_syncdue)
  or a
  jr z,native_elapsed_sum$
@@ -244,6 +257,40 @@ native_elapsed_slow$:
  ld a,c
  inc a
  ldh (_syncdue),a
+ jr native_elapsed_sum$
+native_elapsed_fine$:
+ ldh a,(_syncdue)
+ or a
+ jr z,native_elapsed_sum$
+ ld c,a
+ bit 7,a
+ jr nz,native_elapsed_fine_slow$
+ ld a,(_editirq_fraction)
+ inc a
+ and #15
+ ld (_editirq_fraction),a
+ jr nz,native_elapsed_fine_fast_done$
+ inc b
+native_elapsed_fine_fast_done$:
+ ld a,c
+ dec a
+ ldh (_syncdue),a
+ jr native_elapsed_sum$
+native_elapsed_fine_slow$:
+ ld a,(_editirq_fraction)
+ or a
+ jr nz,native_elapsed_fine_sub$
+ ld a,b
+ or a
+ jr z,native_elapsed_sum$
+ dec b
+ ld a,#16
+native_elapsed_fine_sub$:
+ dec a
+ ld (_editirq_fraction),a
+ ld a,c
+ inc a
+ ldh (_syncdue),a
 native_elapsed_sum$:
  ldh a,(_synclimit)
  add a,b
@@ -256,9 +303,22 @@ native_elapsed_sum$:
  ret
  __endasm;
 }
-uint8_t editirq_pending(void) NONBANKED;
+uint16_t editirq_pending_div(void) NONBANKED;
+/* If SERIAL is already pending at TIM entry, capture before audio work.
+   Fine mode no longer uses these two coarse fractional-reference bytes. */
+void sync_native_capture(void) BANKED {uint16_t stamp=((synclimit[0]|((uint16_t)synclimit[1]<<8))<<2)+(editirq_pending_div()>>2);
+ syncirqphase[0]=stamp;syncirqphase[1]=stamp>>8;syncirqphase[2]|=32;
+}
+/* Queue the local capture WITH its header. A mutable latest-timestamp
+   mailbox pairs the wrong capture with an older packet under UI backlog. */
+void sync_native_timestamp(void) BANKED {uint8_t at=wr;uint16_t stamp;
+ if((uint8_t)(rd-at-1)<3){overflow=1;return;}
+ if(syncirqphase[2]&32){stamp=syncirqphase[0]|((uint16_t)syncirqphase[1]<<8);syncirqphase[2]&=~32;}else stamp=((synclimit[0]|((uint16_t)synclimit[1]<<8))<<2)+(editirq_pending_div()>>2);
+ rx[at++]=0xF9;rx[at++]=stamp&127;rx[at++]=(stamp>>7)&63;wr=at;
+}
 void sync_native_anchor(uint8_t clock) BANKED {uint8_t delta=(clock-syncdivider)&63;uint16_t part,local;int16_t error;syncdivider=clock&63;
- local=(synclimit[0]|((uint16_t)synclimit[1]<<8))+editirq_pending();
+ if(syncirqphase[2]&64)return;
+ local=(synclimit[0]|((uint16_t)synclimit[1]<<8))+(editirq_pending_div()>>4);
  if(!(syncirqphase[2]&128)){syncirqphase[2]=128;syncincrement=local;syncdue=0;return;}
  syncincrement+=(uint16_t)delta*pulsequot;part=(syncirqphase[0]|((uint16_t)syncirqphase[1]<<8))+(uint16_t)delta*pulserem;
  while(part>=pulsebpm){part-=pulsebpm;syncincrement++;}syncirqphase[0]=part;syncirqphase[1]=part>>8;
@@ -274,7 +334,18 @@ static uint8_t receive(uint8_t b) {uint16_t bpm,elapsed;uint8_t ppqn;
    if(native_prepare==3){native_prepare=0;seq_prepared_start();}else seq_cancel_prepare();return 1;}
   if(b==0xF5){native_claimed=1;native_claim_time=frames();return 1;}
   if(b==0xF7)return 1;
-  if((b>=0x80&&b<0xF0)||b==0xF8){uint8_t next=b==0xF8?(beatcount+1)&63:b&63,delta=(next-beatcount)&63;beatcount=next;if(!seqplaying){native_peer_running=1;native_peer_frame=frames();}if(tempo_state>=3)return 1;if(seqplaying){if(!sync_raw_ready){if(syncpending+delta<64)syncpending+=delta;else overflow=1;}}if(b!=0xF8)link_clock_decode(b,delta);return 1;}
+  if((b>=0x80&&b<0xF0)||b==0xF8){uint8_t next=b==0xF8?(beatcount+1)&63:b&63,delta=(next-beatcount)&63;beatcount=next;if(!seqplaying){native_peer_running=1;native_peer_frame=frames();}if(tempo_state>=3&&tempo_state<6)return 1;if(seqplaying){if(!sync_raw_ready){if(syncpending+delta<64)syncpending+=delta;else overflow=1;}}if(b!=0xF8)link_clock_decode(b,delta);return 1;}
+  if(b==0xF9&&sync_raw_ready&&seqplaying){tempo_state=6;return 1;}
+  if(b<128&&tempo_state>=6){
+   if(tempo_state==6){syncalign=b;tempo_state=7;return 1;}
+   if(tempo_state==7){syncalign|=(uint16_t)b<<7;tempo_state=8;return 1;}
+   if(tempo_state==8){tempo_hi=b;tempo_state=9;return 1;}
+   {int16_t error;
+    error=(((uint16_t)tempo_hi+((uint16_t)b<<7)+4-syncalign+4096U)&8191U)-4096;
+    if(error>31)error=31;if(error< -31)error=-31;error*=4;
+    __critical{syncirqphase[2]|=192;*(volatile uint8_t *)0xFFC4=(uint8_t)error;}
+   }tempo_state=0;return 1;
+  }
   if(link_receive(b))return 1;
   if(b==0xF2){tempo_state=3;return 1;}
   if(b==0xF1){native_peer_running=1;native_peer_frame=frames();tempo_state=1;return 1;}

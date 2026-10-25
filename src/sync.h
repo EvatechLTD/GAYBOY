@@ -4,7 +4,6 @@ extern __at (0xFFDA) uint8_t syncmode;
 extern __at (0xFFDB) uint8_t syncslave;
 extern __at (0xFFDC) uint8_t syncpending;
 extern __at (0xFFDD) uint8_t syncbusy;
-extern __at (0xFF98) volatile uint8_t synctx[32];
 extern __at (0xFFD8) volatile uint8_t syncr;
 extern __at (0xFFD9) volatile uint8_t syncw;
 extern __at (0xFFB8) volatile uint8_t syncirqphase[3];

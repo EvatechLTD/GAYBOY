@@ -3,7 +3,8 @@ from check_memory import audit
 s={l.split()[1]:int(l.split()[2],16) for l in Path('build/GAYBOY.noi').read_text().splitlines() if l.startswith('DEF ')}
 assert s['s__HRAM']+s['l__HRAM']<=0xFF98,'Library HRAM overlaps serial sync state'
 assert 0xC000<=s['_twinktx'] and s['_twinktx']+32<=0xD800,'TWINK queue must not alias native HRAM flags'
-assert s['_synctx']==0xFF98 and s['_syncbusy']==0xFFDD,'Unexpected sync HRAM layout'
+assert s['_seqirqready']==0xFF98 and s['_syncbusy']==0xFFDD,'Unexpected sync HRAM layout'
+assert '_synctx' not in s,'Do not alias the transmit queue with active sequencer flags'
 # The C timer entry uses the GBDK bank trampoline only with sync enabled.
 # Pin both ABI and placement; a direct fixed-bank CALL into this ROM is wrong.
 assert s['b_sync_clock_isr']==6 and s['_sync_clock_isr']>>16==6,'Clock IRQ bank/ABI mismatch'
