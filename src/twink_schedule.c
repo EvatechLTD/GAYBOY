@@ -29,15 +29,27 @@ extern volatile uint8_t twinktx[32];
 static uint16_t frame_time(void){uint16_t t;__critical{t=sys_time;}return t;}
 static uint8_t audible(void){uint8_t solos=seqsolo&111;if(drumsolomask&&(!seqmode||experimental_mode))solos|=64;return !(seqmuted&32)&&(!solos||(solos&32));}
 
+/* CRC7 poly09, exact for all byte pairs; foreground ROM lookup only. */
+static const uint8_t crc7_table[128]={
+ 0,9,18,27,36,45,54,63,72,65,90,83,108,101,126,119,
+ 25,16,11,2,61,52,47,38,81,88,67,74,117,124,103,110,
+ 50,59,32,41,22,31,4,13,122,115,104,97,94,87,76,69,
+ 43,34,57,48,15,6,29,20,99,106,113,120,71,78,85,92,
+ 100,109,118,127,64,73,82,91,44,37,62,55,8,1,26,19,
+ 125,116,111,102,89,80,75,66,53,60,39,46,17,24,3,10,
+ 86,95,68,77,114,123,96,105,30,23,12,5,58,51,40,33,
+ 79,70,93,84,107,98,121,112,7,14,21,28,35,42,49,56,
+};
+
 /* Complete frames publish atomically into the existing dedicated TX ring.
    CRC and source work are foreground-only, never part of the byte pump. */
 static uint8_t frame(uint8_t type,const uint8_t *payload,uint8_t n){
- uint8_t bytes[16],i,j,crc=0,b,length=n+2;
+ uint8_t bytes[16],i,j,crc=0,length=n+2;
  if(type==3&&twink_staging){if((uint8_t)(rd-wr-1)<length+3)return 0;}
  else if(((syncr-syncw-1)&31)<length+3)return 0;
  bytes[0]=0xF2;bytes[1]=length;bytes[2]=type;bytes[3]=session;
  if(n)memcpy(bytes+4,payload,n);
- for(j=1;j<length+2;j++){b=bytes[j];for(i=0;i<7;i++){uint8_t top=(crc^b)&64;crc=(crc<<1)&127;if(top)crc^=9;b<<=1;}}
+ for(j=1;j<length+2;j++)crc=crc7_table[(crc^bytes[j])&127];
  bytes[length+2]=crc;
  if(type==3&&twink_staging){uint8_t w=wr;if((uint8_t)(rd-w-1)<length+3)return 0;for(i=0;i<length+3;i++){rx[w]=bytes[i];w++;}__critical{wr=w;}return 1;}
  return twink_queue_message(bytes,length+3);
@@ -62,7 +74,7 @@ static uint8_t scheduled_event(const uint8_t *e){uint8_t b[9];uint16_t target=sc
   b[0]=target&127;b[1]=(target>>7)&127;b[2]=target>>14;b[3]=e[1]-1;b[4]=e[2];b[5]=e[3]&127;b[6]=e[3]>>7;b[7]=event_sequence;
   /* Compact v3 inherits session/generation, but authenticates both in CRC.
      Fixed F4 +8low-seven payload bytes +CRC; anchors may interleave. */
-  for(j=0;j<11;j++){value=j==0?6:j==1?session:j==2?generation:b[j-3];for(i=0;i<7;i++){uint8_t top=(crc^value)&64;crc=(crc<<1)&127;if(top)crc^=9;value<<=1;}}
+  for(j=0;j<11;j++){value=j==0?6:j==1?session:j==2?generation:b[j-3];crc=crc7_table[(crc^value)&127];}
   w=wr;rx[w++]=0xF4;for(i=0;i<8;i++)rx[w++]=b[i];rx[w++]=crc;__critical{wr=w;}
   event_sequence=(event_sequence+1)&63;return 1;
  }

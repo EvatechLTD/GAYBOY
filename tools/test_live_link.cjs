@@ -36,6 +36,13 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   }
   const bpm=Number(option('--bpm','120'));ww(i,'seqbpm',bpm);ww(i,'seqglobalbpm',bpm);
  }
+ if(linked&&process.argv.includes('--arm-slave')){
+  const i=1-master;choose(i,27);tap(i,'down');key(i,'b',true);tap(i,'up');tap(i,'up');key(i,'b',false);
+  assert.equal(v(i,'syncrole'),2,'Forced slave role not selected');choose(i,8);
+  chord(i,'select','a');run(90);assert(!v(i,'seqplaying')&&v(i,'native_prepare')===2,'Slave must prepare and wait without free-running');
+  chord(i,'select','a');run(30);assert(!v(i,'seqplaying')&&!v(i,'native_prepare'),'Second Play must cancel prepared wait');
+  console.log('PASS forced slave prepares silently, waits for master and cancels');
+ }
  core._link_watch_events(0,0,S['_seqposition'],S['_seqticks'],S['_seqclock']);
  core._link_watch_ui(S['_seqplaying'],S['_page']);
  chord(master,'select','a');
