@@ -46,7 +46,7 @@ static uint16_t address(uint8_t table,uint8_t at){uint16_t x=(uint16_t)at*5;
  return at<36?0xB200U+x:0xBB30U+x-180;
 }
 static uint8_t eligible(void){uint8_t c;
- if((syncmode&&(syncmode!=1||syncslave))||!power||monomode||polymode||mono_owned||waveengine==3||seqswing!=50||seqmode)return 0;
+ if((!SYNC_EVENT_IRQ)||!power||monomode||polymode||mono_owned||waveengine==3||seqswing!=50||seqmode)return 0;
  if(!mod_bypass)for(c=5;c<8;c++)if(MOD_LEVEL(c)||evalpatch[c][EV_DEPTH]||coarsepitch[c][1])return 0;
  return 1;
 }
@@ -146,7 +146,7 @@ void drum_irq_start(void) BANKED {if(ready&&seqplaying)arm(1);}
 /* Most timer interrupts only update a clock and countdown in fixed ROM.
    The banked dispatcher runs for actual steps/gate endings, not every tick. */
 void drum_irq_due(void) BANKED {uint8_t boundary=0;uint16_t elapsed=drum_timer_clock-last_tick;last_tick=drum_timer_clock;
- if(!seqplaying||!power||monomode||polymode||(syncmode&&(syncmode!=1||syncslave))||slot!=mx.slot||waveengine==3){drum_irq_active=0;return;}
+ if(!seqplaying||!power||monomode||polymode||(!SYNC_EVENT_IRQ)||slot!=mx.slot||waveengine==3){drum_irq_active=0;return;}
  if(kickleft){if(kickleft<=elapsed){kickleft=0;pulsekickleft=0;kickreleasing=0;NR12_REG=8;NR14_REG=128;}else{kickleft-=elapsed;pulsekickleft=kickleft;}}
  if(step_left>elapsed)step_left-=elapsed;else step_left=0;
  drum_phase+=elapsed*clock_bpm;

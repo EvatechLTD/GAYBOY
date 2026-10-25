@@ -1,5 +1,7 @@
 #pragma bank 60
 #include "api.h"
+#include "native_sync.h"
+#include "smooth_playback.h"
 extern uint16_t seqwholeunits,seqclock;
 extern __at (0xAC6A) uint16_t seqcachedbpm;
 extern __at (0xAC6C) uint16_t seqstepunits;
@@ -22,3 +24,27 @@ void editirq_clock_reset(void) NONBANKED;
 void seq_clock_epoch(void) BANKED {uint8_t control;
  __critical {control=TAC_REG;if(!syncmode){TAC_REG=0;DIV_REG=0;}editirq_clock_reset();TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;if(!syncmode)TAC_REG=control;}
 }
+
+void seq_launch_events(void) BANKED;
+void eval_seq_startup_prepare(void) BANKED;
+void drum_irq_prepare(void) BANKED;
+void seq_irq_prepare(void) BANKED;
+extern uint8_t editbuffer_reading;
+/* Cold native note packets belong before the shared GO, alongside drums.
+   In local playback keep the established startup path until qualified. */
+void seq_startup_prepare(void) BANKED {
+ editbuffer_reading=1;eval_mod_configure();eval_seq_startup_prepare();drum_irq_prepare();
+ if(syncmode)seq_irq_prepare();
+ editbuffer_reading=0;
+}
+/* Both peers enter this short path only after preparing their normal live
+   snapshots. The first note still uses the ordinary editable sequencer. */
+void seq_prepared_start(void) BANKED {
+ seqservicing=1;smooth_playback_preparing=0;
+ if(syncmode==1||syncmode==SYNC_TWINK)syncstart=1;
+ seq_clock_epoch();
+ if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}
+ seq_launch_events();
+}
+
+uint8_t seq_top_entry(void) BANKED {uint8_t col=seqcursor[seqtrack]-seqbase;uint8_t width=seqtrack==6?136:144;uint16_t x=(seqtrack==6?24:16)+((uint16_t)col*width+width/2)/seqcols;return x<68&&seqtrack!=6?1:x<84?2:x<96?3:4;}

@@ -1,5 +1,7 @@
 #pragma bank 10
 #include "api.h"
+#include "native_sync.h"
+#include "twink_schedule.h"
 #include "seq_live_note.h"
 #include "smooth_playback.h"
 uint8_t editbuffer_prepare_stopped(void) BANKED;
@@ -108,6 +110,9 @@ static uint8_t seqlaunching;
 extern uint8_t resident_same_tones;
 void seq_fire(uint8_t c){
  uint8_t data[4],s,note,v=0,oldvelocity=0,oldlevel=0,level,pan,keep=0;
+ /* Scheduled MS owns its future notes and gates. Keep the ordinary track
+    position/UI, but do not repeat its lookup/audio work at the live step. */
+ if(c==TWINK_TRACK&&syncmode==SYNC_TWINK&&twink_scheduled)return;
  if(editirq_owned(c))return;
  if(c==3||c==seqrecordtrack)return;
  if(c<6&&!seq_event_count(c)){if(seqowned[c])seq_off(c);return;}
@@ -177,7 +182,10 @@ void seq_next_deadline(void) BANKED;
 uint8_t sync_local_stop_allowed(void) BANKED;
 void eval_drum_prepare(void) BANKED;
 void storage_sorted_prepare(void) BANKED;
-void seq_transport(void) BANKED {uint8_t c,oldmono=monomode,smooth=smooth_playback_requested;smooth_playback_requested=0;seq_audition_stop();if(seqplaying){if(syncmode==1&&syncslave&&!syncbusy&&!sync_local_stop_allowed())return;if(!seqservicing)seq_frame();seq_stop();smooth_playback_update();return;}seq_stop();
+void seq_startup_prepare(void) BANKED;
+void seq_irq_start(void) BANKED;
+uint8_t seq_top_entry(void) BANKED;
+void seq_transport(void) BANKED {uint8_t c,oldmono=monomode,smooth=smooth_playback_requested;smooth_playback_requested=0;seq_audition_stop();if(native_prepare==2&&!syncbusy){seq_cancel_prepare();return;}if(seqplaying){if(syncmode==1&&syncslave&&!syncbusy&&!sync_local_stop_allowed())return;if(!seqservicing)seq_frame();seq_stop();smooth_playback_update();return;}seq_stop();
  if(experimental_mode){monomode=polymode=0;}else if(seqmode){if(!monomode)monoenable();}
  else {if(monomode||polymode)panic();monomode=polymode=0;if(oldmono){TAC_REG=waveengine?4:0;route=0;for(c=0;c<4;c++)if(!param[c][9]){if(param[c][21]&1)route|=1<<c;if(param[c][21]&2)route|=0x10<<c;}globals();}}
  memset(seqposition,0,SEQ_TRACKS);seqclock=seqticks=seqfraction=0;if(!(TAC_REG&4)){TMA_REG=240;TIMA_REG=240;IF_REG&=~TIM_IFLAG;TAC_REG=4;}seq_gates();mixer_clock_reset();seqservicing=1;
@@ -186,20 +194,25 @@ void seq_transport(void) BANKED {uint8_t c,oldmono=monomode,smooth=smooth_playba
  if(waveengine!=3&&seq_enabled(6)&&seq_audible(6)){uint8_t e[4];uint16_t cursor=0,bit;
   while(seq_event_next_step(6,0,&cursor,e))if(e[1]&&e[1]<=10){bit=1U<<(e[1]-1);if(!(drummutemask&bit)&&(!drumsolomask||(drumsolomask&bit))){drum_init();drum_enable();break;}}
  }
+ sync_raw_configure();
  /* Both transports prepare audio while musical time is stopped. Only the
     explicit Smooth transport changes or suppresses the display. */
  if(smooth)smooth_playback_begin();else smooth_playback_preparing=1;
  if(!editbuffer_prepare_stopped()){smooth_playback_preparing=0;seqservicing=0;smooth_playback_update();return;}
  storage_sorted_prepare();eval_drum_prepare();
- if(smooth_playback_preparing&&(!syncmode||(syncmode==1&&!syncslave))){editbuffer_reading=1;eval_mod_configure();eval_seq_startup_prepare();drum_irq_prepare();editbuffer_reading=0;}
+ if(smooth_playback_preparing&&SYNC_EVENT_IRQ)seq_startup_prepare();
  smooth_playback_preparing=0;if(smooth)smooth_playback_ready();
- seq_clock_epoch();
- if(syncmode){sync_transport(1);if(!seqplaying){seqservicing=0;dirty=1;return;}}
+ if(syncmode==1&&syncslave&&native_prepare){if(native_prepare!=4)native_prepare=2;seqplaying=0;seqservicing=0;smooth_playback_preparing=1;dirty=1;return;}
+ seq_prepared_start();
+}
+#pragma opt_code_speed
+void seq_launch_events(void) BANKED {uint8_t c;
  drum_irq_start();
- seq_irq_launch();editbuffer_reading=editbuffer_active();
+ seq_irq_start();editbuffer_reading=editbuffer_active();
  {for(c=0;c<SEQ_NOTE_TRACKS;c++)if(seq_enabled(c))seq_fire(c);
  if(seq_enabled(6))seq_fire(6);}seq_next_deadline();seq_irq_prepare();editbuffer_reading=0;seqservicing=0;dirty=1;
 }
+void seq_cancel_prepare(void) BANKED {native_prepare=0;seq_stop();smooth_playback_preparing=0;seqservicing=0;dirty=1;}
 /* The timer keeps elapsed time even while no event is due. Avoid rescanning
    seven gates on every audio block: wake only for the next gate or step. */
 /* Hardware timer time is independent of video refresh. 1024 time units/sec;
@@ -331,7 +344,6 @@ uint8_t seq_track_page(uint8_t right) BANKED;
 uint8_t seq_region_duplicate(void) BANKED;
 void seq_popup_input(uint8_t edge) BANKED;
 void seq_popup_render(void) BANKED;
-uint8_t seq_top_entry(void) BANKED {uint8_t col=seqcursor[seqtrack]-seqbase;uint8_t width=seqtrack==6?136:144;uint16_t x=(seqtrack==6?24:16)+((uint16_t)col*width+width/2)/seqcols;return x<68&&seqtrack!=6?1:x<84?2:x<96?3:4;}
 void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DOWN|J_LEFT|J_RIGHT;
  if(eval_confirm){eval_input(p,edge);return;}if(genopen){gen_input(p,edge);return;}
  if(seqpopup){seq_popup_input(edge);return;}

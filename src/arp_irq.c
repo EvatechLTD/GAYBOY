@@ -41,7 +41,7 @@ void arp_irq_pattern_changed(uint8_t c) NONBANKED {
  uint8_t bit=1<<c;if(!(pattern_mask&bit))return;
  __critical{pattern_mask&=~bit;continuous[c]=repeating[c]=reset_loop[c]=0;}
 }
-uint8_t arp_irq_valid(uint8_t c) NONBANKED {return power&&(seqplaying||smooth_playback_preparing)&&seqswing==50&&(!syncmode||!syncslave)&&(arpirq_enabled&(1<<c))&&generation[c]==pattern_generation&&prepared_bpm[c]==seqbpm&&!bend[c];}
+uint8_t arp_irq_valid(uint8_t c) NONBANKED {return power&&(seqplaying||smooth_playback_preparing)&&seqswing==50&&SYNC_EVENT_IRQ&&(arpirq_enabled&(1<<c))&&generation[c]==pattern_generation&&prepared_bpm[c]==seqbpm&&!bend[c];}
 uint8_t arp_irq_continue(uint8_t c) BANKED;
 static uint16_t pattern_steps[3];
 uint8_t arp_irq_pattern_owned(uint8_t c) BANKED {
@@ -73,7 +73,7 @@ void arp_irq_cancel(uint8_t c) NONBANKED {pattern_mask&=~(1<<c);if(!(arpirq_enab
 void arp_irq_reset(void) NONBANKED {__critical{arpirq_enabled=lost_ownership=pattern_mask=0;timer_wait=65535U;}}
 
 static uint8_t eligible(uint8_t c,uint16_t period,uint16_t scale){uint8_t *p=param[c];
- return power&&(seqplaying||smooth_playback_preparing)&&(!syncmode||!syncslave)&&seqswing==50&&
+ return power&&(seqplaying||smooth_playback_preparing)&&SYNC_EVENT_IRQ&&seqswing==50&&
   arpcount[c]&&arpcount[c]<=4&&period>=(uint16_t)(scale*2)&&
   !monomode&&!polymode&&!tablemode[c]&&!bend[c]&&!finepitch[c]&&(!(coarsepitch[c][0]||(!mod_bypass&&(coarsepitch[c][1]||evalpatch[c][EV_DEPTH])))||lfo_irq_owned(c))&&!MOD_LEVEL(c)&&!(mono_owned&(1<<c))&&
   !p[9]&&!p[22]&&!(c==0&&pulsekickleft)&&!(c==2&&(waveengine||evalwaveactive||p[17]))&&
@@ -135,7 +135,7 @@ uint8_t arp_irq_prepare(uint8_t c,uint32_t requested,uint16_t scale,uint16_t ste
 
 static uint16_t next_attack(uint8_t c) NONBANKED {uint16_t wait=whole_ticks[c];if(fractions[c]>arp_phase[c]){wait++;arp_phase[c]+=scales[c]-fractions[c];}else arp_phase[c]-=fractions[c];return wait;}
 void arp_irq_due(void) NONBANKED {uint8_t c,bit,i,*packet,*patch,index,vol,solos;uint16_t ticks,wait,over,pitch,next=65535U;
- if(!seqplaying||syncmode&&syncslave){lost_ownership|=arpirq_enabled;arpirq_enabled=0;return;}
+ if(!seqplaying||!SYNC_EVENT_IRQ){lost_ownership|=arpirq_enabled;arpirq_enabled=0;return;}
  solos=seqsolo&(syncmode==SYNC_TWINK?111:95);if(drumsolomask)solos|=64;
  for(c=0,bit=1;c<3;c++,bit<<=1){
   if(!(arpirq_enabled&bit)||(!remaining[c]&&!(pattern_mask&bit)))continue;

@@ -121,14 +121,15 @@ void input_vblank(void);
 uint8_t editirq_elapsed(uint8_t fallback) NONBANKED;
 extern volatile uint8_t drum_irq_active;
 void drum_irq_tick(uint8_t elapsed) NONBANKED;
+uint8_t sync_native_elapsed(uint8_t ticks) BANKED;
 void engine_timer(void){uint8_t n;
- sync_clock_isr();
+ if(syncmode)sync_clock_isr();
  if(syncarmed){
-  if(waveengine!=3&&seqplaying){n=editirq_elapsed(1);seqticks+=n;if(!syncslave){if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);}}
-  syncsub++;if(syncsub<syncdivider)return;syncsub=0;
+  if(waveengine!=3&&seqplaying&&!syncstart){n=editirq_elapsed(1);if(sync_raw_ready&&syncmode==1)n=sync_native_elapsed(n);seqticks+=n;if(!syncslave||sync_raw_ready){if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);}}
+  if(!sync_raw_ready){syncsub++;if(syncsub<syncdivider)return;syncsub=0;}
  }
  /* Sample after the PCM upload. Delayed VBlank sampling alone can miss a
     one-frame tap; both interrupt producers run without nesting. */
  if(waveengine==3){drum_timer();input_vblank();return;}
- if(seqplaying&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);seqticks+=n;}if(!power)return;
+ if(seqplaying&&!syncstart&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);seqticks+=n;}if(!power)return;
 }

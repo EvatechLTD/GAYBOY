@@ -19,8 +19,12 @@ extern __at (0xFFC6) volatile uint8_t synctxwait;
 extern __at (0xFFC7) volatile uint8_t synctick;
 extern __at (0xFFC8) volatile uint8_t syncstart;
 extern __at (0xFFC9) volatile uint8_t synctxbyte;
+extern uint8_t sync_raw_ready;
+#define SYNC_EVENT_IRQ (!syncmode||!syncslave||sync_raw_ready)
+void sync_raw_configure(void) BANKED;
+void sync_raw_tick(void) BANKED;
 void sync_control_service(void) BANKED;
-void sync_clock_isr(void) NONBANKED;
+void sync_clock_isr(void) BANKED;
 void sync_timer_config(void) BANKED;
 void sync_pattern(void) BANKED;
 void sync_init(void) BANKED;

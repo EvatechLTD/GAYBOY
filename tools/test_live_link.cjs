@@ -10,8 +10,8 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  for(const side of [0,1]){const battery=Buffer.from(side?fs.readFileSync(option('--slave-save',option('--save','assets/demo/KILLING.srm'))):save);battery[32647]=Number(option('--pad','5'))-1;const p=core._malloc(battery.length);core.HEAPU8.set(battery,p);core._link_battery_load(side,p,battery.length);core._free(p);}
  const v=(i,n,o=0)=>core._link_state_read(i,(S['_'+n]??0)+o),put=(i,n,x,o=0)=>core._link_state_write(i,S['_'+n]+o,x);
  const word=(i,n,o=0)=>v(i,n,o)|(v(i,n,o+1)<<8),ww=(i,n,x,o=0)=>{put(i,n,x&255,o);put(i,n,x>>8,o+1);};
- const status=()=>[0,1].map(i=>({pc:core._link_pc(i).toString(16),page:v(i,'page'),playing:v(i,'seqplaying'),slave:v(i,'syncslave'),link:v(i,'linkstate'),pending:v(i,'syncpending'),ticks:word(i,'seqticks'),position:Array.from({length:7},(_,j)=>v(i,'seqposition',j)),drums:v(i,'drum_irq_active'),notes:v(i,'editirq_running'),arp:v(i,'arpirq_enabled'),lfo:v(i,'lfo_irq_mask'),overflow:v(i,'overflow')}));
- let frames=0,lastDebug='';const run=n=>{core._link_run(n);frames+=n;},until=(f,n=3000)=>{for(let j=0;j<n;j++){if(f())return;run(1);if(process.argv.includes('--debug')){const snap=status(),stamp=snap.map(x=>x.active+':'+x.wire.slice(0,6)).join('|');if(stamp!==lastDebug){lastDebug=stamp;console.log(frames,JSON.stringify(snap));}}}const ntrace=core._link_trace_count();console.log('Last wire bytes',Array.from({length:Math.min(48,ntrace)},(_,j)=>core._link_trace_value(ntrace-Math.min(48,ntrace)+j)));throw Error('timeout '+JSON.stringify(status()));};
+ const status=()=>[0,1].map(i=>({pc:core._link_pc(i).toString(16),page:v(i,'page'),playing:v(i,'seqplaying'),slave:v(i,'syncslave'),link:v(i,'linkstate'),pending:v(i,'syncpending'),ticks:word(i,'seqticks'),position:Array.from({length:7},(_,j)=>v(i,'seqposition',j)),drums:v(i,'drum_irq_active'),notes:v(i,'editirq_running'),arp:v(i,'arpirq_enabled'),lfo:v(i,'lfo_irq_mask'),overflow:v(i,'overflow'),raw:S._sync_raw_ready?v(i,'sync_raw_ready'):0,pulsequot:core._link_state_read(i,0xffec)|(core._link_state_read(i,0xffed)<<8),divider:v(i,'syncdivider'),counter:v(i,'synctick'),expected:word(i,'syncincrement'),local:word(i,'synclimit'),debt:v(i,'syncdue'),TMA:core._link_read(i,0xff06),TAC:core._link_read(i,0xff07),SC:core._link_read(i,0xff02),SB:core._link_read(i,0xff01)}));
+ let frames=0,lastDebug='';const firstOverflow=[false,false];const run=n=>{for(let j=0;j<n;j++){core._link_run(1);frames++;if(process.argv.includes('--overflow-debug'))for(let i=0;i<2;i++)if(frames>100&&v(i,'overflow')===1&&!firstOverflow[i]){firstOverflow[i]=true;console.log('FIRST OVERFLOW',frames,i,JSON.stringify({state:status()[i],prepare:v(i,'native_prepare'),busy:v(i,'syncbusy'),servicing:v(i,'seqservicing'),rd:v(i,'rd'),wr:v(i,'wr'),head:Array.from({length:8},(_,j)=>v(i,'rx',(v(i,'rd')+j)&255))}));}}},until=(f,n=3000)=>{for(let j=0;j<n;j++){if(f())return;run(1);if(process.argv.includes('--debug')){const snap=status(),stamp=JSON.stringify(snap);if(stamp!==lastDebug){lastDebug=stamp;console.log(frames,JSON.stringify(snap));}}}const ntrace=core._link_trace_count();console.log('Last wire bytes',Array.from({length:Math.min(48,ntrace)},(_,j)=>core._link_trace_value(ntrace-Math.min(48,ntrace)+j)));throw Error('timeout '+JSON.stringify(status()));};
  const keys={right:0,left:1,up:2,down:3,a:4,b:5,select:6,start:7};
  function key(i,k,down){core._link_key(i,keys[k],+down);until(()=>!!(v(i,'lastpad')&(1<<keys[k]))===down,1800);}
  function tap(i,k){key(i,k,true);key(i,k,false);run(4);}
@@ -25,6 +25,15 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   put(i,'sticky_start',1);
   if(linked){choose(i,27);key(i,'b',true);tap(i,'up');key(i,'b',false);assert.equal(v(i,'syncmode'),1);}
   choose(i,8);
+  if(process.argv.includes('--fixture')){
+   const arp=process.argv.includes('--arp');
+   const tracks=[[],arp?[[0,61,127,16],[0,65,127,16],[0,68,127,16]]:[0,4,8,12].map((s,j)=>[s,[61,65,68,65][j],127,4]),[[0,37,127,16]],[],[],[],[...Array.from({length:16},(_,s)=>[s,11,127,1]),...[0,4,8,12].map(s=>[s,13,127,1])]];
+   let offset=0;const slot=v(i,'mx',1),bank=1+(slot>>2),base=0xa000+(slot&3)*2048+768;
+   for(let c=0;c<7;c++){ww(i,'seqeventoffsets',offset,c*2);ww(i,'seqeventcounts',tracks[c].length,c*2);ww(i,'seqlength',16,c*2);for(const e of tracks[c]){core._link_write(i,0x4000,bank);e.forEach((x,j)=>core._link_write(i,base+offset*4+j,x));offset++;}}core._link_write(i,0x4000,0);
+   for(let j=0;j<48;j++)put(i,'evalpatch',0,j);for(let j=0;j<9;j++)put(i,'coarsepitch',0,j);for(let j=0;j<6;j++)put(i,'finepitch',0,j);
+   if(arp)for(const [j,x] of [[0,1],[2,4],[4,1],[13,1]])put(i,'evalpatch',x,16+j);
+   put(i,'seqmuted',0);put(i,'seqsolo',0);ww(i,'drummutemask',0);ww(i,'drumsolomask',0);put(i,'seqeventcache',0);put(i,'pattern_dirty',1);put(i,'seqirqdirty',1);put(i,'eval_moddirty',1);ww(i,'pattern_generation',word(i,'pattern_generation')+1);put(i,'seqtrack',arp?1:6);
+  }
   const bpm=Number(option('--bpm','120'));ww(i,'seqbpm',bpm);ww(i,'seqglobalbpm',bpm);
  }
  core._link_watch_events(0,0,S['_seqposition'],S['_seqticks'],S['_seqclock']);
@@ -43,7 +52,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
  const lostTimerRequests=[0,0],groups=Array.from({length:2},()=>[[],[],[],[]]),eventPtr=core._link_events(),count=core._link_event_count();
  const words=new Uint32Array(core.HEAPU8.buffer,eventPtr,count*7);
  for(let i=measurementStart;i<count;i++){const at=i*7,tag=words[at+2];if(tag===0x780)lostTimerRequests[words[at+1]]++;if(tag>=0x740&&tag<=0x743)groups[words[at+1]][tag-0x740].push({ms:words[at]/8388.608,pos:words[at+4]&65535});}
- const report={measurementOnly:process.argv.includes('--measure-only'),startupExcluded:true,indexSkewRequiresMatchingAttackSequence:true,linked,graphics,master,drift:Number(option('--drift','0')),frames,status:status(),channels:[],lostTimerRequests,minSP:[0,1].map(i=>core._link_min_sp(i)),graphicsWrites:[0,1].map(i=>core._link_ui_vram_writes(i)),underruns:[0,1].map(i=>word(i,'editirq_underruns')),aborts:core._link_wire_aborts(),unarmed:core._link_unarmed_edges()};
+ const report={measurementOnly:process.argv.includes('--measure-only'),startupExcluded:true,fixture:process.argv.includes('--fixture'),arp:process.argv.includes('--arp'),indexSkewRequiresMatchingAttackSequence:true,linked,graphics,master,drift:Number(option('--drift','0')),frames,status:status(),channels:[],lostTimerRequests,minSP:[0,1].map(i=>core._link_min_sp(i)),graphicsWrites:[0,1].map(i=>core._link_ui_vram_writes(i)),underruns:[0,1].map(i=>word(i,'editirq_underruns')),aborts:core._link_wire_aborts(),unarmed:core._link_unarmed_edges()};
  for(let c=0;c<4;c++){
   const a=groups[master][c],b=groups[1-master][c],grid=7500/Number(option('--bpm','120'))/(master?1+Number(option('--drift','0'))/1e6:1);
   const errors=a.slice(1).map((h,i)=>{const d=h.ms-a[i].ms;return Math.abs(d-Math.round(d/grid)*grid);});
@@ -51,6 +60,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   const skew=a.slice(0,Math.min(a.length,b.length)).map((h,i)=>b[i].ms-h.ms);
   report.channels.push({channel:c,hits:[a.length,b.length],masterMaxGridMs:Math.max(0,...errors),slaveMaxGridMs:Math.max(0,...slaveErrors),skewMinMs:Math.min(...skew),skewMaxMs:Math.max(...skew),firstSkewMs:skew[0],lastSkewMs:skew.at(-1)});
  }
+ if(process.argv.includes('--onsets'))report.onsets=groups;
  fs.writeFileSync(option('--report','build/song-link-report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
  assert(report.underruns.every(n=>!n),'Register queue underrun');
  assert(report.minSP.every(n=>n>=0xde00),'Stack reserve exceeded');

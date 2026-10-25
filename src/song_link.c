@@ -4,6 +4,7 @@
 #include "song_mode.h"
 #include "song_link.h"
 #include "smooth_playback.h"
+#include "native_sync.h"
 #include "link_control.h"
 
 /* This protocol owns the cable only while a prepared Song transport is armed.
@@ -46,6 +47,7 @@ static uint8_t checksum(void){uint8_t i,j,c=0;for(i=0;i<9;i++){c^=W.header[i];fo
 static void send(uint8_t b){uint16_t now=song_pattern_mode?DIV_REG:frame();__critical{if(!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)){W.sentframe=now;W.transfer=1;SB_REG=b;SC_REG=0x81;}}}
 static void quiet(void){NR12_REG=NR22_REG=NR42_REG=8;NR14_REG=NR24_REG=NR44_REG=128;NR30_REG=0;}
 static void begin_slave(void){
+ native_prepare=0;
  song_link_active=1;memset((void *)&W,0,sizeof(W));W.state=S_HEADER;W.reply=WAIT;W.since=sys_time;syncarmed=syncdue=0;syncslave=1;syncr=syncw;rd=wr;
 }
 /* Called from SIO. No __critical routines, implicit EI, source scans or UI. */
@@ -102,6 +104,7 @@ static void phase_service(void){uint8_t low,high,timer,pending;uint16_t local,am
 void pattern_link_request(void) BANKED {if(seqplaying||song_link_active)return;song_pattern_mode=1;song_link_request(1);}
 void song_link_request(uint8_t smooth) BANKED {uint32_t start=smooth?0:song_view.cursor&~15UL;uint16_t bpm=seqbpm;uint8_t i;
  if(seqplaying)return;
+ native_prepare=0;
  /* Finish any native idle poll before changing ownership of SB/SC. */
  while((SC_REG&0x81)==0x81||IF_REG&SIO_IFLAG);
  __critical{song_link_active=1;syncarmed=syncdue=0;syncr=syncw;rd=wr;SC_REG=0;}

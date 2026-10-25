@@ -74,7 +74,7 @@ void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*
  }
  if((eb_building||editbuffer_ready)&&eb_generation!=pattern_generation){eb_building=editbuffer_ready=0;editbuffer_restarts++;}
  if(editbuffer_ready)return;
- if(!eb_building){eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);eb_generation=pattern_generation;eb_left=total();eb_buildtrack=6;eb_changedmask=editbuffer_valid?0:127;for(hash=0;hash<7;hash++)if(eb_newcounts[hash]!=eb_counts[hash])eb_changedmask|=1<<hash;eb_newmask=7;for(hash=0;hash<3;hash++)if(!eb_newcounts[hash])eb_newmask&=~(1<<hash);for(hash=4;hash<6;hash++)if(eb_newcounts[hash])eb_newmask&=~(1<<(hash-4));
+ if(!eb_building){eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);eb_generation=pattern_generation;eb_left=total();eb_buildtrack=6;eb_changedmask=editbuffer_valid?0:127;for(hash=0;hash<7;hash++)if(eb_newcounts[hash]!=eb_counts[hash])eb_changedmask|=1<<hash;eb_newmask=7;for(hash=0;hash<3;hash++)if(!eb_newcounts[hash])eb_newmask&=~(1<<hash);for(hash=4;hash<6;hash++)if(eb_newcounts[hash]&&!(hash==5&&syncmode==SYNC_TWINK))eb_newmask&=~(1<<(hash-4));
   __critical{SWITCH_RAM_MBC5(2);memset((void *)(eb_target+EB_BITS),0,32);SWITCH_RAM_MBC5(0);}eb_building=1;}
  /* Copy a bounded batch, yielding between records for queued input or audio.
     A main-loop pass can span many video frames during dense drawing. */
