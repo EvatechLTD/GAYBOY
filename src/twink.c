@@ -25,6 +25,13 @@ void twink_tx_tick(void) BANKED {
 void twink_reset(void) BANKED {twink_ready=0;busy=0;twink_guard=synctxwait=0;session=(session+1)&127;if(!session)session=1;twink_schedule_reset(session);bpm=0;hello=heartbeat=sys_time-120;seen=serviced=sys_time;}
 void twink_panic(void) BANKED {if(syncmode!=SYNC_TWINK)return;twink_schedule_stop();seqplaying=0;if(syncarmed){__critical {syncarmed=syncdue=0;TMA_REG=TIMA_REG=syncreload;}}__critical {syncw=syncr;}put(0xFF);sync_control_service();}
 void twink_transport(uint8_t playing) BANKED {uint16_t since,current;if(syncmode!=SYNC_TWINK)return;if(!playing){twink_schedule_stop();__critical {syncw=syncr;}put(0xFC);sync_control_service();return;}
+ /* A stopped user may have returned from an unsupported patch to native.
+    Drain the old session completely before allowing a fresh HELLO reply;
+    a stale D1 must not reopen a capability rejection during playback. */
+ if(twink_v2_blocked){
+  while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
+  __critical{rd=wr;}twink_reset();
+ }
  /* Ready A5 proves legacy presence, not timed capability. After reconnect
     allow HELLO/response to finish while the local musical clock is held.
     Never attach an epoch-zero scheduled stream to already-running music. */

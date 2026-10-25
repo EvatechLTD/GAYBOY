@@ -138,7 +138,7 @@ uint8_t twink_schedule_start(void) BANKED {uint8_t b[2],poll=0xF9;uint16_t since
 failed:
  twink_v2_blocked=1;twink_staging=0;event_flush();twink_v2=twink_scheduled=warming=0;twink_anchor_pending=0;__critical{syncw=syncr;}return 0;
 }
-void twink_schedule_service(void) BANKED {uint16_t current,hash,error;uint8_t b[1];uint32_t step;
+void twink_schedule_service(void) BANKED {uint16_t current,hash,error;uint8_t b[2];uint32_t step;
  if(!twink_v2||!twink_scheduled||warming||!seqplaying)return;
  current=now();
  /* The next step deadline is cached. Doing a32-bit tempo division at
@@ -154,7 +154,8 @@ void twink_schedule_service(void) BANKED {uint16_t current,hash,error;uint8_t b[
   hash=fingerprint();
   if(hash!=signature||scheduled_slot!=mx.slot||scheduled_bpm!=seqbpm){
    b[0]=(generation+1)&127;if(!b[0])b[0]=1;
-   if(!frame(4,b,1))return;
+   b[1]=audible()?0:1;
+   if(!frame(4,b,b[1]?2:1))return;
    event_flush();generation=b[0];scan_step=step+1;scan_clock=service_clock;scan_error=step_error;signature=hash;scheduled_slot=mx.slot;scheduled_bpm=seqbpm;
   }
   source_generation=pattern_generation;
