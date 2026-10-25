@@ -22,8 +22,7 @@ volatile uint8_t editirq_enabled,editirq_running;
 static uint16_t gate[3],prepared_bpm;
 static uint8_t prepared_mask,prepared_buffer,prepared_frame,prepared_wave,prepared_kick,prepared_owner,prepared_record,prepared_power;
 static volatile uint16_t editirq_phase;
-static uint8_t divider_last;
-volatile uint8_t editirq_fraction;
+static uint8_t divider_last,divider_fraction;
 uint8_t editirq_max_gap;
 extern uint8_t linkstate;
 uint16_t editirq_attacks,editirq_underruns;
@@ -34,9 +33,9 @@ uint8_t editirq_owned(uint8_t c) NONBANKED {
 }
 /* DIV measures wall time even if a register commit spans a TIMA overflow.
    All enabled paths sample more often than DIV's 15.625 ms wrap interval. */
-void editirq_clock_reset(void) NONBANKED {divider_last=DIV_REG;editirq_fraction=0;}
+void editirq_clock_reset(void) NONBANKED {divider_last=DIV_REG;divider_fraction=0;}
 /* Serial IRQ observes time between timer callbacks without consuming it. */
-uint16_t editirq_pending_div(void) NONBANKED {return (uint16_t)(uint8_t)(DIV_REG-divider_last)+editirq_fraction;}
+uint8_t editirq_pending(void) NONBANKED {return ((uint16_t)(uint8_t)(DIV_REG-divider_last)+divider_fraction)>>4;}
 uint8_t editirq_elapsed(uint8_t fallback) NONBANKED __naked {fallback;__asm
  push bc
  ld e,a
@@ -74,11 +73,11 @@ elapsed_fraction$:
  ld a,c
  and #15
  ld b,a
- ld a,(_editirq_fraction)
+ ld a,(_divider_fraction)
  add a,b
  ld b,a
  and #15
- ld (_editirq_fraction),a
+ ld (_divider_fraction),a
  ld a,c
  swap a
  and #15
@@ -95,7 +94,7 @@ elapsed_fallback$:
  ld a,b
  ld (_divider_last),a
  xor a
- ld (_editirq_fraction),a
+ ld (_divider_fraction),a
  ld a,e
  pop bc
  ret

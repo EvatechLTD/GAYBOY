@@ -3,10 +3,8 @@
 extern volatile uint8_t twink_guard,twink_ended_div;
 void twink_tx_tick(void) BANKED;
 extern uint8_t twink_v2;
-extern volatile uint8_t native_prepare;
 void twink_v2_irq(void) BANKED;
 void sync_raw_sample(void) BANKED;
-void sync_native_capture(void) BANKED;
 /* Banked interrupt-only clock, entered through the GBDK preserving trampoline.
    Phase uses elapsed DIV /16 times64 times BPM, not interrupt invocations.
    Reloads are selected outside the IRQ; there is no division in this kernel.
@@ -23,27 +21,10 @@ sync_clock_active$:
  jr z,sync_clock_master$
  ldh a,(_syncmode)
  dec a
- jr z,sync_native_raw$
+ ret z
  push bc
  ld e,#b_sync_raw_sample
  ld hl,#_sync_raw_sample
- call ___sdcc_bcall_ehl
- pop bc
- ret
-sync_native_raw$:
- ldh a,(_syncirqphase+2)
- and #0x60
- cp #0x40
- ret nz
- ldh a,(#0x0f)
- and #8
- ret z
- ldh a,(#0x01)
- cp #0xf9
- ret nz
- push bc
- ld e,#b_sync_native_capture
- ld hl,#_sync_native_capture
  call ___sdcc_bcall_ehl
  pop bc
  ret
@@ -62,38 +43,9 @@ sync_clock_master$:
  or a
  ret z
  push bc
- jp sync_twink_v2_pump$
+ jr sync_twink_v2_pump$
 sync_clock_running$:
  push bc
- ; A timestamp control may finish during the peer timer IRQ. Do not start
- ; its pending native clock before the bounded serial rearm margin expires.
- ldh a,(_syncmode)
- dec a
- jr nz,sync_clock_native_pending_done$
- ld a,(_native_prepare)
- cp #6
- jr nz,sync_clock_native_pending_done$
- ldh a,(_synctxwait)
- or a
- jr nz,sync_clock_native_pending_done$
- ldh a,(_syncdue)
- or a
- jr z,sync_clock_native_pending_done$
- ldh a,(#0x02)
- bit 7,a
- jr nz,sync_clock_native_pending_done$
- ldh a,(#0x0f)
- bit 3,a
- jr nz,sync_clock_native_pending_done$
- xor a
- ldh (_syncdue),a
- ldh a,(_synctick)
- or #0x80
- call _link_clock_byte
- ldh (#0x01),a
- ld a,#0x81
- ldh (#0x02),a
-sync_clock_native_pending_done$:
  ldh a,(_syncmode)
  cp #6
  jr nz,twink_queue_done$
@@ -146,12 +98,6 @@ twink_queue_done$:
  jr z,sync_clock_elapsed$
  inc b
 sync_clock_elapsed$:
- ldh a,(#0xec)
- add a,b
- ldh (#0xec),a
- ldh a,(#0xed)
- adc a,#0
- ldh (#0xed),a
  ld a,b
  or a
  jr z,sync_clock_compare$
@@ -179,13 +125,13 @@ sync_clock_compare$:
  ldh a,(_synclimit+2)
  cp a,b
  jr c,sync_clock_due$
- jp nz,sync_clock_done$
+ jr nz,sync_clock_done$
  dec hl
  ld b,(hl)
  ldh a,(_synclimit+1)
  cp a,b
  jr c,sync_clock_due$
- jp nz,sync_clock_done$
+ jr nz,sync_clock_done$
 sync_clock_due$:
  ldh a,(_synctick)
  inc a
@@ -219,16 +165,6 @@ sync_clock_due$:
  xor a
  ld (_twink_guard),a
 sync_clock_guard_done$:
- ldh a,(_syncmode)
- dec a
- jr nz,sync_clock_rearm_done$
- ld a,(_native_prepare)
- cp #6
- jr nz,sync_clock_rearm_done$
- ldh a,(_synctxwait)
- or a
- jr nz,sync_clock_pending$
-sync_clock_rearm_done$:
  ldh a,(#0x0f)
  and #8
  jr nz,sync_clock_pending$
@@ -254,7 +190,7 @@ sync_clock_send$:
  ldh (#0x01),a
  ld a,#0x81
  ldh (#0x02),a
- jp sync_clock_done$
+ jr sync_clock_done$
 sync_clock_pending$:
  ldh a,(_syncdue)
  or a
