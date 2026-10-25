@@ -135,12 +135,21 @@ static void engine_timer_legacy(void){uint8_t n;
  if(seqplaying&&!syncstart&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);seqticks+=n;}if(!power)return;
 }
 
-/* Native link uses the same prepared audio executors as local playback.
+/* Native link and timed TWINK use the prepared audio executors from local playback.
    Avoid walking the legacy PCM/pulse-divider branches on every 1 kHz tick. */
 void engine_timer(void) __naked { __asm
  ldh a,(_syncmode)
- dec a
+ cp #1
+ jr z,prepared_timer_mode$
+ cp #6
  jp nz,_engine_timer_legacy
+ ld a,(_twink_v2)
+ or a
+ jp z,_engine_timer_legacy
+ ld a,(_twink_scheduled)
+ or a
+ jp z,_engine_timer_legacy
+prepared_timer_mode$:
  ld a,(_waveengine)
  cp #3
  jp z,_engine_timer_legacy
