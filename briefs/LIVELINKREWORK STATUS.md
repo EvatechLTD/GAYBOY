@@ -22,6 +22,10 @@ Latest source regressions: local normal seven-phase LFO benchmark, local Smooth 
 
 OPEN before any merge: matched v4 lifecycle/legacy fallback and long drift/receiver live-control qualification; live BPM changes, swing, mute/unmute and pad-transition deadlines; remaining native linked timing error and full-page UI delay; hardware test of the frozen pair. In particular the existing live-BPM rebase still uses absolute step*15360/BPM and is not approved as continuous tempo-change handling. Do not publish this checkpoint as universally live-edit safe.
 
+Native PLL deadband experiment (rejected): ignoring the first +/-1unit of phase error reduced some follower grid variation but did not improve worst paired timing (2.89ms versus2.84ms in matched137BPM/+1000ppm ARP/UI), and master input median rose6versus4frames. Reverted source and rebuilt exact89972 hash. Artifacts `build/GAYBOY-NATIVE-DEADBAND-REJECTED.gb/.noi`, report `build/native-deadband137.log`. Do not retain a PLL change solely because one channel looks smoother.
+
+Receiver bank-placement follow-up: hot publication/cold ARM split2fab800fb609d8a562e6d90fa744d65cb7a709ceb05c3249d2596bdf01a527a3 passes one721-note control run with exact four-pitch order, but phase-offset sweep still produces late notes (offset8:16late/max58units). Cold4560 can pass offsets where hot2fab fails. Thus a single clean control run was alignment-sensitive; neither receiver is fully qualified yet. Worker is tracing actual readiness/foreground reconciliation. Keep this negative control in future qualification.
+
 ## Earlier checkpoints (historical)
 
 ## Accepted branch milestones
