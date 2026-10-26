@@ -1,3 +1,40 @@
+# LIVELINKREWORK status ? 2026-10-26
+
+Current private hardware pair: `G:/DEVELOPMENT/GAYBOY/DATA/TESTS/TWINK-DIRECT-20261026/`. Source ROM SHA426cdb910b461155782c23d969896fb7c86a0c6d345109d1e190d173e927799e; receiver SHA2eece6829b1a708f3b82f99e130f03167abe401f97e2e5de67e3683a92af91de. Not merged or deployed. Main is the approved ARP-only release e77ba79; it was merged into this private branch ba2e680. Length control is isolated separately on LENGTH_CONTROL.
+
+## Current scope
+
+Prioritize proprietary GAYBOY live sync, Songlink, TWINK. LSDJ and PO are outside current work. SameBoy is mandatory for listening/timing acceptance; historical PyBoy sound/timing claims need SameBoy/hardware revalidation. Preserve user emulator windows and saves.
+
+TWINK DIRECT sends fixed five-byte ON/OFF frames without receiver clock, handshake, ACK or feedback. Receiver basic RAW INIT11, P1/P2/Wave+chorus8 only. Host computes note/gate timing; no receiver chord/arp offload. Private pair README gives operating limits.
+
+## This pass
+
+- MS note cache is stably sorted by onset/pitch. Up to16 notes use compiled seven-byte packets in each existing128-byte cache half, including CRCs and mixer velocity.17..32 retain sorted raw cache; larger lanes retain SRAM snapshots. One added WRAM byte;26 bytes remain above the512-byte stack reserve.
+- A small BANKED assembly lookup copies common compiled packets without the C stack-spilled search. It preserves BC and respects the six-byte trampoline argument frame. Other cases retain the C path.
+- Source foreground catch-up had been disabled by retired v2 negotiation flags, and its helper was not called. It now retires IRQ-owned bookkeeping, but MUST reject a batch that reaches ANY ARP logical onset/end. Pending edits, unsupported owners, modulation, recording, launches and song playback retain the original path.
+-33-note fallback selected an upper octave because MS was excluded from the lowest-head construction proof even though the IRQ reader assumed that proof. MS now participates in head ordering; equal-pitch insertion retains the earliest original velocity.
+
+## Evidence and limits
+
+SameBoy full120/240 host interaction suite verifies actual note mutation and rendering, including plot/resize/move, selection/group drag and paint.120 BPM OFF?TWINK frames: plot24?23, resize39?41, move40?39, multiselect28?27, group drag83?84, paint111?119.240 BPM: plot40?28, resize42?44, move59?63, group drag139?144, paint191?181. Full page redraw remains slower240:308?339 frames. These are fixture/phase-specific results, not universal identical performance.
+
+Real bit-level cable tests: final packet-fast candidate410/410 at120,829/829 at240, correct pitches and zero CRC/unarmed/abort faults during both-machine controls. End-to-end P2?remote attack median~9.5ms versus~11.7ms earlier direct pair. Remote interval error P95~1.6?2.1ms, worst~2.6ms: do not claim internal timing parity or constant5ms latency. Receiver decode?APU~0.873ms. Slow current-level mismatch fallback remains correct. Local saved-ARP playback, native137 BPM/+1000ppm/shared panic, Songlink, and linked Smooth both blank/shared stop pass.
+
+Audible edit propagation is a required test. An unconstrained AUTONOMOUS experiment made UI look fast but left five-note edits stale indefinitely in5/6 phase cases. Rejected. BOUNDED passes all12 real UI move/plot phase cases, and final PACKET-FAST also passes12/12, with the last48 actual APU pitches in each case matching the exact edited chord order. Never substitute UI acknowledgements or resident-memory writes for actual audible update proof.
+
+The receiver worktree `G:/DEVELOPMENT/MONOSIMP-TWINKTIMING-V2`, branchTWINK-DIRECT, preserves tests/reports in972c061 (and subsequent final qualification). Its docs/DIRECT_SOURCE_IRQ_COST.md and DIRECT_WIRE_LATENCY.md explain same-IRQ delay and measurement units. Root benchmark reports live in that build directory: direct-main-arp-ui-{before,sorted,small-lane,compiled16,autonomous,constant-stride,bounded,packet-fast}.json.
+
+## Rejected experiments / remaining work
+
+Generic small-lane resident-index bypass had mixed/worse dense paint results and was reverted. Constant-stride C lookup did not lower measured IRQ cost; only the bounded packet-copy helper did. More expensive cache preparation is not automatically an audio win: compiled16 lowered delay but had mixed interval jitter. An apparent missing last cable note was an unfinished host IRQ at capture cutoff; tests now drain through both CPUs' interrupt completion and TX idle.
+
+Remaining source delay occurs within the SAME timer IRQ. Local commit?MS lookup costs~1.3ms normally/~2.7ms at the loop boundary before lookup itself; no clock-epoch slip. Do not put the MS synth before local audio and silently delay master voices to improve its relative number. Hardware listening/editing approval remains outstanding for this pair. No master scheduler redesign, experimental synth FX expansion or external sync work is in this checkpoint.
+
+---
+
+# Historical checkpoint (superseded; retain as experiment history)
+
 # LIVELINKREWORK ? development status (2026-10-25)
 
 Main and the published ROM remain protected at 9e04d59. All experiments are in this worktree. No user emulator or save may be closed, replaced or modified by automated tests. Use null-window tests or minimized independent emulator copies. Preserve local editing performance; whole-song cold preparation is not an acceptable live-editing benchmark.

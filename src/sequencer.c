@@ -223,6 +223,9 @@ uint8_t seq_twink_catchup(uint16_t ticks) BANKED;
 void seq_frame(void) BANKED {uint8_t c,expired,boundary,budget=4;uint16_t ticks,left,slice,advance,over;if(!seqplaying||seqservicing)return;seqservicing=1;editbuffer_reading=editbuffer_active();
  __critical {ticks=seqticks;seqticks=0;}
  if(syncmode&&syncmode!=SYNC_TWINK&&!syncslave)ticks=sync_advance(ticks);
+ /* Direct notes already fired on the timer. Retire only proven autonomous
+    bookkeeping; all edited/unsupported lanes retain the regular path. */
+ if(syncmode==SYNC_TWINK&&seq_twink_catchup(ticks)){seq_next_deadline();editbuffer_reading=0;seqservicing=0;return;}
 
  while(ticks&&seqplaying){
   slice=ticks>128?128:ticks;{uint16_t wait=eval_arp_wait();if(wait<slice)slice=wait;}left=seqclock>=seqthreshold?0:seqthreshold-seqclock;advance=slice*seqbpm;boundary=advance>=left;

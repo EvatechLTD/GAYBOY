@@ -4,6 +4,9 @@
 #include "smooth_playback.h"
 #include "mixer_shared.h"
 #include "twink_schedule.h"
+#include "song_mode.h"
+#include "song_link.h"
+#include "mod_bypass.h"
 extern uint16_t seqwholeunits,seqclock;
 extern __at (0xAC6A) uint16_t seqcachedbpm;
 extern __at (0xAC6C) uint16_t seqstepunits;
@@ -53,7 +56,8 @@ uint8_t seq_top_entry(void) BANKED {uint8_t col=seqcursor[seqtrack]-seqbase;uint
 
 extern uint8_t editbuffer_ready,editbuffer_valid,editbuffer_reading;
 extern volatile uint8_t drum_irq_active;
-extern uint8_t midi_launch_enabled,seqrecordtrack,arp_active_mask;
+extern uint8_t midi_launch_enabled,seqrecordtrack,arp_active_mask,eval_lfousers,eval_envusers;
+extern volatile uint8_t editirq_enabled,editirq_running;
 extern volatile uint8_t padsampled;
 uint8_t editirq_owned(uint8_t c) NONBANKED;
 uint8_t arp_irq_valid(uint8_t c) NONBANKED;
@@ -62,16 +66,18 @@ void eval_seq_phase_add(uint16_t phase) BANKED;
 /* Already-executed IRQ notes must not be replayed as foreground catch-up.
    This path only advances the presentation/transport bookkeeping when every
    populated local lane has a proven autonomous owner and no handoff is due. */
+extern uint8_t eval_chordnext[3];
 static uint8_t twink_autonomous(void){
  uint8_t c;
- if(!seqplaying||seqbpm<30||seqbpm>240||syncmode!=SYNC_TWINK||!twink_scheduled||!twink_v2||twink_reply==0xD4||twink_reply==0xD5||!editbuffer_valid||editbuffer_ready||seqirqdirty||
+ if(!seqplaying||seqbpm<30||seqbpm>240||syncmode!=SYNC_TWINK||!twink_scheduled||!editbuffer_valid||editbuffer_ready||seqirqdirty||
     monomode||polymode||seqmode||waveengine==3||seqswing!=50||seqrecordtrack!=255||
-    mx.pending!=255||midi_launch_enabled||(page==18&&!navopen&&mx.focus>=30&&mx.focus<35&&(padsampled&J_A)))return 0;
+    mx.pending!=255||midi_launch_enabled||song_playing||song_link_active||(!mod_bypass&&(eval_lfousers||eval_envusers))||(page==18&&!navopen&&mx.focus>=30&&mx.focus<35&&(padsampled&J_A)))return 0;
+ if(seqeventcounts[4]||(seqeventcounts[5]&&(!(editirq_enabled&8)||!editirq_running)))return 0;
  for(c=0;c<SEQ_TRACKS;c++)if((c<3||c>=5)&&!seqlength[c])return 0;
  for(c=0;c<3;c++){
   if(seqgateleft[c])return 0;
   if(arp_active_mask&(1<<c)){
-   if(!arp_irq_valid(c)||evalpatch[c][EV_CLOCK]||evalpatch[c][EV_DIV]!=4||evalpatch[c][EV_TIMING]||!arp_irq_continue(c))return 0;
+   if(!arp_irq_valid(c)||evalpatch[c][EV_CLOCK]||evalpatch[c][EV_DIV]!=4||evalpatch[c][EV_TIMING]||eval_chordnext[c]==255)return 0;
   }
   if(!seq_event_count(c))continue;
   if(editirq_owned(c)||(arp_active_mask&(1<<c)))continue;
@@ -90,7 +96,15 @@ uint8_t seq_twink_catchup(uint16_t ticks) BANKED {
  oldclock=seqclock;low=(uint16_t)(uint8_t)ticks*seqbpm;
  high=(ticks>>8)*seqbpm+(low>>8)+(oldclock>>8);
  low=(low&255)+(oldclock&255);high+=low>>8;
- steps=high/60;seqclock=((high-steps*60)<<8)|(uint8_t)low;
+ steps=high/60;delta=((high-steps*60)<<8)|(uint8_t)low;
+ /* Foreground must visit every pending chord onset/end. Native mono/drum/MS
+    owners can retire freely; an ARP batch stops before its next logical event. */
+ for(c=0;c<3;c++)if(arp_active_mask&(1<<c)){
+  length=seqlength[c];pos=eval_chordnext[c]?eval_chordnext[c]:length;
+  pos=pos>seqposition[c]?pos-seqposition[c]:length-seqposition[c]+pos;
+  if(steps>=pos)return 0;
+ }
+ seqclock=delta;
  delta=seqclock>=oldclock?seqclock-oldclock:seqclock+15360U-oldclock;
  eval_seq_phase_add(delta);
  if(steps){

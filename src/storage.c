@@ -128,7 +128,7 @@ void editbuffer_service(void) BANKED {uint8_t e[4],old[7],hash,mask,*dst,*bits,*
  mask=1U<<(hash&7);
  dst=(uint8_t *)(eb_target+at*7);bits=(uint8_t *)(eb_target+EB_BITS+(hash>>3));head=(uint8_t *)(eb_target+EB_HEAD+hash);
  __critical{SWITCH_RAM_MBC5(2);memcpy(dst,e,4);dst[4]=f;dst[5]=f>>8;dst[6]=amp;
- if((*bits&mask)&&eb_buildtrack<4&&e[1]>=*(uint8_t *)(eb_target+(uint16_t)*head*7+1)){uint8_t *link=(uint8_t *)(eb_target+EB_NEXT+*head);*(uint8_t *)(eb_target+EB_NEXT+at)=*link==*head?(uint8_t)at:*link;*link=at;}
+ if((*bits&mask)&&((eb_buildtrack<4&&e[1]>=*(uint8_t *)(eb_target+(uint16_t)*head*7+1))||(eb_buildtrack==TWINK_TRACK&&e[1]>*(uint8_t *)(eb_target+(uint16_t)*head*7+1)))){uint8_t *link=(uint8_t *)(eb_target+EB_NEXT+*head);*(uint8_t *)(eb_target+EB_NEXT+at)=*link==*head?(uint8_t)at:*link;*link=at;}
  else{*(uint8_t *)(eb_target+EB_NEXT+at)=(*bits&mask)?*head:(uint8_t)at;*head=at;}*bits|=mask;SWITCH_RAM_MBC5(0);}
  }while(--budget);
  if(!eb_left){longest=0;eb_boundarytrack=255;for(hash=0;hash<7;hash++)if((editbuffer_valid?eb_counts[hash]:seqeventcounts[hash])&&seqlength[hash]>longest){longest=seqlength[hash];eb_boundarytrack=hash;}eb_building=0;editbuffer_ready=1;}
