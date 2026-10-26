@@ -19,4 +19,5 @@ void twink_schedule_stop(void) BANKED;
 void twink_schedule_service(void) BANKED;
 uint8_t twink_v2_clock(void) NONBANKED;
 void twink_v2_irq(void) BANKED;
+void twink_schedule_changed(void) BANKED;
 #endif

@@ -34,7 +34,9 @@ void stop(uint8_t c) BANKED {
  else if(c==2){if(waveengine)enginestop();NR30_REG=0;}
  else NR42_REG=0;
 }
-void panic_audio(void) BANKED{twink_panic();uint8_t c;seqapending=seqamoved=0;seqplaying=0;seqticks=0;drum_stop();exp_reset();monocount=monodown=0;modreset();memset(keycount,0,4);voice_reset();for(c=0;c<4;c++){active[c]=0;stop(c);held[c]=255;sustain[c]=0;}NR12_REG=NR22_REG=0;}
+extern volatile uint8_t drum_irq_active;
+void arp_irq_reset(void) NONBANKED;
+void panic_audio(void) BANKED{twink_panic();uint8_t c;seqapending=seqamoved=0;seqplaying=0;if(syncmode==1&&syncarmed){sync_transport(0);drum_irq_active=0;arp_irq_reset();}seqticks=0;drum_stop();exp_reset();monocount=monodown=0;modreset();memset(keycount,0,4);voice_reset();for(c=0;c<4;c++){active[c]=0;stop(c);held[c]=255;sustain[c]=0;}NR12_REG=NR22_REG=0;}
 extern uint8_t seqgate[7];
 extern uint16_t seqcachedbpm,seqdeadline;
 uint8_t experimental_mode=1;

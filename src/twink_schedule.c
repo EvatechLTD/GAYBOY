@@ -15,13 +15,12 @@ __at (0xFFEC) volatile uint16_t twink_last_anchor;
 __at (0xFFEE) volatile uint8_t twink_anchor_second;
 __at (0xFFEF) volatile uint8_t twink_anchor_pending;
 static uint8_t session,generation,scheduled_slot,probing,warming;
-static uint16_t source_generation,signature,scheduled_bpm,service_clock;
+static uint16_t source_length,scheduled_bpm,service_clock;
 static uint16_t step_units;
 static uint8_t step_remainder,step_error;
 static uint16_t scan_clock;
 static uint8_t scan_error;
 static uint32_t scan_step,play_step;
-extern uint16_t pattern_generation;
 extern uint8_t editbuffer_reading;
 extern volatile uint8_t padread,padwrite,padsampled;
 extern volatile uint8_t twink_guard,twink_ended_div;
@@ -53,12 +52,6 @@ static uint8_t frame(uint8_t type,const uint8_t *payload,uint8_t n){
  bytes[length+2]=crc;
  if(type==3&&twink_staging){uint8_t w=wr;if((uint8_t)(rd-w-1)<length+3)return 0;for(i=0;i<length+3;i++){rx[w]=bytes[i];w++;}__critical{wr=w;}return 1;}
  return twink_queue_message(bytes,length+3);
-}
-static uint16_t fingerprint(void){uint16_t i,h=seqlength[5]^seqeventcounts[5];uint8_t e[4],j,reading=editbuffer_reading;
- editbuffer_reading=0;
- h^=(uint16_t)audible()<<15;
- for(i=0;i<seqeventcounts[5];i++){seq_event_get(5,i,e);for(j=0;j<4;j++)h=(h<<5)^(h>>11)^e[j];}
- editbuffer_reading=reading;return h;
 }
 static uint8_t source_note(uint8_t step,uint8_t *e){uint8_t found,reading=editbuffer_reading;editbuffer_reading=0;found=seq_note_event(5,step,e);editbuffer_reading=reading;return found;}
 static uint16_t now(void){uint16_t n;uint8_t fraction,delta;
@@ -108,7 +101,7 @@ uint8_t twink_schedule_start(void) BANKED {uint8_t b[2],poll=0xF9;uint16_t since
  twink_reply=0xD1;scan_step=play_step=0;step_units=15360U/seqbpm;step_remainder=15360U%seqbpm;
  scan_clock=0;scan_error=seqbpm/2;
  service_clock=(15360U+seqbpm/2)/seqbpm;step_error=(15360U+seqbpm/2)%seqbpm;scheduled_slot=mx.slot|(audible()?128:0);scheduled_bpm=seqbpm;
- source_generation=pattern_generation;signature=fingerprint();
+ source_length=seqlength[5];
  __critical{twink_clock=twink_clock_fraction=0;twink_clock_div=DIV_REG;twink_last_anchor=0;twink_anchor_pending=0;}
  b[0]=seqbpm>>7;b[1]=seqbpm&127;
  since=frame_time();while(!frame(2,b,2)){sync_control_service();if((uint16_t)(frame_time()-since)>120)goto failed;}
@@ -141,8 +134,12 @@ failed:
 /* scheduled_slot low3 bits identify the pad; bit7 remembers audibility,
    bit6 coalesces an edit while its old immutable prefix retires. No new RAM. */
 #define PLAN_SLOT 7U
+#define PLAN_DIRTY 32U
 #define PLAN_EDIT 64U
 #define PLAN_AUDIBLE 128U
+/* Only MS note mutations invalidate its forecast. Local lane edits and
+   patch UI changes must not scan or rebuild this additional channel. */
+void twink_schedule_changed(void) BANKED {if(twink_scheduled)scheduled_slot|=PLAN_DIRTY;}
 static void advance_play_clock(uint16_t current){uint16_t error;
  while((int16_t)(current-service_clock)>=0){play_step++;service_clock+=step_units;error=(uint16_t)step_error+step_remainder;if(error>=seqbpm){error-=seqbpm;service_clock++;}step_error=error;}
 }
@@ -151,31 +148,30 @@ static void warm_source_index(uint8_t *e){uint16_t length=seqlength[5];uint8_t s
  step=!(length&(length-1))?((uint8_t)play_step&(uint8_t)(length-1)):play_step%length;
  source_note(step,e);
 }
-void twink_schedule_service(void) BANKED {uint16_t current,hash,error,cutoff,next;uint8_t b[4],state,i,r,saved;uint32_t cutstep;
+void twink_schedule_service(void) BANKED {uint16_t current,error,cutoff,next;uint8_t b[4],state,i,r,saved;uint32_t cutstep;
  if(!twink_v2||!twink_scheduled||warming||!seqplaying)return;
  current=now();state=mx.slot|(audible()?PLAN_AUDIBLE:0);
- if((int16_t)(current-service_clock)<0&&scan_step>=play_step+16&&source_generation==pattern_generation&&scheduled_slot==state&&scheduled_bpm==seqbpm)return;
+ if((int16_t)(current-service_clock)<0&&scan_step>=play_step+16&&source_length==seqlength[5]&&scheduled_slot==state&&scheduled_bpm==seqbpm)return;
  if(scheduled_bpm!=seqbpm){step_units=15360U/seqbpm;step_remainder=15360U%seqbpm;service_clock=(uint16_t)(((play_step+1)*15360UL+seqbpm/2)/seqbpm);step_error=((play_step+1)*15360UL+seqbpm/2)%seqbpm;}
  advance_play_clock(current);
  /* Let an active note gesture finish before replacing its forecast. Existing
     immutable events and ongoing source refill remain available meanwhile. */
  if((scheduled_slot&(PLAN_SLOT|PLAN_AUDIBLE))==state&&scheduled_bpm==seqbpm&&page==8&&seqtrack==5&&
     (padsampled&(J_A|J_B))&&(padsampled&(J_LEFT|J_RIGHT|J_UP|J_DOWN))){fill(play_step+16);return;}
- if(source_generation!=pattern_generation||(scheduled_slot&(PLAN_SLOT|PLAN_AUDIBLE))!=state||scheduled_bpm!=seqbpm){
-  hash=fingerprint();
+ if((scheduled_slot&PLAN_DIRTY)||source_length!=seqlength[5]||(scheduled_slot&(PLAN_SLOT|PLAN_AUDIBLE))!=state||scheduled_bpm!=seqbpm){
   if((scheduled_slot&(PLAN_SLOT|PLAN_AUDIBLE))!=state||scheduled_bpm!=seqbpm){
    /* Mute/transport changes retain their separate immediate control path. */
    b[0]=(generation+1)&127;if(!b[0])b[0]=1;b[1]=audible()?0:1;
    if(!frame(4,b,b[1]?2:1))return;
    event_flush();generation=b[0];scan_step=play_step+1;scan_clock=service_clock;scan_error=step_error;
-   signature=hash;scheduled_slot=state;scheduled_bpm=seqbpm;
-  }else if(hash!=signature){
-   signature=hash;
+   scheduled_slot=state;scheduled_bpm=seqbpm;
+  }else {
+   scheduled_slot&=~PLAN_DIRTY;
    if(twink_v2>=3){scheduled_slot|=PLAN_EDIT;warm_source_index(b);}
    /* Older peers cannot retain a cutoff prefix. Keep already-admitted music
       rather than flush its imminent deadlines; later fills read edits. */
   }
-  source_generation=pattern_generation;
+  source_length=seqlength[5];
  }
  if(scheduled_slot&PLAN_EDIT){
   /* Finish and acknowledge any old wire event before inspecting the FIFO.

@@ -83,8 +83,13 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
 
  assert(report.channels[3].hits.every(n=>n>100),'Not enough drum attacks');
  if(linked&&!process.argv.includes('--measure-only')){for(const c of report.channels.filter(c=>c.hits[0]>3)){if(!process.argv.includes('--slave-save')||c.channel===3)assert(Math.abs(c.skewMinMs)<1.5&&Math.abs(c.skewMaxMs)<1.5,'Inter-device onset skew');assert(c.masterMaxGridMs<1.3,'Master timing regression');assert(c.slaveMaxGridMs<1.3,'Slave timing regression');}}
- chord(master,'select','a');until(()=>!v(master,'seqplaying'));
+ chord(master,'select',process.argv.includes('--panic-stop')?'start':'a');until(()=>!v(master,'seqplaying'));
  if(linked)until(()=>!v(1-master,'seqplaying'));else chord(1-master,'select','a');
+ if(process.argv.includes('--panic-stop')){
+  run(120);assert([0,1].every(i=>!v(i,'seqplaying')&&!v(i,'syncarmed')),'Panic must stop and disarm both peers');
+  assert([0,1].every(i=>!v(i,'drum_irq_active')&&!v(i,'arpirq_enabled')),'Panic must retire both audio schedulers');
+  console.log('PASS master Start+Select panic stops and disarms slave');
+ }
 
  console.log('PASS real-cable live-pattern start, actual attack measurement and shared stop');
 })().catch(e=>{console.error(e);process.exitCode=1;});
