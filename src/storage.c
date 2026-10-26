@@ -279,3 +279,6 @@ uint16_t seq_duration_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4
 uint8_t seq_note_set(uint8_t c,uint8_t step,uint8_t note,uint8_t velocity,uint16_t duration) BANKED {uint16_t i;uint8_t e[4];if(c==3||(c>=4&&!(c==TWINK_TRACK&&syncmode==SYNC_TWINK))||duration>256)return 0;i=find(c,step,note?note:seqpitch[c]+1);if(!note){if(i!=65535U)seq_event_erase(c,i);return 1;}e[0]=step;e[1]=note;e[2]=velocity;e[3]=duration;return seq_event_put(c,i,e);}
 void storage_sorted_dirty(void) BANKED {indexvalid=0;} void storage_sorted_install(uint8_t mask) BANKED {(void)mask;}
 void storage_sorted_prepare(void) BANKED {prepare_index();} void storage_cursor_reset(void) BANKED {}
+
+uint8_t editbuffer_record_index(uint8_t c,uint8_t relative) BANKED {return eb_offsets[c]+relative;}
+void editbuffer_record_read(uint8_t index,uint8_t *out) BANKED {uint8_t ie=IE_REG;IE_REG=0;SWITCH_RAM_MBC5(2);memcpy(out,(const void *)(editbuffer_base+(uint16_t)index*7),7);SWITCH_RAM_MBC5(0);IE_REG=ie;}
