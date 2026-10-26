@@ -2,7 +2,27 @@
 
 Main and the published ROM remain protected at 9e04d59. All experiments are in this worktree. No user emulator or save may be closed, replaced or modified by automated tests. Use null-window tests or minimized independent emulator copies. Preserve local editing performance; whole-song cold preparation is not an acceptable live-editing benchmark.
 
-## Current checkpoint: basic chorus, four-note 1/16 arp (2026-10-25)
+## Qualified basic-arp checkpoint (2026-10-25)
+
+This is a private branch test pair, not a main/site release or universal link qualification. Latest source commit5e25464, frozen `build/GAYBOY-TWINK-V4-PREFIX2-WIP.gb/.noi` SHA25661161c74fc1d9eeaeaf3c54538394d2645e535f628bb69ab9805fbb1e018ca5e. Receiver frozen `G:/DEVELOPMENT/MONOSIMP-TWINKTIMING-V2/build/native-v4-value-invalidation/MONOSIMP.gb/.noi/.map` SHA2563dfc3a9991ad1f9a7d30ffac19480d41e27fd77365c4948d3d3c89a447bbfbb0. Both use existing32KB save layout; no user save/session was touched.
+
+Accepted scope: native P1/P2/Wave plus real chorus8, ordinary receiver mode0. Four-note1/16 timing comparison uses a held-chord internal P2 live arp and the matching written-out MS pitch stream. MS currently selects the lowest simultaneous note; no held-chord/receiver-arp protocol has been added. This distinction must be explained to users.
+
+The actual receiver control-edit fix is targeted invalidation: chorus/vibrato/rate and ordinary value edits were unnecessarily rebuilding61 routing/phase caches synchronously (~82ms), starving upcoming raw note preparation at240BPM. New lightweight value invalidation retains unchanged dependency/phase/moving caches and forces evaluated values to refresh. Full invalidation remains for routing/presets and shape/global-base changes affecting membership.104 comparisons across26 edits/plain+routed contexts check all61values+27effects exactly. No deferred/disabled modulation, shortened wire guard or lower musical clock resolution was used. The apparent hot-bank fix was phase-sensitive and is rejected as the explanation.
+
+Final evidence, real emulated cable, actual APU launches:
+
+- Four previously fragile receiver-control alignments0/4/8/12:392/391/391/391 matching remote/kick/P2 attacks, no late/rejected/wire faults, exact four-pitch order and actual packet-to-APU frequency agreement.
+- Mixed240BPM/+1000ppm run, chorus/level edits and navigation on both machines followed by4800 steady frames:1957/1957/1957 attacks, zero late/rejected/CRC/session/overflow/unarmed/abort faults, one16-bit clock wrap. `MONOSIMP-TWINKTIMING-V2/build/v4-prefix2-value-controls-nav-drift240.json`.
+- Actual remote note spacing after two startup notes:62.180..63.018ms versus internalP2 61.357..63.755ms, ideal62.5ms. This meets timing-consistency baseline, not identical phase: remote median~3.87ms ahead ofP2 (range2.79..4.53ms ahead); first P2 attack trails remote by32.2ms in this fixture. See matching `-comparison.json`. Do not hide startup by claiming steady-only figures cover it. Ordinary continuous modulation also writes APU registers; select the first positive attack after each timed note application rather than counting every control-driven register trigger as a new note.
+- Six controlled master MS edits at120/240 and actual plot/move/resize remain playing, changed pitches heard, changed duration2 verified in compact wire frames. Continuity-safe future-cutoff edits still take time: on the final worker fixture, cutoff~0.72..0.81sec after edit; changed-step occurrence~0.75..0.77sec at240/~1.26..1.32sec at120. Not immediate local editing.
+- Actual near-wrap edit: sourceclock65208, futurecutoff448,1116/1116 attacks, changedpitch heard afterwrap, no late/rejected/cutoff/wire errors. `build/v4-prefix2-wrap-edit240.json`. Optional test `TWINK_MASTER_PRE_FRAMES` changes pre-edit wait; default60 retained.
+- Finalv4 lifecycle and old477receiver/v3 negotiation+masteredit fallback pass; old peer128/128 attacks and changed pitch heard. Receiver standalone patch/battery, Wave/sweep, modulation/MIDI and14-page UI regressions pass. Local normal LFO/Smooth, native link and linkedSmooth evidence is below; no main/site update occurred.
+
+Still OPEN: physical hardware qualification of this new pair; TWINK live tempo/pad/mute transition preparation; MS held-chord arp feature; cold first-attack grouping/steady channel offset; remaining~1..3ms native screen-on follower timing and slow full page transitions. Linked Smooth remains the separately qualified strict submillisecond native subset. Do not imply all experimental Monosimp FX, PCM or arbitrary modulation were qualified by this basic-patch result.
+
+## Earlier v4 checkpoint (superseded)
+
 
 This section supersedes earlier experimental receiver-mode and source UI conclusions below. Work remains on LIVELINKREWORK; main, website and user saves are unchanged.
 
