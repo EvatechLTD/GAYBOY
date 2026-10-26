@@ -5,6 +5,7 @@
 #include "mod_bypass.h"
 #include "lfo_irq.h"
 #include "mixer_shared.h"
+#include "arp_prefetch.h"
 
 extern uint8_t arpfirstnotes[3][4],arpfirstvel[3][4],arpindex[3],arpnote[3],arpcount[3],tablemode[4],seqrecordtrack;
 extern uint16_t arpfirstfreq[3][4],seqclock;
@@ -12,8 +13,8 @@ extern uint32_t arpclock[3];
 extern uint16_t pattern_generation;
 void editirq_wave_capture(uint8_t *out) BANKED;
 
-/* The timer only reads prepared packets. No ROM banks, SRAM banks, note
-   searches, divisions or synthesis dispatch are involved in an attack. */
+/* Regular attacks read prepared packets. Chord handoff calls bounded banked
+   code to copy prepared WRAM packets; no note scans or divisions at deadline. */
 volatile uint8_t arpirq_enabled;
 static volatile uint8_t lost_ownership;
 uint16_t arpirq_attacks;
@@ -30,15 +31,88 @@ static uint16_t prepared_bpm[3];
 static uint8_t prepared_notes[3][4],prepared_vel[3][4],prepared_param[3][26],prepared_order[3],prepared_count[3],prepared_level[3],prepared_retrigger[3],prepared_custom;
 static uint8_t prepared_eval[3][7];
 static uint16_t prepared_length[3];
+uint8_t arp_irq_valid(uint8_t c) NONBANKED;
+/* Four-note deterministic orders use at most six packets. The two unused
+   slots hold one future chord descriptor per voice, without another buffer. */
+#define FUTURE(c) ((uint8_t *)(packets[c]+6))
+#define FUTURE_FLAGS(c) (*(volatile uint8_t *)&packets[c][7][5])
+#define FUTURE_READY 1U
+#define FUTURE_HANDED 2U
+#define FUTURE_BLOCKED 4U
+extern uint16_t editbuffer_swaps;
+uint8_t editbuffer_record_index(uint8_t c,uint8_t relative) BANKED;
+void editbuffer_record_read(uint8_t index,uint8_t *out) BANKED;
+uint8_t arp_irq_future_needed(uint8_t c,uint8_t target) BANKED {
+ uint8_t *f=FUTURE(c),flag=FUTURE_FLAGS(c);
+ if(continuous[c]||repeating[c]||reset_loop[c]||(pattern_mask&(1<<c))||!arp_irq_valid(c)||!remaining[c]||evalpatch[c][EV_CLOCK]||!evalpatch[c][EV_RETRIGGER]||unit_shift[c]||sequence_length[c]>6)return 0;
+ if(flag&FUTURE_HANDED)return 0;
+ return !(flag&(FUTURE_READY|FUTURE_BLOCKED))||f[4]!=target||(f[6]|((uint16_t)f[7]<<8))!=editbuffer_swaps||(f[8]|((uint16_t)f[9]<<8))!=pattern_generation;
+}
+uint8_t arp_irq_future_stage(uint8_t c,uint8_t target,uint8_t next,uint8_t count,const uint8_t *indices,uint16_t swaps,uint16_t gen,uint8_t *cache) BANKED {
+ uint8_t i,rank,length,order=prepared_order[c],*f=FUTURE(c),ready=0,e[7],*packet;uint16_t ranks=0;uint16_t steps,bpm=seqbpm,whole,fraction;uint32_t span;
+ FUTURE_FLAGS(c)=0;
+ steps=next>target?next-target:seqlength[c]-target+next;span=(uint32_t)steps*15360U;if(span/bpm>=65535UL)count=0;
+ if(!count||count>4){f[4]=target;f[6]=swaps;f[7]=swaps>>8;f[8]=gen;f[9]=gen>>8;FUTURE_FLAGS(c)=FUTURE_BLOCKED;return 0;}
+ whole=span/bpm;fraction=span%bpm;
+ for(i=0;i<count;i++){
+  editbuffer_record_read(editbuffer_record_index(c,indices[i]),e);packet=cache+i*6;
+  packet[0]=e[1]-1;packet[1]=e[2];packet[2]=e[4];packet[3]=e[5];packet[4]=e[6]<<4;packet[5]=i;
+ }
+ ((EvalChord *)cache)->onset=next;((EvalChord *)cache)->duration=65535U;
+ length=count<2?1:(order==2||order==4||order==10)?count*2-2:count;
+ for(i=0;i<length;i++){
+  rank=i;if(order==1)rank=count-1-i;
+  else if(order==2||order==4||order==10){if(rank>=count)rank=count*2-2-rank;if(order==4)rank=count-1-rank;else if(order==10)rank=rank&1?count-1-(rank>>1):rank>>1;}
+  else if(order==5)rank=rank&1?count-1-(rank>>1):rank>>1;
+  else if(order==6)rank=rank&1?(count-1)/2+(rank+1)/2:(count-1)/2-rank/2;
+  ranks|=(uint16_t)rank<<(i*2);
+ }
+ f[0]=(uint16_t)cache;f[1]=(uint16_t)cache>>8;f[2]=ranks;f[3]=ranks>>8;
+ f[4]=target;f[5]=count;f[6]=swaps;f[7]=swaps>>8;f[8]=gen;f[9]=gen>>8;f[10]=next;
+ __critical{if(swaps==editbuffer_swaps&&gen==pattern_generation&&prepared_bpm[c]==bpm&&seqbpm==bpm&&remaining[c]&&!(FUTURE_FLAGS(c)&FUTURE_HANDED)){loop_whole[c]=whole;loop_fraction[c]=fraction;FUTURE_FLAGS(c)=FUTURE_READY;ready=1;}}
+ return ready;
+}
+/* Foreground reconciles its logical boundary without replaying the attack
+   that the timer already emitted. It must not reset the live IRQ index. */
+uint8_t arp_irq_handoff_seen(uint8_t c,uint8_t step) BANKED {
+ uint8_t i,*cache,*f=FUTURE(c),flag=FUTURE_FLAGS(c);
+ if(!(flag&FUTURE_HANDED)||f[4]!=step)return 0;
+ cache=(uint8_t *)(f[0]|((uint16_t)f[1]<<8));
+ for(i=0;i<f[5];i++){prepared_notes[c][i]=cache[i*6];prepared_vel[c][i]=cache[i*6+1];}
+ return (f[6]|((uint16_t)f[7]<<8))==editbuffer_swaps&&(f[8]|((uint16_t)f[9]<<8))==pattern_generation?f[5]:(f[5]|128U);
+}
+void arp_irq_handoff_finish(uint8_t c) BANKED {if(FUTURE_FLAGS(c)&FUTURE_HANDED)FUTURE_FLAGS(c)=0;}
+/* A snapshot swap after a real IRQ attack must not replay an unchanged chord.
+   Compare the newly scanned chord with what actually sounded. */
+uint8_t arp_irq_handoff_matches(uint8_t c,const uint8_t *bits,const uint8_t *vel,uint8_t count) BANKED {
+ uint8_t i,n;if(count!=prepared_count[c]||memcmp(vel,prepared_vel[c],count))return 0;
+ for(i=0;i<count;i++){n=prepared_notes[c][i];if(!(bits[n>>3]&(1U<<(n&7))))return 0;}return 1;
+}
+static uint16_t next_attack(uint8_t c) NONBANKED;
+/* Rare chord-boundary work is bounded: read already compiled note packets,
+   never scan resident notes or perform synthesis/division here. No EI. */
+uint8_t arp_irq_handoff_commit(uint8_t c,uint16_t over) BANKED {
+ uint8_t i,*p,*f=FUTURE(c),count=f[5],length,order=prepared_order[c],*cache;uint16_t phase=loop_residual[c],wait;
+ if(!(FUTURE_FLAGS(c)&FUTURE_READY)||(f[6]|((uint16_t)f[7]<<8))!=editbuffer_swaps||(f[8]|((uint16_t)f[9]<<8))!=pattern_generation||prepared_bpm[c]!=seqbpm)return 0;
+ FUTURE_FLAGS(c)=FUTURE_HANDED;cache=(uint8_t *)(f[0]|((uint16_t)f[1]<<8));
+ length=count<2?1:(order==2||order==4||order==10)?count*2-2:count;
+ memcpy(packets[c],cache,count*6);
+ if(mx.level[c]!=127){p=(uint8_t *)packets[c];for(i=0;i<count;i++,p+=6){uint16_t scaled=(uint16_t)p[1]*mx.level[c]+63;p[1]=(scaled>>7)+((uint8_t)((scaled&127)+(scaled>>7))>=127);}}
+ packets[c][4][0]=f[2];packets[c][4][1]=f[3];packets[c][4][5]=255;
+ prepared_count[c]=count;sequence_length[c]=length;arpindex[c]=length==1?0:1;
+ wait=loop_whole[c];if(loop_fraction[c]>loop_residual[c]){wait++;loop_residual[c]+=prepared_bpm[c]-loop_fraction[c];}else loop_residual[c]-=loop_fraction[c];remaining[c]=wait>over?wait-over:0;
+ arp_phase[c]=phase;wait=next_attack(c);attack_wait[c]=wait>over?wait-over:1;
+ return 1;
+}
 static uint16_t lasttick[3];
 static volatile uint16_t timer_clock,timer_wait=65535U;
 
 uint8_t arp_irq_owned(uint8_t c) NONBANKED {return (arpirq_enabled|lost_ownership)&(1<<c);}
-void arp_irq_cancel(uint8_t c) NONBANKED;
+void arp_irq_cancel(uint8_t c) BANKED;
 /* A changed snapshot ends automatic future looping, retaining the current
    chord until its natural gate/onset. Foreground will admit the edited chord. */
 void arp_irq_pattern_changed(uint8_t c) NONBANKED {
- uint8_t bit=1<<c;if(!(pattern_mask&bit))return;
+ uint8_t bit=1<<c;FUTURE_FLAGS(c)&=FUTURE_HANDED;if(!(pattern_mask&bit))return;
  __critical{pattern_mask&=~bit;continuous[c]=repeating[c]=reset_loop[c]=0;}
 }
 uint8_t arp_irq_valid(uint8_t c) NONBANKED {return power&&(seqplaying||smooth_playback_preparing)&&seqswing==50&&SYNC_EVENT_IRQ&&(arpirq_enabled&(1<<c))&&generation[c]==pattern_generation&&prepared_bpm[c]==seqbpm&&!bend[c];}
@@ -69,7 +143,7 @@ uint8_t arp_irq_continue(uint8_t c) BANKED {
     (c==2&&(prepared_custom!=custom||(custom&&memcmp(wave_image,customwave,16)))))return 0;
  generation[c]=pattern_generation;return 1;
 }
-void arp_irq_cancel(uint8_t c) NONBANKED {pattern_mask&=~(1<<c);if(!(arpirq_enabled|lost_ownership))return;if(c<3){__critical{arpirq_enabled&=~(1<<c);lost_ownership&=~(1<<c);}}}
+void arp_irq_cancel(uint8_t c) BANKED {FUTURE_FLAGS(c)=0;pattern_mask&=~(1<<c);if(!(arpirq_enabled|lost_ownership))return;if(c<3){__critical{arpirq_enabled&=~(1<<c);lost_ownership&=~(1<<c);}}}
 void arp_irq_reset(void) NONBANKED {__critical{arpirq_enabled=lost_ownership=pattern_mask=0;timer_wait=65535U;}}
 
 static uint8_t eligible(uint8_t c,uint16_t period,uint16_t scale){uint8_t *p=param[c];
@@ -83,6 +157,7 @@ static uint8_t eligible(uint8_t c,uint16_t period,uint16_t scale){uint8_t *p=par
 uint8_t arp_irq_prepare(uint8_t c,uint32_t requested,uint16_t scale,uint16_t steps) BANKED {
  uint8_t count=arpcount[c],order=evalpatch[c][EV_ORDER],length,i,rank,*packet,*v=param[c],bit=1<<c;
  uint16_t amp,f,wait,whole,fraction,residual,barwhole,barfraction,barresidual,period,pending,input_scale=scale;uint8_t keep,shift=0,pattern=0,e[4];uint16_t gatewindow;uint32_t left,span,original=requested;
+ if((arpirq_enabled&bit)&&(FUTURE_FLAGS(c)&FUTURE_HANDED))return 1;
  while(requested>65535UL&&!(scale&1)&&!(requested&1)){requested>>=1;scale>>=1;shift++;}
  if(requested>65535UL){arp_irq_cancel(c);return 0;}period=requested;
  if(arp_irq_valid(c)&&periods[c]==period&&scales[c]==scale)return 1;
@@ -92,6 +167,7 @@ uint8_t arp_irq_prepare(uint8_t c,uint32_t requested,uint16_t scale,uint16_t ste
  if((arpirq_enabled&bit)&&periods[c]==period&&scales[c]==scale&&prepared_bpm[c]==seqbpm&&prepared_length[c]==seqlength[c]&&!memcmp(prepared_eval[c],evalpatch[c]+1,7)&&prepared_count[c]==count&&prepared_order[c]==order&&prepared_level[c]==mx.level[c]&&prepared_retrigger[c]==evalpatch[c][EV_RETRIGGER]&&unit_shift[c]==shift&&
     !memcmp(prepared_notes[c],arpfirstnotes[c],count)&&!memcmp(prepared_vel[c],arpfirstvel[c],count)&&!memcmp(prepared_param[c],v,26)&&
     (c!=2||(prepared_custom==custom&&(!custom||!memcmp(wave_image,customwave,16))))){generation[c]=pattern_generation;return 1;}
+ FUTURE_FLAGS(c)=0;
  left=(uint32_t)steps*15360U;
  if(left<=seqclock)return 0;
  left=(left-seqclock+seqbpm-1)/seqbpm;
@@ -127,7 +203,7 @@ uint8_t arp_irq_prepare(uint8_t c,uint32_t requested,uint16_t scale,uint16_t ste
   }
  }
  memcpy(prepared_eval[c],evalpatch[c]+1,7);prepared_length[c]=seqlength[c];memcpy(prepared_notes[c],arpfirstnotes[c],count);memcpy(prepared_vel[c],arpfirstvel[c],count);memcpy(prepared_param[c],v,26);prepared_count[c]=count;prepared_order[c]=order;prepared_level[c]=mx.level[c];prepared_retrigger[c]=evalpatch[c][EV_RETRIGGER];if(c==2)prepared_custom=custom;
- __critical{memcpy(packets[c],stage_packets,length*6);memcpy(patches[c],stage_patch,6);if(c==2)memcpy(wave_image,stage_wave,16);lost_ownership&=~bit;periods[c]=period;scales[c]=scale;arp_phase[c]=residual;attack_wait[c]=wait;whole_ticks[c]=whole;fractions[c]=fraction;continuous[c]=keep;unit_shift[c]=shift;prepared_bpm[c]=seqbpm;repeating[c]=keep;remaining[c]=left;sequence_length[c]=length;generation[c]=pattern_generation;lasttick[c]=timer_clock;
+ __critical{memcpy(packets[c],stage_packets,length*6);if(length<5)packets[c][4][5]=0;memcpy(patches[c],stage_patch,6);if(c==2)memcpy(wave_image,stage_wave,16);lost_ownership&=~bit;periods[c]=period;scales[c]=scale;arp_phase[c]=residual;attack_wait[c]=wait;whole_ticks[c]=whole;fractions[c]=fraction;continuous[c]=keep;unit_shift[c]=shift;prepared_bpm[c]=seqbpm;repeating[c]=keep;remaining[c]=left;sequence_length[c]=length;generation[c]=pattern_generation;lasttick[c]=timer_clock;
   if(pattern){pattern_steps[c]=steps;pattern_mask|=bit;pattern_gate[c]=((uint32_t)steps*15360U+seqbpm-1)/seqbpm;remaining[c]=gatewindow;}else pattern_mask&=~bit;reset_loop[c]=keep&&evalpatch[c][EV_RETRIGGER];loop_wait[c]=left;loop_whole[c]=barwhole;loop_fraction[c]=barfraction;loop_residual[c]=barresidual;first_wait[c]=whole+(fraction!=0);first_residual[c]=fraction?scale-fraction:0;
   if(pattern&&gatewindow<wait)wait=gatewindow;if(left<wait&&(!repeating[c]||reset_loop[c]))wait=left;if(wait<timer_wait)timer_wait=wait;arpirq_enabled|=bit;}
  return 1;
@@ -147,7 +223,7 @@ void arp_irq_due(void) NONBANKED {uint8_t c,bit,i,*packet,*patch,index,vol,solos
    if(remaining[c]<=ticks){remaining[c]=0;active[c]=seqowned[c]=keycount[c]=0;
     if(c==0){NR12_REG=8;NR14_REG=128;}else if(c==1){NR22_REG=8;NR24_REG=128;}else NR30_REG=0;
    }else remaining[c]-=ticks;
-  }}else if(!repeating[c]){if(remaining[c]<=ticks){remaining[c]=0;continue;}remaining[c]-=ticks;}lasttick[c]=timer_clock;
+  }}else if(!repeating[c]){if(remaining[c]<=ticks){over=ticks-remaining[c];if(arp_irq_handoff_commit(c,over)){lasttick[c]=timer_clock;index=0;goto emit;}remaining[c]=0;continue;}remaining[c]-=ticks;}lasttick[c]=timer_clock;
   if(reset_loop[c]){
    if(ticks<loop_wait[c])loop_wait[c]-=ticks;
    else{
@@ -168,7 +244,7 @@ void arp_irq_due(void) NONBANKED {uint8_t c,bit,i,*packet,*patch,index,vol,solos
   index=arpindex[c];if(index>=sequence_length[c])index=0;
   arpindex[c]=index+1==sequence_length[c]?0:index+1;
 emit:
-  packet=packets[c][index];arpnote[c]=packet[5];
+  if(packets[c][4][5]==255){pitch=packets[c][4][0]|((uint16_t)packets[c][4][1]<<8);index=(pitch>>(index*2))&3;}packet=packets[c][index];arpnote[c]=packet[5];
   if(!packet[1]||(seqmuted&bit)||(solos&&!(solos&bit))){
    active[c]=seqowned[c]=keycount[c]=0;
    if(c==0){NR12_REG=8;NR14_REG=128;}else if(c==1){NR22_REG=8;NR24_REG=128;}else NR30_REG=0;
