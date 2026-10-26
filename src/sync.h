@@ -19,6 +19,8 @@ extern __at (0xFFC7) volatile uint8_t synctick;
 extern __at (0xFFC8) volatile uint8_t syncstart;
 extern __at (0xFFC9) volatile uint8_t synctxbyte;
 extern uint8_t sync_raw_ready;
+/* Direct MS is an output lane; the host keeps its standalone audio clock. */
+#define SYNC_LOCAL_AUDIO (!syncmode||syncmode==6)
 #define SYNC_EVENT_IRQ (!syncmode||!syncslave||sync_raw_ready)
 void sync_raw_configure(void) BANKED;
 void sync_raw_tick(void) BANKED;

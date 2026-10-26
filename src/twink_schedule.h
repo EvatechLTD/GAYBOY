@@ -20,4 +20,9 @@ void twink_schedule_service(void) BANKED;
 uint8_t twink_v2_clock(void) NONBANKED;
 void twink_v2_irq(void) BANKED;
 void twink_schedule_changed(void) BANKED;
+uint8_t twink_packet_crc(uint8_t type,uint8_t pitch,uint8_t velocity) BANKED;
+uint16_t twink_note_crcs(uint8_t pitch,uint8_t velocity) BANKED;
+void twink_irq_note(const uint8_t *event) BANKED;
+void twink_irq_off(uint8_t pitch) BANKED;
+void twink_direct_kick(void) NONBANKED;
 #endif

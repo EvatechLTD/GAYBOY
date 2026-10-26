@@ -1,60 +1,109 @@
 #pragma bank 60
 #include "api.h"
 #include "twink_schedule.h"
-/* TWINK v1: F3,type,a,b,CRC7; 80..BF numbered clock, F9 stopped heartbeat,
-   FA start, FC stop, FF panic. Reverse A5 identifies TWINK input. */
+#include "mixer_shared.h"
 uint8_t twink_ready;
-/* Independent queue: native synctx aliases the retired pulse IRQ flags.
-   UI and sequencer housekeeping may still write those flags during play. */
 volatile uint8_t twinktx[32];
 volatile uint8_t twink_guard,twink_ended_div;
-static uint16_t serviced,seen,hello,heartbeat,bpm;
-static uint8_t session=1,busy;
-static uint8_t crc(uint8_t t,uint8_t a,uint8_t b){uint8_t i,j,c=0,v[3];v[0]=t;v[1]=a;v[2]=b;for(j=0;j<3;j++)for(i=0;i<7;i++){uint8_t top=(c^v[j])&64;c=(c<<1)&127;if(top)c^=9;v[j]<<=1;}return c;}
-static uint8_t put(uint8_t b){uint8_t next=(syncw+1)&31;if(next==syncr){overflow=1;return 0;}__critical {twinktx[syncw]=b;syncw=next;}return 1;}
-uint8_t twink_queue_message(const uint8_t *data,uint8_t size) BANKED {uint8_t w=syncw,i;if(((syncr-w-1)&31)<size)return 0;for(i=0;i<size;i++){twinktx[w]=data[i];w=(w+1)&31;}__critical{syncw=w;}sync_control_service();return 1;}
-static uint8_t packet(uint8_t type,uint8_t a,uint8_t b){uint8_t w=syncw;if(((syncr-w-1)&31)<5){overflow=1;return 0;}twinktx[w]=0xF3;w=(w+1)&31;twinktx[w]=type;w=(w+1)&31;twinktx[w]=a;w=(w+1)&31;twinktx[w]=b;w=(w+1)&31;twinktx[w]=crc(type,a,b);__critical {syncw=(w+1)&31;}return 1;}
-/* IRQ consumer: drain one prebuilt byte without depending on a UI pass.
-   No __critical calls here: their EI epilogue would nest interrupts. */
-void twink_tx_tick(void) BANKED {
- if(twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
- if(synctxwait||(SC_REG&0x80)||(IF_REG&SIO_IFLAG)||twink_guard)return;
- if(syncdue){syncdue=0;SB_REG=0x80|synctick;SC_REG=0x81;}
- else if(syncr!=syncw){synctxbyte=twinktx[syncr];SB_REG=synctxbyte;syncr=(syncr+1)&31;SC_REG=0x81;}
+static uint8_t off_crc;
+/* Direct mode has no MIDI receive stream: reuse its 256-byte buffer as two
+   immutable 32-note caches. Larger lanes retain the cartridge snapshot. */
+volatile uint8_t twink_private_active,twink_private_next;
+static uint8_t private_base,private_count,private_slot=255;
+static uint16_t private_revision;
+extern uint16_t twink_ms_generation;
+extern uint8_t editbuffer_reading;
+extern __at (0xAC6C) uint16_t seqstepunits;
+uint8_t editbuffer_irq_event(uint8_t c,uint8_t step,uint8_t *event) NONBANKED;
+void twink_prepare_notes(void) BANKED {uint16_t count=seqeventcounts[5],i;uint8_t e[4],base,reading;
+ if(count>32){twink_private_next=0;return;}
+ twink_private_next=1;
+ if(twink_private_active&&private_slot==mx.slot&&private_revision==twink_ms_generation&&private_count==count)return;
+ base=private_base^128;reading=editbuffer_reading;editbuffer_reading=0;
+ for(i=0;i<count;i++){seq_event_get(5,i,e);memcpy((uint8_t *)rx+base+i*4,e,4);}
+ editbuffer_reading=reading;
+ __critical{private_base=base;private_count=count;private_slot=mx.slot;private_revision=twink_ms_generation;twink_private_active=1;}
 }
-void twink_reset(void) BANKED {twink_ready=0;busy=0;twink_guard=synctxwait=0;session=(session+1)&127;if(!session)session=1;twink_schedule_reset(session);bpm=0;hello=heartbeat=sys_time-120;seen=serviced=sys_time;}
-void twink_panic(void) BANKED {if(syncmode!=SYNC_TWINK)return;twink_schedule_stop();seqplaying=0;if(syncarmed){__critical {syncarmed=syncdue=0;TMA_REG=TIMA_REG=syncreload;}}__critical {syncw=syncr;}put(0xFF);sync_control_service();}
-void twink_transport(uint8_t playing) BANKED {uint16_t since,current;if(syncmode!=SYNC_TWINK)return;if(!playing){twink_schedule_stop();__critical {syncw=syncr;}put(0xFC);sync_control_service();return;}
- /* A stopped user may have returned from an unsupported patch to native.
-    Drain the old session completely before allowing a fresh HELLO reply;
-    a stale D1 must not reopen a capability rejection during playback. */
- if(twink_v2_blocked){
-  while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();
-  __critical{rd=wr;}twink_reset();
- }
- /* Ready A5 proves legacy presence, not timed capability. After reconnect
-    allow HELLO/response to finish while the local musical clock is held.
-    Never attach an epoch-zero scheduled stream to already-running music. */
- if(!twink_v2&&!twink_v2_blocked){
-  seqplaying=0;__critical{since=sys_time;}
-  do{twink_service();sync_control_service();__critical{current=sys_time;}}
-  while(!twink_v2&&!twink_v2_blocked&&(uint16_t)(current-since)<45);
-  seqplaying=1;
- }
- if(twink_v2&&twink_schedule_start()){bpm=seqbpm;put(0xFA);sync_control_service();return;}
- packet(1,session,1);packet(2,seqbpm>>7,seqbpm&127);bpm=seqbpm;put(0xFA);sync_control_service();}
-void twink_note(uint8_t on,uint8_t pitch,uint8_t velocity) BANKED {if(syncmode!=SYNC_TWINK||!twink_ready)return;if(twink_scheduled&&seqplaying)return;if(!packet(on?3:4,pitch,on?velocity:0))twink_panic();sync_control_service();}
-void twink_service(void) BANKED {uint16_t now;if(syncmode!=SYNC_TWINK||busy)return;busy=1;__critical{now=sys_time;}
- if(twink_staging&&twink_received){__critical{twink_received=0;}seen=now;twink_ready=1;if(twink_reply==0xD5){twink_v2_blocked=1;twink_v2=0;}else if(!twink_v2_blocked&&twink_reply==0xD7)twink_v2=3;}
- while(!twink_staging&&rd!=wr){uint8_t b=rx[rd++];if(b<128&&twink_v2&&!twink_v2_blocked){twink_ack=b;seen=now;twink_ready=1;}else if(b>=0xD1&&b<=0xD7){twink_reply=b;if(b==0xD5){twink_v2_blocked=1;twink_v2=0;}else if(!twink_v2_blocked){if(b==0xD7)twink_v2=3;else if(b==0xD6&&twink_v2<2)twink_v2=2;else if(b==0xD1&&!twink_v2)twink_v2=1;}seen=now;twink_ready=1;}else if(b==0xA5){if(!twink_ready){packet(1,session,1);packet(2,seqbpm>>7,seqbpm&127);put(seqplaying?0xFA:0xFC);dirty=1;}seen=now;twink_ready=1;}}
- /* A broken timed stream must stop cleanly, rather than leaving the local
-    song running while MS silently waits for a planner that can never catch up. */
- if(twink_scheduled&&(twink_reply==0xD4||twink_reply==0xD5)){uint8_t saved=seqservicing;twink_v2_blocked=1;twink_v2=0;seqservicing=1;if(seqplaying)seq_transport();seqservicing=saved;dirty=1;}
- if(serviced!=now){serviced=now;
-  if(twink_ready&&(uint16_t)(now-seen)>120){twink_ready=0;twink_schedule_reset(session);dirty=1;}
-  if((uint16_t)(now-hello)>=60){hello=now;if(!twink_v2&&!twink_ready)packet(1,session,1);}
-  if(bpm!=seqbpm){if(packet(2,seqbpm>>7,seqbpm&127))bpm=seqbpm;}
-  if(!seqplaying&&(uint16_t)(now-heartbeat)>=15){heartbeat=now;put(0xF9);}
- }
- if(twink_ready&&!seqplaying)twink_schedule_probe();twink_schedule_service();sync_control_service();busy=0;
+uint8_t twink_irq_event(uint8_t step,uint8_t *e) BANKED {uint8_t i,found=0,note=255,*p;uint16_t v;
+ if(!twink_private_active)return editbuffer_irq_event(5,step,e);
+ p=(uint8_t *)rx+private_base;
+ for(i=0;i<private_count;i++,p+=4)if(p[0]==step&&p[1]&&p[1]<note){memcpy(e,p,4);note=e[1];found=1;}
+ if(!found)return 0;
+ v=e[2];if(mx.level[5]!=127){v=v*mx.level[5]+63;v=(v>>7)+((uint8_t)((v&127)+(v>>7))>=127);}
+ e[6]=v;e[4]=twink_packet_crc(3,e[1]-1,e[6]);e[5]=twink_packet_crc(4,e[1]-1,0);return 1;
+}
+
+/* One-way byte burst. SIO drains the remainder; the musical timer never
+   polls a link clock or receiver credits. No interrupt-enabling helpers. */
+void twink_direct_kick(void) NONBANKED __naked {__asm
+ push bc
+ ldh a,(#0x02)
+ bit 7,a
+ jr nz,direct_tx_done$
+ ldh a,(#0x0f)
+ bit 3,a
+ jr nz,direct_tx_done$
+ ldh a,(_syncr)
+ ld b,a
+ ldh a,(_syncw)
+ cp a,b
+ jr z,direct_tx_done$
+ ld hl,#_twinktx
+ ld a,b
+ add a,l
+ ld l,a
+ jr nc,direct_tx_address$
+ inc h
+direct_tx_address$:
+ ld a,(hl)
+ ldh (#0x01),a
+ ld a,b
+ inc a
+ and #31
+ ldh (_syncr),a
+ ld a,#0x81
+ ldh (#0x02),a
+direct_tx_done$:
+ pop bc
+ ret
+ __endasm;}
+void twink_direct_next(void) NONBANKED __naked {__asm
+ push bc
+ ldh a,(#0x04)
+ ld c,a
+ ld b,#2
+next_gap_wait$:
+ ldh a,(#0x04)
+ cp a,c
+ jr z,next_gap_wait$
+ ld c,a
+ dec b
+ jr nz,next_gap_wait$
+ pop bc
+ jp _twink_direct_kick
+ __endasm;}
+/* Called with interrupts disabled, or by the foreground while stopped. */
+static uint8_t enqueue(uint8_t type,uint8_t pitch,uint8_t velocity,uint8_t crc){uint8_t w=syncw;
+ if(((syncr-w-1)&31)<5){overflow=1;return 0;}
+ twinktx[w]=0xF3;w=(w+1)&31;twinktx[w]=type;w=(w+1)&31;twinktx[w]=pitch;w=(w+1)&31;twinktx[w]=velocity;w=(w+1)&31;twinktx[w]=crc;syncw=(w+1)&31;
+ twink_direct_kick();return 1;
+}
+/* IRQ entry consumes the already compiled seventh-byte velocity and CRCs. */
+void twink_irq_note(const uint8_t *e) BANKED {off_crc=e[5];enqueue(3,e[1]-1,e[6],e[4]);}
+void twink_irq_off(uint8_t pitch) BANKED {enqueue(4,pitch,0,off_crc);}
+uint8_t twink_queue_message(const uint8_t *data,uint8_t size) BANKED {uint8_t i,w=syncw;if(((syncr-w-1)&31)<size)return 0;for(i=0;i<size;i++){twinktx[w]=data[i];w=(w+1)&31;}__critical{syncw=w;twink_direct_kick();}return 1;}
+void twink_tx_tick(void) BANKED {twink_direct_kick();}
+void twink_reset(void) BANKED {twink_schedule_reset(0);twink_ready=1;twink_guard=synctxwait=0;twink_private_active=twink_private_next=0;private_slot=255;}
+static void wire_stop(uint8_t b){__critical{syncw=syncr;twinktx[syncw]=b;syncw=(syncw+1)&31;twink_direct_kick();}}
+void twink_panic(void) BANKED {if(syncmode!=SYNC_TWINK)return;twink_scheduled=0;seqplaying=0;syncarmed=syncdue=syncstart=0;wire_stop(0xFF);}
+void twink_transport(uint8_t playing) BANKED {if(syncmode!=SYNC_TWINK)return;twink_scheduled=playing;syncarmed=syncdue=syncstart=0;if(!playing)wire_stop(0xFC);}
+void twink_note(uint8_t on,uint8_t pitch,uint8_t velocity) BANKED {uint8_t c;if(syncmode!=SYNC_TWINK)return;c=twink_packet_crc(on?3:4,pitch,on?velocity:0);__critical{enqueue(on?3:4,pitch,on?velocity:0,c);}}
+void twink_service(void) BANKED {}
+
+/* Swing/unsupported local IRQ synthesis keeps its normal foreground path. */
+void twink_direct_fire(void) BANKED {uint8_t e[7],solos=seqsolo&111,audible;
+ if(drumsolomask)solos|=64;audible=power&&!(seqmuted&32)&&(!solos||(solos&32));
+ if(audible&&twink_irq_event(seqposition[5],e)&&e[2]&&e[6]){
+  __critical{twink_irq_note(e);}seqowned[5]=e[1];seqsource[5]=seqposition[5];seqgateleft[5]=(uint32_t)seqstepunits*(e[3]?e[3]:256U);
+ }else if((!audible||!seqgateleft[5])&&seqowned[5]){__critical{twink_irq_off(seqowned[5]-1);}seqowned[5]=0;seqgateleft[5]=0;}
 }

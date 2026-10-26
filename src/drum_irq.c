@@ -129,7 +129,7 @@ void drum_irq_service(void) BANKED {uint8_t budget=2,reading,busy;
   if(seen_generation!=pattern_generation){drum_irq_configure();if(!building)return;}
   if(buildstep>=lengths[target]){
    building=drum_irq_pending=0;
-   if(!waveengine){uint8_t reload=!syncmode&&seqstepunits*seqbpm==15360U&&!(seqstepunits&3)?240:252;__critical{TMA_REG=reload;if(!seqplaying){TIMA_REG=reload;IF_REG&=~TIM_IFLAG;}}}
+   if(!waveengine){uint8_t reload=(!syncmode||syncmode==SYNC_TWINK)&&seqstepunits*seqbpm==15360U&&!(seqstepunits&3)?240:252;__critical{TMA_REG=reload;if(!seqplaying){TIMA_REG=reload;IF_REG&=~TIM_IFLAG;}}}
    __critical{ready=1;}
    if(seqplaying&&!drum_irq_active){mixfill();if(slot==mx.slot)arm(0);}return;
   }

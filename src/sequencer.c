@@ -95,10 +95,10 @@ uint16_t seq_dur(uint8_t c,uint8_t s){return seq_duration_get(c,s); }
 uint8_t seq_vel(uint8_t c,uint8_t s){return seq_velocity_get(c,s); }
 #pragma opt_code_speed
 uint8_t seq_enabled(uint8_t c){return c<3||c==6||(c==TWINK_TRACK&&syncmode==SYNC_TWINK);}
-void seq_off(uint8_t c){uint8_t note;eval_seq_off(c);if(!syncmode&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
+void seq_off(uint8_t c){uint8_t note;eval_seq_off(c);if(SYNC_LOCAL_AUDIO&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
 void seq_clear_release(uint8_t track) BANKED {if(!editbuffer_reading&&editbuffer_active())return;seq_off(track);}
 
-void seq_stop(void){uint8_t c;drum_irq_active=0;arp_irq_reset();seq_native_launch_clear();editbuffer_reset();if(!syncmode)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
+void seq_stop(void){uint8_t c;drum_irq_active=0;arp_irq_reset();seq_native_launch_clear();editbuffer_reset();if(SYNC_LOCAL_AUDIO)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
 uint8_t seq_audible(uint8_t c){uint8_t solos=seqsolo&(syncmode==SYNC_TWINK?111:experimental_mode?95:79);if(drumsolomask&&(!seqmode||experimental_mode))solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
 void seq_gates(void) BANKED;
 void seq_clock_epoch(void) BANKED;
@@ -108,11 +108,13 @@ uint8_t resident_first_note(uint8_t c,uint8_t *e) BANKED;
 void resident_first_clear(void) BANKED;
 static uint8_t seqlaunching;
 extern uint8_t resident_same_tones;
+extern volatile uint8_t editirq_enabled,editirq_running;
+void twink_direct_fire(void) BANKED;
 void seq_fire(uint8_t c){
  uint8_t data[4],s,note,v=0,oldvelocity=0,oldlevel=0,level,pan,keep=0;
  /* Scheduled MS owns its future notes and gates. Keep the ordinary track
     position/UI, but do not repeat its lookup/audio work at the live step. */
- if(c==TWINK_TRACK&&syncmode==SYNC_TWINK&&twink_scheduled)return;
+ if(c==TWINK_TRACK&&syncmode==SYNC_TWINK){if(twink_scheduled&&(editirq_enabled&8)&&editirq_running)return;twink_direct_fire();return;}
  if(editirq_owned(c))return;
  if(c==3||c==seqrecordtrack)return;
  if(c<6&&!seq_event_count(c)){if(seqowned[c])seq_off(c);return;}
@@ -150,12 +152,12 @@ void seq_fire(uint8_t c){
 }
 /* A prepared, same-mode pattern handoff keeps the timer's pending elapsed
    time. Stopping/restarting transport here would lose time on every change. */
-void seq_pattern_release(void) BANKED {uint8_t c,busy=seqservicing;if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;seqrecordtrack=255;seqrecordlength=0;
+void seq_pattern_release(void) BANKED {uint8_t c,busy=seqservicing;if(SYNC_LOCAL_AUDIO)seqirqready=seqirqfired=0;seqservicing=1;seqrecordtrack=255;seqrecordlength=0;
  /* A full pattern release clears foreground track ownership. Prepared
     same-pattern continuity is handled by the ordinary handoff path. */
  for(c=0;c<SEQ_TRACKS;c++)seq_off(c);
  seqservicing=busy;}
-static void pattern_start(uint8_t preserve){uint8_t c,busy=seqservicing;drum_irq_active=0;arp_irq_reset();if(!syncmode)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);if(!preserve)seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
+static void pattern_start(uint8_t preserve){uint8_t c,busy=seqservicing;drum_irq_active=0;arp_irq_reset();if(SYNC_LOCAL_AUDIO)seqirqready=seqirqfired=0;seqservicing=1;memset(seqposition,0,SEQ_TRACKS);if(!preserve)seqswingphase=0;seq_swing_step();seqdeadline=1;seq_irq_launch();
 
  if(seqcachedbpm!=seqbpm)seq_gates();if(!preserve)mixer_clock_reset();if(syncmode&&(!preserve||syncslave))sync_pattern();
  seqlaunching=1;
@@ -220,8 +222,8 @@ void seq_cancel_prepare(void) BANKED {native_prepare=0;seq_stop();smooth_playbac
 uint8_t seq_twink_catchup(uint16_t ticks) BANKED;
 void seq_frame(void) BANKED {uint8_t c,expired,boundary,budget=4;uint16_t ticks,left,slice,advance,over;if(!seqplaying||seqservicing)return;seqservicing=1;editbuffer_reading=editbuffer_active();
  __critical {ticks=seqticks;seqticks=0;}
- if(syncmode&&!syncslave)ticks=sync_advance(ticks);
- if(syncmode==SYNC_TWINK&&seq_twink_catchup(ticks)){seq_next_deadline();seq_irq_prepare();editbuffer_reading=0;seqservicing=0;return;}
+ if(syncmode&&syncmode!=SYNC_TWINK&&!syncslave)ticks=sync_advance(ticks);
+
  while(ticks&&seqplaying){
   slice=ticks>128?128:ticks;{uint16_t wait=eval_arp_wait();if(wait<slice)slice=wait;}left=seqclock>=seqthreshold?0:seqthreshold-seqclock;advance=slice*seqbpm;boundary=advance>=left;
   if(boundary){over=advance-left;
@@ -268,8 +270,8 @@ void seq_clamp_cursor(void){eval_seq_clamp_cursor();}
 void eval_seq_off_track(uint8_t c) BANKED {if(!editbuffer_reading&&editbuffer_active())return;seq_off(c);}
 
 void seq_track_view(void) BANKED;
-void seq_mute(void){mixer_pattern_changed();if(!syncmode){seqirqready=0;seqirqdirty=1;}seqmuted^=1<<seqtrack;if(seqmuted&(1<<seqtrack))seq_off(seqtrack);dirty=1;}
-void seq_solo(void){mixer_pattern_changed();uint8_t c;if(!syncmode){seqirqready=0;seqirqdirty=1;}seqsolo^=1<<seqtrack;for(c=0;c<SEQ_TRACKS;c++)if(!seq_audible(c))seq_off(c);dirty=1;}
+void seq_mute(void){mixer_pattern_changed();if(SYNC_LOCAL_AUDIO){seqirqready=0;seqirqdirty=1;}seqmuted^=1<<seqtrack;if(seqmuted&(1<<seqtrack))seq_off(seqtrack);dirty=1;}
+void seq_solo(void){mixer_pattern_changed();uint8_t c;if(SYNC_LOCAL_AUDIO){seqirqready=0;seqirqdirty=1;}seqsolo^=1<<seqtrack;for(c=0;c<SEQ_TRACKS;c++)if(!seq_audible(c))seq_off(c);dirty=1;}
 void seq_meter_edit(uint8_t field,int16_t delta) BANKED;
 void seq_edit_value(uint8_t field,int16_t delta){uint8_t c=seqtrack,bars=field==12;uint16_t bar,target;uint16_t step=c==6?65535:seq_hit(c,seqcursor[c],seqpitch[c]),current;int16_t value,lo=1,hi=127;
  if(page==10&&(field==2||field==12)){field=field==2?12:2;bars=field==12;}
@@ -285,7 +287,7 @@ void seq_edit_value(uint8_t field,int16_t delta){uint8_t c=seqtrack,bars=field==
  mixer_pattern_changed();
  if(field==2){current=seqlength[c];hi=256;}else if(field==3){current=seqgate[c];hi=100;}else if(field==4)current=page==10||step==65535?seqdefaultvel[c]:seq_velocity_get(c,step);else {current=step==65535?seqdefaultdur[c]:seq_dur(c,step);hi=256;if(c==6)lo=0;}
  value=field==2&&!bars&&(delta>=10||delta<=-10)?(delta>0?(current>128?256:current*2):(current>1?current/2:1)):current+delta;if(value<lo)value=lo;if(value>hi)value=hi;
- if((field==2||field==3)&&!syncmode){seqirqready=0;seqirqdirty=1;}
+ if((field==2||field==3)&&SYNC_LOCAL_AUDIO){seqirqready=0;seqirqdirty=1;}
  if(field==2)seqlength[c]=value;else if(field==3)seqgate[c]=value;else if(field==4){if(page==10||step==65535)seqdefaultvel[c]=value;else {eval_plotvel[c]=value;seq_note_set(c,step,seq_note_get(c,step),value,seq_dur(c,step));}}
  else {if(step!=65535)seq_note_set(c,step,seq_note_get(c,step),seq_velocity_get(c,step),value);seqdefaultdur[c]=value;}
  if(field==3)seqcachedbpm=0;

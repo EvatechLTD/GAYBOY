@@ -51,7 +51,8 @@ const uint8_t limits[26]={3,15,1,7,7,1,7,63,1,1,7,1,7,1,31,3,255,1,15,1,7,3,1,1,
 #include "twink_schedule.h"
 #include "engine_state.h"
 #include "mono_state.h"
-void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){if(!twink_v2)twink_ended_div=DIV_REG;twink_guard=1;if(syncstart==1&&synctxbyte==0xFA){syncstart=2;if(twink_v2){twink_clock=0;twink_clock_fraction=0;twink_clock_div=DIV_REG;twink_last_anchor=0;twink_anchor_pending=0;}}if(twink_staging){if(b<128){twink_ack=b;twink_received=1;}else if(b>=0xD1&&b<=0xD7){twink_reply=b;twink_received=1;}return;}if(n!=rd){rx[wr]=b;wr=n;}else overflow=1;return;} if(syncmode&&!syncslave){
+void twink_direct_next(void) NONBANKED;
+void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){if(syncr!=syncw)twink_direct_next();return;} if(syncmode&&!syncslave){
  if(syncstart==1&&synctxbyte==0xFA)syncstart=2;synctxwait=3;if(waveengine==3&&syncdivider==1)synctxwait=1;
  if(syncdue){syncdue=0;SB_REG=syncmode==1?(0x80|synctick):0;SC_REG=0x81;}return;
  } if(sync_raw_ready&&seqplaying)sync_raw_tick();SB_REG=0; SC_REG=0x80; if(n==rd) overflow=1; else {rx[wr]=b;wr=n;} }
@@ -119,7 +120,7 @@ extern uint8_t mixer_layout_dirty;
 void mixer_layout_service(void) BANKED;
 void mixer_poll_input(void) BANKED;
 void eval_audio_resume_wave(void) BANKED;
-void mixfill(void){if(song_playing||song_link_active)return;if(syncmode==SYNC_TWINK)twink_service();if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(!smooth_playback_active&&page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode==1&&sync_raw_ready){if(rd!=wr&&!syncbusy)sync_live_service();}else if(syncmode!=SYNC_TWINK&&rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
+void mixfill(void){if(song_playing||song_link_active)return;if(voice_owner_busy){if(waveengine!=3&&expconfig[0])exp_fill();return;}if(!smooth_playback_active&&page==18&&!navopen&&padread!=padwrite)mixer_poll_input();if(syncarmed&&syncmode==1&&link_peer_capable&&linkbitqueued<8&&linktxread<linktxsize)link_wire_service();if(syncarmed&&syncr!=syncw&&!synctxwait)sync_control_service();if(syncmode==1&&sync_raw_ready){if(rd!=wr&&!syncbusy)sync_live_service();}else if(syncmode!=SYNC_TWINK&&rd!=wr&&!syncbusy&&(!syncmode||!seqservicing||(syncmode==1&&!syncslave))){uint8_t b=rx[rd++];midi(b);} /* Retire a bounded part of the incoming installation before catching up
     musical time. Otherwise repeated cartridge scans can keep the scheduler
     busy forever and prevent the foreground installer from making progress.
     The guard also prevents nested I/O yields from reentering this service. */

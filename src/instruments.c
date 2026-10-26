@@ -84,7 +84,7 @@ void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i,head=seqhead,gesture,tra
     Until it is published, discard synthetic repeat debt from that hold. */
  seqpreviewpinned=0;if(seqgesturepage)seqeditpreview=0;
  if(!seqeditpreview&&seqpreviewdirty){seqpreviewdirty=0;seqdrawvalid=roll_preview_finish();dirty=1;}
- for(i=0;i<repeatsteps;i++){uint8_t retained=seqdrawvalid;oldcursor=seqcursor[c];oldpitch=c==6?drumrow:seqpitch[c];oldtop=seqtop[c];oldbase=seqbase;if(!(syncmode==SYNC_TWINK&&seqplaying&&seq_twink_input_service()))mixfill();/* Only value gestures can change a tone; grid mutations mark themselves. */if(edge&&!navopen&&!(p&(J_START|J_SELECT))&&page!=8&&(page<18||page==23)&&(p&(J_A|J_B)))mixer_pattern_changed();ui_action(p,edge);
+ for(i=0;i<repeatsteps;i++){uint8_t retained=seqdrawvalid;oldcursor=seqcursor[c];oldpitch=c==6?drumrow:seqpitch[c];oldtop=seqtop[c];oldbase=seqbase;mixfill();/* Only value gestures can change a tone; grid mutations mark themselves. */if(edge&&!navopen&&!(p&(J_START|J_SELECT))&&page!=8&&(page<18||page==23)&&(p&(J_A|J_B)))mixer_pattern_changed();ui_action(p,edge);
   if(seqeditpreview){seqpreviewdirty=1;if(retained)seqdrawvalid=seqgrouptrack==seqtrack?2:1;}
   if(tracking){stop=0;
    if(c!=6&&seqpitch[c]!=oldpitch){

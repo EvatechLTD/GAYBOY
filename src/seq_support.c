@@ -24,7 +24,7 @@ void editirq_clock_reset(void) NONBANKED;
    TIMA reload alone leaves the first interval dependent on DIV's low phase.
    Keep PCM's selected timer mode and leave all external sync clocks alone. */
 void seq_clock_epoch(void) BANKED {uint8_t control;
- __critical {control=TAC_REG;if(!syncmode){TAC_REG=0;DIV_REG=0;}editirq_clock_reset();TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;if(!syncmode)TAC_REG=control;}
+ __critical {control=TAC_REG;if(SYNC_LOCAL_AUDIO){TAC_REG=0;DIV_REG=0;}editirq_clock_reset();TIMA_REG=TMA_REG;IF_REG&=~TIM_IFLAG;seqclock=seqticks=seqfraction=0;seqplaying=1;if(SYNC_LOCAL_AUDIO)TAC_REG=control;}
 }
 
 void seq_launch_events(void) BANKED;

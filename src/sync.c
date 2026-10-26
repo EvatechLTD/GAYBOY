@@ -63,6 +63,7 @@ void link_clock_abort(void) BANKED;
 void link_clock_decode(uint8_t b,uint8_t delta) BANKED;
 void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=midi_launch_enabled=0;syncmode=0;syncslave=0;}
 void sync_control_service(void) BANKED {
+ if(syncmode==SYNC_TWINK){__critical{twink_direct_kick();}return;}
  __critical {
   if(syncmode==SYNC_TWINK&&twink_v2){if(!syncarmed&&twink_v2_clock())twink_v2_irq();}
   else if(syncmode==SYNC_TWINK&&twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
@@ -127,6 +128,7 @@ static uint8_t prepare_peer(void){uint8_t at=wr,b,wait=0,ready=0,i;uint16_t sinc
  send(0xFC);while(syncr!=syncw||SC_REG&0x80||IF_REG&SIO_IFLAG)sync_control_service();seqplaying=0;linkstate=4;dirty=1;return 0;
 }
 void sync_transport(uint8_t playing) BANKED {uint32_t limit;uint8_t pending,byte,guard,reply;
+ if(syncmode==SYNC_TWINK){twink_transport(playing);return;}
  if(!playing){sync_raw_ready=0;syncstart=0;if(native_prepare!=1&&native_prepare!=4)native_prepare=0;}
  if(syncmode==SYNC_TWINK&&!playing)twink_transport(0);
  if(!playing&&syncmode==1&&!syncslave&&syncarmed){send(0xFC);while(syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))sync_control_service();}
@@ -329,7 +331,7 @@ void sync_render(void) BANKED {memset(canvas,0,360);memset(canvas,96,20);drawtex
  drawtext(0,12,"A/B+ARROWS TO EDIT",0);drawtext(0,13,"SELECT+A PLAY / STOP",0);
  if(native_prepare==2)drawtext(0,16,"WAITING FOR MASTER",0);
  if(linkstate==4)drawtext(0,16,"START CLASH - RETRY",0);
- if(syncmode==SYNC_TWINK){drawtext(0,15,twink_ready?"MONOSIMP CONNECTED":"CONNECT MONOSIMP",0);if(twink_reply==0xD4)drawtext(0,16,"TWINK TIMING ERROR",0);}
+ if(syncmode==SYNC_TWINK){drawtext(0,15,"MONOSIMP SERIAL OUT",0);}
  else if(syncmode>=4)drawtext(0,15,"PULSE ADAPTER NEEDED",0);
  else if(syncmode==3)drawtext(0,15,"LSDJ SYNC MODE",0);
  else drawtext(0,15,"GAME BOY LINK CABLE",0);

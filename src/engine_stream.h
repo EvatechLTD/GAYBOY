@@ -124,7 +124,7 @@ void drum_irq_tick(uint8_t elapsed) NONBANKED;
 uint8_t sync_native_elapsed(uint8_t ticks) NONBANKED;
 uint8_t editirq_elapsed_active(uint8_t fallback) NONBANKED;
 static void engine_timer_legacy(void){uint8_t n;
- if(syncmode)sync_clock_isr();
+ if(syncmode&&syncmode!=SYNC_TWINK)sync_clock_isr();
  if(syncarmed){
   if(waveengine!=3&&seqplaying&&!syncstart){n=editirq_elapsed(1);if(sync_raw_ready&&syncmode==1)n=sync_native_elapsed(n);seqticks+=n;if(!syncslave||sync_raw_ready){if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);}}
   if(!sync_raw_ready){syncsub++;if(syncsub<syncdivider)return;syncsub=0;}
