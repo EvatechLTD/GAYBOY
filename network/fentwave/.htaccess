@@ -1,0 +1,5 @@
+Options -Indexes
+DirectoryIndex index.html
+<FilesMatch "^(waitlist-core|notify)\.php$">
+Require all denied
+</FilesMatch>
