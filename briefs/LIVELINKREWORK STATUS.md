@@ -4,6 +4,8 @@ Main and the published ROM remain protected at 9e04d59. All experiments are in t
 
 ## Qualified basic-arp checkpoint (2026-10-25)
 
+Frozen two-ROM package: `G:/DEVELOPMENT/MONOSIMP-TWINKTIMING-V2/build/TWINK-BASIC-ARP-V4-TEST/` (GAYBOY-BASIC-ARP-V4-TEST.gb and MONOSIMP-BASIC-ARP-V4-TEST.gb, matching symbols and scopedREADME). Receiver committed06b97fa; both source worktrees clean at checkpoint. Use these together for hardware baseline testing, not the earlier phase-sensitive receiver artifacts.
+
 This is a private branch test pair, not a main/site release or universal link qualification. Latest source commit5e25464, frozen `build/GAYBOY-TWINK-V4-PREFIX2-WIP.gb/.noi` SHA25661161c74fc1d9eeaeaf3c54538394d2645e535f628bb69ab9805fbb1e018ca5e. Receiver frozen `G:/DEVELOPMENT/MONOSIMP-TWINKTIMING-V2/build/native-v4-value-invalidation/MONOSIMP.gb/.noi/.map` SHA2563dfc3a9991ad1f9a7d30ffac19480d41e27fd77365c4948d3d3c89a447bbfbb0. Both use existing32KB save layout; no user save/session was touched.
 
 Accepted scope: native P1/P2/Wave plus real chorus8, ordinary receiver mode0. Four-note1/16 timing comparison uses a held-chord internal P2 live arp and the matching written-out MS pitch stream. MS currently selects the lowest simultaneous note; no held-chord/receiver-arp protocol has been added. This distinction must be explained to users.
