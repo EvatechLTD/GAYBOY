@@ -1,6 +1,7 @@
 #pragma bank 6
 #include "api.h"
 #include "twink_schedule.h"
+#include "twink_chord.h"
 /* Compatibility names for the retired timed transport; direct serial has no
    receiver clock, admission window or return negotiation. */
 uint8_t twink_v2,twink_scheduled,twink_reply,twink_ack,twink_v2_blocked;
@@ -34,6 +35,8 @@ void twink_schedule_stop(void) BANKED {twink_scheduled=0;}
 void twink_schedule_probe(void) BANKED {}
 uint8_t twink_schedule_start(void) BANKED {twink_scheduled=1;return 1;}
 void twink_schedule_service(void) BANKED {}
-void twink_schedule_changed(void) BANKED {twink_ms_generation++;}
+void twink_schedule_changed(void) BANKED {twink_ms_generation++;twink_chord_work=1;}
 uint8_t twink_v2_clock(void) NONBANKED {return 0;}
 void twink_v2_irq(void) BANKED {}
+
+uint8_t twink_crc_step(uint8_t crc,uint8_t value) BANKED {return crc7_table[crc^value];}

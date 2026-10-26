@@ -1,6 +1,6 @@
 #ifndef GAYBOY_SEQUENCER_LIMITS_H
 #define GAYBOY_SEQUENCER_LIMITS_H
-#define SEQ_NOTE_MINIMUM(c) ((c)==2?24:36)
+#define SEQ_NOTE_MINIMUM(c) (((c)==2||(c)==TWINK_TRACK)?24:36)
 /* The native period counters reach C2 (pulse) and C1 (Wave). The DSP
    renderer's 2048 Hz output requires its existing B5 pitch ceiling. */
 static uint8_t seq_note_maximum(uint8_t c){

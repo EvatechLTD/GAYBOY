@@ -45,7 +45,7 @@ static uint16_t composeindex,composelast,composeduration;
 static uint8_t onsetpitch[16],onsetvelocity[16];
 static const uint8_t masks[9]={255,127,63,31,15,7,3,1,0};
 static uint8_t indexof(uint8_t id){return id>=64&&id<96?id-64:id>=160&&id<244?id-128:id>=252?id-136:255;}
-static uint8_t ready(void){return page==8&&seqtrack<4&&!navopen&&!seqpopup&&seqfontdirty&&rollcache[0]==168&&seqviewtrack==seqtrack&&seqviewbase==seqbase&&seqviewcols==seqcols&&seqviewtop==seqtop[seqtrack]&&rollcache[4]==seqgridheight;}
+static uint8_t ready(void){return page==8&&(seqtrack<4||seqtrack==TWINK_TRACK)&&!navopen&&!seqpopup&&seqfontdirty&&rollcache[0]==168&&seqviewtrack==seqtrack&&seqviewbase==seqbase&&seqviewcols==seqcols&&seqviewtop==seqtop[seqtrack]&&rollcache[4]==seqgridheight;}
 /* Pending note pixels do not invalidate the published background. Selection
    can XOR that image between compositor batches, including partly updated
    rows. Future batches apply the newly published selection mask. */
@@ -194,7 +194,7 @@ uint8_t native_edit_flush(void) BANKED {uint8_t col,e[4],selection,composed=0,re
  if(selection==2&&seqdrawvalid)seqdrawvalid=2;return 0;
 }
 void native_velocity_edit(int8_t delta) BANKED {uint8_t e[4],c=seqtrack;uint16_t cursor=0;int16_t value;
- if(c>=4||!seq_note_event(c,seqcursor[c],e))return;value=(int16_t)e[2]+delta;if(value<1)value=1;if(value>127)value=127;if(value==e[2])return;
+ if((c>=4&&c!=TWINK_TRACK)||!seq_note_event(c,seqcursor[c],e))return;value=(int16_t)e[2]+delta;if(value<1)value=1;if(value>127)value=127;if(value==e[2])return;
  while(seq_event_next_step(c,seqcursor[c],&cursor,e)){e[2]=value;seq_event_put(c,cursor-1,e);}eval_plotvel[c]=value;seqbused=1;dirty=1;
 }
 /* Drain several small batches while input is idle. Check actual queued edges

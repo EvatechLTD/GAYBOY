@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "api.h"
+#include "twink_chord.h"
 #include "native_sync.h"
 #include "mod_bypass.h"
 #include "link_control.h"
@@ -127,6 +128,7 @@ void mixfill(void){if(song_playing||song_link_active)return;if(voice_owner_busy)
  if(seqplaying&&!seqservicing&&seqeventcache>=2){seqservicing=1;sparse_service();seqservicing=0;}
  if((rd==wr||(syncmode&&!syncslave)||sync_raw_ready)&&seqplaying&&!seqservicing&&seqticks>=seqdeadline)seq_frame();
 
+ if(syncmode==SYNC_TWINK&&(seqplaying||smooth_playback_preparing)&&(twink_chord_work||twink_chord_check_frame!=(uint8_t)sys_time))twink_chord_service();
  if(waveengine==3&&drumtail&&!mixrunning&&!drumon[0]&&!drumon[1])eval_audio_resume_wave();
  if(padread==padwrite&&sparse_enabled==1&&seqplaying&&!seqservicing&&(page==18||link_ui_hold))sparse_prepare_service();}
 /* Intro audio can interrupt graphics in any ROM bank. Restore that bank before

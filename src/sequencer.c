@@ -2,6 +2,7 @@
 #include "api.h"
 #include "native_sync.h"
 #include "twink_schedule.h"
+#include "twink_chord.h"
 #include "seq_live_note.h"
 #include "smooth_playback.h"
 uint8_t editbuffer_prepare_stopped(void) BANKED;
@@ -95,7 +96,7 @@ uint16_t seq_dur(uint8_t c,uint8_t s){return seq_duration_get(c,s); }
 uint8_t seq_vel(uint8_t c,uint8_t s){return seq_velocity_get(c,s); }
 #pragma opt_code_speed
 uint8_t seq_enabled(uint8_t c){return c<3||c==6||(c==TWINK_TRACK&&syncmode==SYNC_TWINK);}
-void seq_off(uint8_t c){uint8_t note;eval_seq_off(c);if(SYNC_LOCAL_AUDIO&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){if(note)twink_note(0,note-1,0);return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
+void seq_off(uint8_t c){uint8_t note;eval_seq_off(c);if(SYNC_LOCAL_AUDIO&&!seqservicing&&c<2){__critical {seqirqready&=~(1<<c);seqirqfired&=~(1<<c);}seqirqdirty=1;}if(c==6){drum_stop();return;}note=seqowned[c];seqowned[c]=0;seqgateleft[c]=0;if(c==TWINK_TRACK){twink_chord_release();return;}if(note){seq_audio();if(c<2&&!monomode)keyevent(c,note-1,0);else event(0x80|c,note-1,0);seq_audio();}}
 void seq_clear_release(uint8_t track) BANKED {if(!editbuffer_reading&&editbuffer_active())return;seq_off(track);}
 
 void seq_stop(void){uint8_t c;drum_irq_active=0;arp_irq_reset();seq_native_launch_clear();editbuffer_reset();if(SYNC_LOCAL_AUDIO)seqirqready=seqirqfired=0;seqrecordtrack=255;seqrecordlength=0;seqplaying=0;if(syncmode)sync_transport(0);for(c=0;c<SEQ_TRACKS;c++)seq_off(c);seqplaying=0;seqswingphase=0;seq_swing_step();seqclock=seqticks=0;seqdeadline=1;if(!waveengine&&!monomode&&!(evalwaveactive&&expconfig[0]))TAC_REG=0;dirty=1;}
@@ -279,7 +280,7 @@ void seq_meter_edit(uint8_t field,int16_t delta) BANKED;
 void seq_edit_value(uint8_t field,int16_t delta){uint8_t c=seqtrack,bars=field==12;uint16_t bar,target;uint16_t step=c==6?65535:seq_hit(c,seqcursor[c],seqpitch[c]),current;int16_t value,lo=1,hi=127;
  if(page==10&&(field==2||field==12)){field=field==2?12:2;bars=field==12;}
  if(bars){bar=(uint16_t)seqbeats*(16/seqdenom);current=seqlength[c];value=delta>0?(current/bar)+delta:((current+bar-1)/bar)+delta;if(value<1)value=1;if(value>256/bar)value=256/bar;target=value*bar;delta=(int16_t)target-current;field=2;}
- if(field==4&&seqhead==5&&c<4){native_velocity_edit(delta);return;}
+ if(field==4&&seqhead==5&&(c<4||c==TWINK_TRACK)){native_velocity_edit(delta);return;}
  if(field==4&&seqhead==5&&c==6){drum_velocity_edit(delta);return;}
  if(field==11){seq_swing_edit(delta);return;}
  if(field==10){int16_t z=(int16_t)seqzoom+delta;seqzoom=z<0?0:z>2?2:z;seq_dimensions();seq_clamp_cursor();seqdrawvalid=0;dirty=1;return;}
@@ -324,7 +325,7 @@ void seq_move(uint8_t edge){uint8_t c=seqtrack,e[4],other[4],old[4],fast;uint16_
  for(i=0;i<seq_event_count(c);i++){seq_event_get(c,i,e);if(e[1]==seqpitch[c]+1&&e[0]==seqaanchor){source=i;break;}}if(source==65535)return;
  dur=e[3]?e[3]:256;dst=e[0];pitch=e[1];if(edge&J_LEFT)dst--;if(edge&J_RIGHT)dst++;if(edge&J_UP)pitch++;if(edge&J_DOWN)pitch--;
  if(dst<0||dst+dur>seqlength[c]||pitch<SEQ_NOTE_MINIMUM(c)+1||pitch>seq_note_maximum(c)+1)return;
- if(dst!=e[0])for(i=0;i<seq_event_count(c);i++){if(i==source)continue;seq_event_get(c,i,other);if(other[1]&&((!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY])||other[1]==pitch)&&dst<other[0]+(other[3]?other[3]:256)&&other[0]<dst+dur)return;seq_audio();}
+ if(dst!=e[0])for(i=0;i<seq_event_count(c);i++){if(i==source)continue;seq_event_get(c,i,other);if(other[1]&&((c!=TWINK_TRACK&&!eval_mode(c)&&!evalpatch[c][EV_CHORD_HISTORY])||other[1]==pitch)&&dst<other[0]+(other[3]?other[3]:256)&&other[0]<dst+dur)return;seq_audio();}
  if(seqplaying&&seqsource[c]==e[0]&&!editbuffer_active())seq_off(c);memcpy(old,e,4);e[0]=dst;e[1]=pitch;fast=roll_replace_feedback(c,old,e,source);if(!seq_event_put(c,source,e))fast=0;
  seqaanchor=dst;seqcursor[c]=dst+seqaoffset;seqpitch[c]=pitch-1;seq_clamp_cursor();seqdrawvalid=fast;dirty=1;if(!seqplaying)seq_live_current(0);
 }
@@ -340,7 +341,7 @@ void seq_group_box(uint8_t edge){uint8_t c=seqtrack;
  seq_clamp_cursor();seqgrouptrack=c;seqgroupx0=seqcursor[c]<seqaanchor?seqcursor[c]:seqaanchor;seqgroupx1=seqcursor[c]>seqaanchor?seqcursor[c]:seqaanchor;
  seqgroupy0=seqpitch[c]<seqaoffset?seqpitch[c]:seqaoffset;seqgroupy1=seqpitch[c]>seqaoffset?seqpitch[c]:seqaoffset;seq_clamp_cursor();if(seqdrawvalid)seqdrawvalid=2;dirty=1;
 }
-uint8_t seq_header_vertical(uint8_t down){uint8_t f=seqfocus;f=down?(f==12?1:f+1):(f==1?12:f-1);while((!experimental_mode&&f==9)||f==3||f==4||f==5)f=down?(f==12?1:f+1):(f==1?12:f-1);return f;}
+uint8_t seq_header_vertical(uint8_t down) BANKED;
 void seq_record_finish(void) BANKED {uint8_t c=seqrecordtrack;if(c==255)return;seqrecordtrack=255;seqrecordlength=0;seq_off(c);seqdrawvalid=0;dirty=1;}
 void seq_record_start(void){uint8_t c=seqtrack,n=seqpitch[c]+1,v=eval_plotvel[c];seq_record_finish();
  if(seqplaying){if(!seq_note_set(c,seqposition[c],n,v,1))return;mixer_pattern_changed();}
@@ -455,7 +456,7 @@ void roll_header_range(void) BANKED;
    and mode before a pending page/scroll repaint, so controls stay visible
    while that repaint is interrupted and retried for incoming input. */
 static void seq_header(uint8_t c){
- memset(canvas,96,20);seq_text(0,0,seqshort[c],1);if(c!=6)seq_text(4,0,c==TWINK_TRACK?(twink_ready?"LINK":"WAIT"):eval_mode(c)==1?"ARP":"MONO",seqhead!=1);
+ memset(canvas,96,20);seq_text(0,0,seqshort[c],1);if(c!=6)seq_text(4,0,c==TWINK_TRACK?"TWINK":eval_mode(c)==1?"ARP":"MONO",seqhead!=1);
  canvas[9]=244+((seqmuted>>c)&1)+(seqhead==2?2:0);canvas[11]=248+((seqsolo>>c)&1)+(seqhead==3?2:0);roll_header_range();
 }
 static void seq_header_publish(uint8_t c){
@@ -475,7 +476,7 @@ void seq_render(void) BANKED {
  if((c!=6&&seqviewtop!=seqtop[c])||seqviewbase!=seqbase||seqviewcols!=seqcols||seqviewtrack!=c)seqdrawvalid=0;
  if(navopen){seqdrawvalid=0;memcpy(canvas,seqscreen,360);seqflushpending=1;HIDE_SPRITES;return;}
  seq_header_publish(c);
- if(c<4&&!seqdrawvalid)backing=native_edit_feedback();
+ if((c<4||c==TWINK_TRACK)&&!seqdrawvalid)backing=native_edit_feedback();
  seq_resize_status();
  /* A viewport rebuild is deferred during a drag. A retained viewport can
     still update its selection mask without reading or redrawing notes. */
@@ -485,7 +486,7 @@ void seq_render(void) BANKED {
   seq_feedback_cursor();return;
  }
  if(roll_preview_service()){dirty=1;seq_feedback_cursor();return;}
- if(c<4&&native_edit_service()){seqflushpending=dirty=1;seq_feedback_cursor();return;}
+ if((c<4||c==TWINK_TRACK)&&native_edit_service()){seqflushpending=dirty=1;seq_feedback_cursor();return;}
  if(seqdrawvalid==2){if(roll_selection_update()){seqflushpending=1;seqdrawvalid=1;}else seqdrawvalid=0;}
  if(seqdrawvalid){seq_audio();}
  else{roll_feedback_cancel();seqflushpending=1;seq_meterbuild();if(c==6)drum_render();else seq_pixels(navigation);if(rollcancelled){seqflushpending=0;seqdrawvalid=0;dirty=1;return;}seq_audio();memcpy(seqscreen,canvas,360);seqdrawvalid=1;}

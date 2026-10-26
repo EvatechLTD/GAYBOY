@@ -143,7 +143,7 @@ static uint8_t native_feedback_safe(uint8_t c,const uint8_t *e,uint8_t erase){
  return 1;
 }
 uint8_t roll_note_feedback(uint8_t c,const uint8_t *e,uint8_t erase) BANKED {uint8_t row=0,col,endcol,left,right,top,bottom,x,k,voices,height;uint16_t begin=e[0],end=begin+(e[3]?e[3]:256U),at,id;uint32_t bits=0;int16_t y;
- if(!feedback_ready(c)||c==4||c==5)return 0;if(c!=6&&!native_feedback_safe(c,e,erase))return 0;if(end<=seqbase||begin>=(uint16_t)seqbase+seqcols)return 0;col=begin<seqbase?0:begin-seqbase;endcol=end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase;
+ if(!feedback_ready(c)||c==4)return 0;if(c!=6&&!native_feedback_safe(c,e,erase))return 0;if(end<=seqbase||begin>=(uint16_t)seqbase+seqcols)return 0;col=begin<seqbase?0:begin-seqbase;endcol=end>(uint16_t)seqbase+seqcols?seqcols:end-seqbase;
  if(c==6){row=DRUM_VIEW_ROW(e[1]-1);if(row>=13)return 0;bits=(feedback_low[endcol]^feedback_low[col]);if(erase&&(fastoverlap&(1U<<row)))return 0;if(!erase&&(fastrowbits[row]&bits))return 0;
   row=DRUM_VIEW_ROW(e[1]-1);top=DRUM_SCREEN_ROW(row)*8+1;bottom=top+6;
  }else{y=((int16_t)seqtop[c]-(e[1]-1))*seqheight;if(y<0||y+seqheight>seqgridheight)return 0;top=y+1;bottom=y+seqheight-1;}
@@ -186,7 +186,7 @@ static uint8_t feedback_drum_resize(const uint8_t *old,const uint8_t *next){
 static uint8_t feedback_native_resize(uint8_t c,const uint8_t *old,const uint8_t *next){
  uint16_t a=old[0]+(old[3]?old[3]:256U),b=next[0]+(next[3]?next[3]:256U),at;
  uint8_t left,right,top,bottom,k,first,last,width,erase=b<a;int16_t y;
- if(!feedback_ready(c)||c>=4||!native_feedback_safe(c,old,1))return 0;
+ if(!feedback_ready(c)||(c>=4&&c!=TWINK_TRACK)||!native_feedback_safe(c,old,1))return 0;
  y=((int16_t)seqtop[c]-(old[1]-1))*seqheight;if(y<0||y+seqheight>seqgridheight)return 0;
  if(a<=seqbase||b<=seqbase||old[0]>=(uint16_t)seqbase+seqcols)return 0;
  first=(erase?b:a)>=(uint16_t)seqbase+seqcols?seqcols:(erase?b:a)-seqbase;last=(erase?a:b)>=(uint16_t)seqbase+seqcols?seqcols:(erase?a:b)-seqbase;

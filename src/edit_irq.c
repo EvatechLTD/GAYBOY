@@ -6,7 +6,7 @@
 #include "lfo_irq.h"
 #include "mixer_shared.h"
 #include "twink_schedule.h"
-uint8_t twink_irq_event(uint8_t step,uint8_t *event) BANKED;
+#include "twink_chord.h"
 extern volatile uint8_t drum_irq_active;
 extern uint8_t editbuffer_valid,editbuffer_irq_mask,arpirq_enabled;
 extern uint8_t arp_active_mask;
@@ -139,15 +139,8 @@ void editirq_commit(void) NONBANKED {
     if(c==0){NR12_REG=8;NR14_REG=128;}else if(c==1){NR22_REG=8;NR24_REG=128;}else if(c==2)NR30_REG=0;
    }
   }
- if((editirq_enabled&8)&&syncmode==SYNC_TWINK&&twink_scheduled){
-  if(++position[3]>=seqlength[5])position[3]=0;if(gate[3])gate[3]--;
-  found=twink_irq_event(position[3],e);
-  if(power&&found&&e[2]&&e[6]&&!(seqmuted&32)&&(!solos||(solos&32))){
-   gate[3]=e[3]?e[3]:256U;twink_irq_note(e);seqowned[5]=e[1];seqsource[5]=position[3];seqgateleft[5]=0;
-  }else if(!gate[3]||!power||(seqmuted&32)||(solos&&!(solos&32))){
-   gate[3]=0;if(seqowned[5])twink_irq_off(seqowned[5]-1);seqowned[5]=0;seqgateleft[5]=0;
-  }
- }
+ if((editirq_enabled&8)&&syncmode==SYNC_TWINK&&twink_scheduled){if(++position[3]>=seqlength[5])position[3]=0;twink_chord_step(position[3]);}
+
 }
 /* This dispatcher runs up to1024 times/s. Keep elapsed and the phase sum in
    registers; stack-spilled C arithmetic was consuming the editor's budget. */
@@ -264,3 +257,5 @@ void seq_irq_prepare(void) BANKED {
   start=seqclock+seqticks*seqbpm;while(start>=15360U){start-=15360U;for(c=0;c<4;c++)if(++position[c]>=seqlength[c==3?5:c])position[c]=0;}editirq_phase=start;/* DIV remains in the continuous transport epoch. */editirq_enabled=want;editirq_running=1;
  }
 }
+
+uint8_t twink_chord_next_step(void) BANKED {uint16_t next=(editirq_running?position[3]:seqposition[5])+1U;return next>=seqlength[5]?0:next;}
