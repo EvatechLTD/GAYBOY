@@ -4,6 +4,7 @@ extern volatile uint8_t twink_guard,twink_ended_div;
 void twink_tx_tick(void) BANKED;
 extern uint8_t twink_v2;
 void twink_v2_irq(void) BANKED;
+uint8_t twink_v2_clock(void) NONBANKED;
 void sync_raw_sample(void) BANKED;
 /* Fixed-ROM clock; only the negotiated TWINK delivery uses a bank trampoline.
    Phase uses elapsed DIV /16 times64 times BPM, not interrupt invocations.
@@ -53,9 +54,13 @@ sync_clock_running$:
  or a
  jr z,twink_v1_queue$
 sync_twink_v2_pump$:
+ call _twink_v2_clock
+ or a
+ jr z,sync_twink_v2_idle$
  ld e,#b_twink_v2_irq
  ld hl,#_twink_v2_irq
  call ___sdcc_bcall_ehl
+sync_twink_v2_idle$:
  pop bc
  ret
 twink_v1_queue$:

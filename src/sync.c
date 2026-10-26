@@ -64,7 +64,7 @@ void link_clock_decode(uint8_t b,uint8_t delta) BANKED;
 void sync_init(void) BANKED {memset((void *)0xFF98,0,0x5A);syncrole=native_peer_running=midi_launch_enabled=0;syncmode=0;syncslave=0;}
 void sync_control_service(void) BANKED {
  __critical {
-  if(syncmode==SYNC_TWINK&&twink_v2){if(!syncarmed)twink_v2_irq();}
+  if(syncmode==SYNC_TWINK&&twink_v2){if(!syncarmed&&twink_v2_clock())twink_v2_irq();}
   else if(syncmode==SYNC_TWINK&&twink_guard&&(uint8_t)(DIV_REG-twink_ended_div)>=8)twink_guard=0;
   if(!(syncmode==SYNC_TWINK&&twink_v2)&&!synctxwait&&!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)&&(syncmode!=SYNC_TWINK||!twink_guard)){
    if(syncmode==SYNC_TWINK&&syncdue){syncdue=0;SB_REG=0x80|synctick;SC_REG=0x81;}

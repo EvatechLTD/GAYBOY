@@ -217,9 +217,11 @@ void seq_cancel_prepare(void) BANKED {native_prepare=0;seq_stop();smooth_playbac
    seven gates on every audio block: wake only for the next gate or step. */
 /* Hardware timer time is independent of video refresh. 1024 time units/sec;
    the existing 256 Hz audio-block interrupt contributes four units per tick. */
+uint8_t seq_twink_catchup(uint16_t ticks) BANKED;
 void seq_frame(void) BANKED {uint8_t c,expired,boundary,budget=4;uint16_t ticks,left,slice,advance,over;if(!seqplaying||seqservicing)return;seqservicing=1;editbuffer_reading=editbuffer_active();
  __critical {ticks=seqticks;seqticks=0;}
  if(syncmode&&!syncslave)ticks=sync_advance(ticks);
+ if(syncmode==SYNC_TWINK&&seq_twink_catchup(ticks)){seq_next_deadline();seq_irq_prepare();editbuffer_reading=0;seqservicing=0;return;}
  while(ticks&&seqplaying){
   slice=ticks>128?128:ticks;{uint16_t wait=eval_arp_wait();if(wait<slice)slice=wait;}left=seqclock>=seqthreshold?0:seqthreshold-seqclock;advance=slice*seqbpm;boundary=advance>=left;
   if(boundary){over=advance-left;
@@ -415,16 +417,28 @@ void seq_input(uint8_t p,uint8_t edge) BANKED {uint8_t c=seqtrack,mask=J_UP|J_DO
 }
 /* Three grid families fit the preview slots; +6 still selects the playhead tile. */
 void seq_meterbuild(void) BANKED;
-void seq_tiles(void){uint8_t tile,y,lo,hi,buf[16];
+/* The eight M/S glyphs are immutable; do not rasterize them on entry. */
+static const uint8_t seq_switch_tiles[8][16]={
+ {187,187,147,147,171,171,171,171,187,187,187,187,187,187,255,255},
+ {68,68,108,108,84,84,84,84,68,68,68,68,68,68,0,0},
+ {58,58,18,18,42,42,42,42,58,58,58,58,58,58,129,129},
+ {197,197,237,237,213,213,213,213,197,197,197,197,197,197,126,126},
+ {195,195,191,191,191,191,199,199,251,251,251,251,135,135,255,255},
+ {60,60,64,64,64,64,56,56,4,4,4,4,120,120,0,0},
+ {66,66,62,62,62,62,70,70,122,122,122,122,6,6,129,129},
+ {189,189,193,193,193,193,185,185,133,133,133,133,249,249,126,126},
+};
+uint8_t seq_twink_autonomous(void) BANKED;
+void seq_tiles(void){uint8_t tile,buf[16],defer,frame;
  if(seqtilesready)return;
+ /* A static eight-tile header is tiny. With autonomous linked audio, give
+    foreground preparation between tile pairs after a video frame instead
+    of performing an expensive catch-up after every sixteen-byte tile. */
+ defer=syncmode==SYNC_TWINK&&seqplaying&&seq_twink_autonomous();frame=(uint8_t)sys_time;
  /* Full-height header switches use the same 5x7 letters as the UI. */
- for(tile=0;tile<8;tile++){for(y=0;y<8;y++){const uint8_t m[7]={17,27,21,21,17,17,17},s[7]={15,16,16,14,1,1,30};uint8_t glyph=y<7?(tile<4?m[y]:s[y])<<2:0;
-  /* Inactive switches share the black header; active switches invert.
-     Focus uses contrasting rails without changing the switch state. */
-  lo=(tile&1)?glyph:(uint8_t)~glyph;hi=lo;
-  if(tile&2){lo^=0x81;hi^=0x81;}
-  if(y==7&&tile&2){lo=(uint8_t)~lo;hi=lo;}
-  buf[y*2]=lo;buf[y*2+1]=hi;}ui_upload_tile(244+tile,buf,0);seq_audio();}
+ for(tile=0;tile<8;tile++){memcpy(buf,seq_switch_tiles[tile],16);ui_upload_tile(244+tile,buf,0);
+  if(!defer||((tile&1)&&frame!=(uint8_t)sys_time)){seq_audio();frame=(uint8_t)sys_time;}
+ }
  seqtilesready=1;previewshape=255;
 }
 void seq_open(void) BANKED {seqpopup=0;seqapending=seqamoved=0;seqdrawvalid=seqdrag=0;seq_tiles();seqselectused=seqbused=1;seqfocus=seqedit=seqhead=0;if(selected==3)selected=0;if(seqtrack==3)seqtrack=0;seqtrack=seqtrack==TWINK_TRACK&&syncmode==SYNC_TWINK?TWINK_TRACK:seqmode?4:seqtrack==6?6:selected==4?5:selected;if(seqtrack==6)drum_init();seq_dimensions();seq_clamp_cursor();dirty=1;}

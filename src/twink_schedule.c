@@ -23,7 +23,7 @@ static uint8_t scan_error;
 static uint32_t scan_step,play_step;
 extern uint16_t pattern_generation;
 extern uint8_t editbuffer_reading;
-extern volatile uint8_t padread,padwrite;
+extern volatile uint8_t padread,padwrite,padsampled;
 extern volatile uint8_t twink_guard,twink_ended_div;
 extern volatile uint8_t twinktx[32];
 static uint16_t frame_time(void){uint16_t t;__critical{t=sys_time;}return t;}
@@ -69,7 +69,7 @@ static uint8_t scheduled_event(const uint8_t *e){uint8_t b[9];uint16_t target=sc
  /* The old MIDI receive buffer is exclusive to this prebuilt event FIFO
     during negotiated TWINK playback. Reverse traffic uses IRQ mailboxes.
     Foreground prepares, but neither drawing nor parsing clocks delivery. */
- if(twink_v2==2){uint8_t crc=0,value,j,i,w;
+ if(twink_v2>=2){uint8_t crc=0,value,j,i,w;
   if((uint8_t)(rd-wr-1)<10)return 0;
   b[0]=target&127;b[1]=(target>>7)&127;b[2]=target>>14;b[3]=e[1]-1;b[4]=e[2];b[5]=e[3]&127;b[6]=e[3]>>7;b[7]=event_sequence;
   /* Compact v3 inherits session/generation, but authenticates both in CRC.
@@ -85,7 +85,7 @@ static void event_flush(void){__critical{rd=wr=0;twink_event_left=twink_event_pe
 static void fill(uint32_t through){uint8_t e[4],budget=16,at;uint16_t length=seqlength[5],error;
  if(!length||(twink_reply==0xD4||twink_reply==0xD5))return;
  while(scan_step<through&&budget--){
-  if(twink_staging&&(uint8_t)(rd-wr-1)<(twink_v2==2?10:14))return;
+  if(twink_staging&&(uint8_t)(rd-wr-1)<(twink_v2>=2?10:14))return;
   at=!(length&(length-1))?((uint8_t)scan_step&(uint8_t)(length-1)):scan_step%length;
   if(audible()&&source_note(at,e)&&e[1]&&e[2]){
    if(!scheduled_event(e))return;
@@ -96,10 +96,10 @@ static void fill(uint32_t through){uint8_t e[4],budget=16,at;uint16_t length=seq
 void twink_schedule_reset(uint8_t current) BANKED {
  session=current;generation=1;twink_v2=twink_scheduled=twink_reply=twink_v2_blocked=probing=warming=event_sequence=0;twink_staging=twink_received=0;event_flush();scan_step=0;service_clock=frame_time()-15;
 }
-void twink_schedule_probe(void) BANKED {uint8_t version=3;
+void twink_schedule_probe(void) BANKED {uint8_t version=probing==4?3:4;
  if(seqplaying||twink_v2||twink_v2_blocked||warming)return;
  if(probing&&(uint16_t)(frame_time()-service_clock)<15)return;
- if(frame(1,&version,1)){probing=1;service_clock=frame_time();}
+ if(frame(1,&version,1)){probing=version;service_clock=frame_time();}
 }
 void twink_schedule_stop(void) BANKED {__critical{twink_staging=0;event_sequence=(event_sequence+1)&63;}event_flush();twink_scheduled=warming=0;twink_anchor_pending=0;}
 uint8_t twink_schedule_start(void) BANKED {uint8_t b[2],poll=0xF9;uint16_t since;
@@ -107,7 +107,7 @@ uint8_t twink_schedule_start(void) BANKED {uint8_t b[2],poll=0xF9;uint16_t since
  warming=1;twink_scheduled=0;event_flush();twink_received=0;twink_staging=1;generation=(generation+1)&127;if(!generation)generation=1;
  twink_reply=0xD1;scan_step=play_step=0;step_units=15360U/seqbpm;step_remainder=15360U%seqbpm;
  scan_clock=0;scan_error=seqbpm/2;
- service_clock=(15360U+seqbpm/2)/seqbpm;step_error=(15360U+seqbpm/2)%seqbpm;scheduled_slot=mx.slot;scheduled_bpm=seqbpm;
+ service_clock=(15360U+seqbpm/2)/seqbpm;step_error=(15360U+seqbpm/2)%seqbpm;scheduled_slot=mx.slot|(audible()?128:0);scheduled_bpm=seqbpm;
  source_generation=pattern_generation;signature=fingerprint();
  __critical{twink_clock=twink_clock_fraction=0;twink_clock_div=DIV_REG;twink_last_anchor=0;twink_anchor_pending=0;}
  b[0]=seqbpm>>7;b[1]=seqbpm&127;
@@ -138,29 +138,60 @@ uint8_t twink_schedule_start(void) BANKED {uint8_t b[2],poll=0xF9;uint16_t since
 failed:
  twink_v2_blocked=1;twink_staging=0;event_flush();twink_v2=twink_scheduled=warming=0;twink_anchor_pending=0;__critical{syncw=syncr;}return 0;
 }
-void twink_schedule_service(void) BANKED {uint16_t current,hash,error;uint8_t b[2];uint32_t step;
+/* scheduled_slot low3 bits identify the pad; bit7 remembers audibility,
+   bit6 coalesces an edit while its old immutable FIFO drains. No new RAM. */
+#define PLAN_SLOT 7U
+#define PLAN_EDIT 64U
+#define PLAN_AUDIBLE 128U
+static void advance_play_clock(uint16_t current){uint16_t error;
+ while((int16_t)(current-service_clock)>=0){play_step++;service_clock+=step_units;error=(uint16_t)step_error+step_remainder;if(error>=seqbpm){error-=seqbpm;service_clock++;}step_error=error;}
+}
+static void warm_source_index(uint8_t *e){uint16_t length=seqlength[5];uint8_t step;
+ if(!length)return;
+ step=!(length&(length-1))?((uint8_t)play_step&(uint8_t)(length-1)):play_step%length;
+ source_note(step,e);
+}
+void twink_schedule_service(void) BANKED {uint16_t current,hash,error,cutoff;uint8_t b[4],state,i;uint32_t cutstep;
  if(!twink_v2||!twink_scheduled||warming||!seqplaying)return;
- current=now();
- /* The next step deadline is cached. Doing a32-bit tempo division at
-    every audio yield spent the preparation budget before notes needed it. */
- if((int16_t)(current-service_clock)<0&&scan_step>=play_step+16&&source_generation==pattern_generation&&scheduled_slot==mx.slot&&scheduled_bpm==seqbpm)return;
- step=play_step;
- if(scheduled_bpm!=seqbpm){step_units=15360U/seqbpm;step_remainder=15360U%seqbpm;service_clock=(uint16_t)(((step+1)*15360UL+seqbpm/2)/seqbpm);step_error=((step+1)*15360UL+seqbpm/2)%seqbpm;}
- /* Exact rounded rational deadlines. Catch-up must not do a long divide
-    for every missed step: under IRQ load that work made itself fall behind. */
- while((int16_t)(current-service_clock)>=0){step++;service_clock+=step_units;error=(uint16_t)step_error+step_remainder;if(error>=seqbpm){error-=seqbpm;service_clock++;}step_error=error;}
- play_step=step;
- if(source_generation!=pattern_generation||scheduled_slot!=mx.slot||scheduled_bpm!=seqbpm){
+ current=now();state=mx.slot|(audible()?PLAN_AUDIBLE:0);
+ if((int16_t)(current-service_clock)<0&&scan_step>=play_step+16&&source_generation==pattern_generation&&scheduled_slot==state&&scheduled_bpm==seqbpm)return;
+ if(scheduled_bpm!=seqbpm){step_units=15360U/seqbpm;step_remainder=15360U%seqbpm;service_clock=(uint16_t)(((play_step+1)*15360UL+seqbpm/2)/seqbpm);step_error=((play_step+1)*15360UL+seqbpm/2)%seqbpm;}
+ advance_play_clock(current);
+ /* Let an active note gesture finish before replacing its forecast. Existing
+    immutable events and ongoing source refill remain available meanwhile. */
+ if((scheduled_slot&(PLAN_SLOT|PLAN_AUDIBLE))==state&&scheduled_bpm==seqbpm&&page==8&&seqtrack==5&&
+    (padsampled&(J_A|J_B))&&(padsampled&(J_LEFT|J_RIGHT|J_UP|J_DOWN))){fill(play_step+16);return;}
+ if(source_generation!=pattern_generation||(scheduled_slot&(PLAN_SLOT|PLAN_AUDIBLE))!=state||scheduled_bpm!=seqbpm){
   hash=fingerprint();
-  if(hash!=signature||scheduled_slot!=mx.slot||scheduled_bpm!=seqbpm){
-   b[0]=(generation+1)&127;if(!b[0])b[0]=1;
-   b[1]=audible()?0:1;
+  if((scheduled_slot&(PLAN_SLOT|PLAN_AUDIBLE))!=state||scheduled_bpm!=seqbpm){
+   /* Mute/transport changes retain their separate immediate control path. */
+   b[0]=(generation+1)&127;if(!b[0])b[0]=1;b[1]=audible()?0:1;
    if(!frame(4,b,b[1]?2:1))return;
-   event_flush();generation=b[0];scan_step=step+1;scan_clock=service_clock;scan_error=step_error;signature=hash;scheduled_slot=mx.slot;scheduled_bpm=seqbpm;
+   event_flush();generation=b[0];scan_step=play_step+1;scan_clock=service_clock;scan_error=step_error;
+   signature=hash;scheduled_slot=state;scheduled_bpm=seqbpm;
+  }else if(hash!=signature){
+   signature=hash;
+   if(twink_v2>=3){scheduled_slot|=PLAN_EDIT;warm_source_index(b);}
+   /* Older peers cannot retain a cutoff prefix. Keep already-admitted music
+      rather than flush its imminent deadlines; later fills read edits. */
   }
   source_generation=pattern_generation;
  }
- fill(step+16);
+ if(scheduled_slot&PLAN_EDIT){
+  /* A drained source FIFO proves all old forecast events are on the peer,
+     so retaining its prefix cannot leave an unsent imminent note behind. */
+  if(rd!=wr||twink_event_left||twink_event_pending||syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))return;
+  warm_source_index(b);current=now();advance_play_clock(current);
+  cutstep=play_step+5;cutoff=service_clock;error=step_error;
+  for(i=1;i<5;i++){cutoff+=step_units;error+=step_remainder;if(error>=seqbpm){error-=seqbpm;cutoff++;}}
+  /* If preparation consumed the old runway, extend it before attempting a
+     cutoff. Never create a silent gap just to publish an edit sooner. */
+  if((int16_t)(scan_clock-cutoff)<0){fill(play_step+16);return;}
+  b[0]=(generation+1)&127;if(!b[0])b[0]=1;b[1]=cutoff&127;b[2]=(cutoff>>7)&127;b[3]=cutoff>>14;
+  if(!frame(4,b,4))return;
+  event_flush();generation=b[0];scan_step=cutstep;scan_clock=cutoff;scan_error=error;scheduled_slot=state;
+ }
+ fill(play_step+16);
 }
 /* Repeated replies describe the same absolute admission window. This
    foreground-free arithmetic runs only when its byte actually changes. */
@@ -171,7 +202,9 @@ static void admission(void){uint8_t ack,delta,end,room;
 /* One prebuilt byte per call. No source lookup, CRC, division, synthesis,
    or interrupt-enabling helper. HRAM clock math avoids C stack spills in
    this1024Hz path; control and EVENT bodies stay indivisible. */
-void twink_v2_irq(void) BANKED __naked {__asm
+/* Keep the clock and busy-wire checks fixed. Most timer callbacks have
+   no byte to deliver; they must not pay a ROM-bank trampoline to learn it. */
+uint8_t twink_v2_clock(void) NONBANKED __naked {__asm
  ldh a,(#0x04)
  ld d,a
  ldh a,(_twink_clock_div)
@@ -210,16 +243,24 @@ v2_clock_add$:
  ld a,d
  sub a,e
  cp #24
- ret c
+ jr c,v2_clock_blocked$
  xor a
  ld (_twink_guard),a
 v2_bus_check$:
  ldh a,(#0x02)
  bit 7,a
- ret nz
+ jr nz,v2_clock_blocked$
  ldh a,(#0x0f)
  bit 3,a
- ret nz
+ jr nz,v2_clock_blocked$
+ ld a,#1
+ ret
+v2_clock_blocked$:
+ xor a
+ ret
+ __endasm;
+}
+void twink_v2_irq(void) BANKED __naked {__asm
  ld a,(_twink_staging)
  or a
  jr z,v2_anchor_check$
@@ -355,7 +396,7 @@ v2_event_start$:
  ld a,(_twink_v2)
  cp #2
  ld a,#13
- jr nz,v2_event_length$
+ jr c,v2_event_length$
  ld a,#9
 v2_event_length$:
  ld (_twink_event_left),a
@@ -381,7 +422,7 @@ v2_poll$:
  ld a,#0xF9
  ldh (#0x01),a
 v2_send$:
- ; Bound receiver rearm from the wire's completion, not from when this
+ ; Bound receiver rearm from wire completion, not from when this
  ; CPU eventually services its SIO interrupt. Standard serial takes16DIV;
  ; two extra DIV cover sampling/write phase before the24DIV safety guard.
  ldh a,(#0x04)

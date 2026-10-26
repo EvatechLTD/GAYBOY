@@ -51,7 +51,7 @@ const uint8_t limits[26]={3,15,1,7,7,1,7,63,1,1,7,1,7,1,31,3,255,1,15,1,7,3,1,1,
 #include "twink_schedule.h"
 #include "engine_state.h"
 #include "mono_state.h"
-void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){if(!twink_v2)twink_ended_div=DIV_REG;twink_guard=1;if(syncstart==1&&synctxbyte==0xFA){syncstart=2;if(twink_v2){twink_clock=0;twink_clock_fraction=0;twink_clock_div=DIV_REG;twink_last_anchor=0;twink_anchor_pending=0;}}if(twink_staging){if(b<128){twink_ack=b;twink_received=1;}else if(b>=0xD1&&b<=0xD6){twink_reply=b;twink_received=1;}return;}if(n!=rd){rx[wr]=b;wr=n;}else overflow=1;return;} if(syncmode&&!syncslave){
+void serial_isr(void) { uint8_t b=SB_REG,n=wr+1; if(syncmode==SYNC_TWINK){if(!twink_v2)twink_ended_div=DIV_REG;twink_guard=1;if(syncstart==1&&synctxbyte==0xFA){syncstart=2;if(twink_v2){twink_clock=0;twink_clock_fraction=0;twink_clock_div=DIV_REG;twink_last_anchor=0;twink_anchor_pending=0;}}if(twink_staging){if(b<128){twink_ack=b;twink_received=1;}else if(b>=0xD1&&b<=0xD7){twink_reply=b;twink_received=1;}return;}if(n!=rd){rx[wr]=b;wr=n;}else overflow=1;return;} if(syncmode&&!syncslave){
  if(syncstart==1&&synctxbyte==0xFA)syncstart=2;synctxwait=3;if(waveengine==3&&syncdivider==1)synctxwait=1;
  if(syncdue){syncdue=0;SB_REG=syncmode==1?(0x80|synctick):0;SC_REG=0x81;}return;
  } if(sync_raw_ready&&seqplaying)sync_raw_tick();SB_REG=0; SC_REG=0x80; if(n==rd) overflow=1; else {rx[wr]=b;wr=n;} }

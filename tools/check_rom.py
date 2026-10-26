@@ -9,6 +9,7 @@ assert '_synctx' not in s,'Do not alias the transmit queue with active sequencer
 # TWINK still uses exactly one GBDK bank trampoline per pump invocation.
 assert s['_sync_clock_isr']<0x4000 and s['_sync_native_elapsed']<0x4000,'Native hot clock must remain fixed ROM'
 assert s['b_app_run']==60 and s['_app_run']>>16==60 and s['_main']<0x4000,'Foreground bank/boot stub mismatch'
+assert s['_twink_v2_clock']<0x4000,'TWINK busy-clock front end must remain fixed ROM'
 assert s['b_twink_v2_irq']==6 and s['_twink_v2_irq']>>16==6,'TWINK kernel bank/ABI mismatch'
 assert s['_syncirqphase']==0xFFB8 and s['_syncdue']==0xFFC4,'Clock state overlaps reserved HRAM'
 assert s['_pad_names']==0xAE40 and s['_mixer_image']>=0xAE68 and s['_mixer_image']+28<=0xAE90,'Five-character pad cache overlaps mixer renderer state'
