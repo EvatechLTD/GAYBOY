@@ -139,7 +139,7 @@ failed:
  twink_v2_blocked=1;twink_staging=0;event_flush();twink_v2=twink_scheduled=warming=0;twink_anchor_pending=0;__critical{syncw=syncr;}return 0;
 }
 /* scheduled_slot low3 bits identify the pad; bit7 remembers audibility,
-   bit6 coalesces an edit while its old immutable FIFO drains. No new RAM. */
+   bit6 coalesces an edit while its old immutable prefix retires. No new RAM. */
 #define PLAN_SLOT 7U
 #define PLAN_EDIT 64U
 #define PLAN_AUDIBLE 128U
@@ -151,7 +151,7 @@ static void warm_source_index(uint8_t *e){uint16_t length=seqlength[5];uint8_t s
  step=!(length&(length-1))?((uint8_t)play_step&(uint8_t)(length-1)):play_step%length;
  source_note(step,e);
 }
-void twink_schedule_service(void) BANKED {uint16_t current,hash,error,cutoff;uint8_t b[4],state,i;uint32_t cutstep;
+void twink_schedule_service(void) BANKED {uint16_t current,hash,error,cutoff,next;uint8_t b[4],state,i,r,saved;uint32_t cutstep;
  if(!twink_v2||!twink_scheduled||warming||!seqplaying)return;
  current=now();state=mx.slot|(audible()?PLAN_AUDIBLE:0);
  if((int16_t)(current-service_clock)<0&&scan_step>=play_step+16&&source_generation==pattern_generation&&scheduled_slot==state&&scheduled_bpm==seqbpm)return;
@@ -178,17 +178,28 @@ void twink_schedule_service(void) BANKED {uint16_t current,hash,error,cutoff;uin
   source_generation=pattern_generation;
  }
  if(scheduled_slot&PLAN_EDIT){
-  /* A drained source FIFO proves all old forecast events are on the peer,
-     so retaining its prefix cannot leave an unsent imminent note behind. */
-  if(rd!=wr||twink_event_left||twink_event_pending||syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))return;
+  /* Finish and acknowledge any old wire event before inspecting the FIFO.
+     Its unsent suffix need not drain if it begins at/after our cutoff. */
+  if(twink_event_left||twink_event_pending||syncr!=syncw||(SC_REG&0x80)||(IF_REG&SIO_IFLAG))return;
   warm_source_index(b);current=now();advance_play_clock(current);
   cutstep=play_step+5;cutoff=service_clock;error=step_error;
   for(i=1;i<5;i++){cutoff+=step_units;error+=step_remainder;if(error>=seqbpm){error-=seqbpm;cutoff++;}}
   /* If preparation consumed the old runway, extend it before attempting a
      cutoff. Never create a silent gap just to publish an edit sooner. */
   if((int16_t)(scan_clock-cutoff)<0){fill(play_step+16);return;}
+  /* Every earlier note must already be admitted. Compact FIFO frames are
+     ordered; one head target proves its entire unsent suffix is replaceable.
+     Detach only that suffix atomically; keep staged RX mailboxes active.
+     No partial packet or acknowledgement remains when the FIFO is emptied. */
+  i=0;__critical {
+   if(!twink_event_left&&!twink_event_pending&&syncr==syncw&&!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)){
+    r=rd;next=cutoff;if(r!=wr){r++;next=rx[r++];next|=(uint16_t)rx[r++]<<7;next|=(uint16_t)rx[r]<<14;}
+    if((int16_t)(next-cutoff)>=0){saved=wr;wr=rd;i=1;}
+   }
+  }
+  if(!i)return;
   b[0]=(generation+1)&127;if(!b[0])b[0]=1;b[1]=cutoff&127;b[2]=(cutoff>>7)&127;b[3]=cutoff>>14;
-  if(!frame(4,b,4))return;
+  if(!frame(4,b,4)){__critical{wr=saved;}return;}
   event_flush();generation=b[0];scan_step=cutstep;scan_clock=cutoff;scan_error=error;scheduled_slot=state;
  }
  fill(play_step+16);

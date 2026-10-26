@@ -26,6 +26,12 @@ Native PLL deadband experiment (rejected): ignoring the first +/-1unit of phase 
 
 Receiver bank-placement follow-up: hot publication/cold ARM split2fab800fb609d8a562e6d90fa744d65cb7a709ceb05c3249d2596bdf01a527a3 passes one721-note control run with exact four-pitch order, but phase-offset sweep still produces late notes (offset8:16late/max58units). Cold4560 can pass offsets where hot2fab fails. Thus a single clean control run was alignment-sensitive; neither receiver is fully qualified yet. Worker is tracing actual readiness/foreground reconciliation. Keep this negative control in future qualification.
 
+Source edit handoff follow-up: `build/GAYBOY-TWINK-V4-PREFIX2-WIP.gb/.noi`, SHA256 `61161c74fc1d9eeaeaf3c54538394d2645e535f628bb69ab9805fbb1e018ca5e`. A full source-FIFO drain is unnecessary if all in-flight old packets are acknowledged and the first unsent target is at/after cutoff. Ordered compact frames then prove the entire unsent suffix replaceable. Atomically detach that suffix by setting wr=rd, publish CANCEL, reset generation and refill; retain staged RX mailboxes throughout. If frame publication fails, restore the detached FIFO. Six exact-phase120/240 tests and actual UI plot/move/resize all have matching attacks, changed audible pitch, duration2 on wire, no late/rejected/cutoff faults. Reports `MONOSIMP-TWINKTIMING-V2/build/v4-prefix2-*`. In tested120 cases edited step10 becomes audible after~1.1sec instead~3.1sec (one fewer missed recurrence);240 remains~1.7sec. This is an incremental latency improvement, not instant live editing.
+
+Rejected first prefix implementation temporarily set twink_staging=0 to pause EVENT transmission. That flag also controls RX routing: replies can enter the FIFO instead of IRQ mailboxes and corrupt its suffix. One120phase0 case remainedplaying with zero late counters but stopped delivering notes. Corrected prefix2 keeps staging enabled and verifies matching attacks plus actual changed sound. Never treat zero late counters alone as proof of continuity.
+
+Explicit receiver markers now isolate the control-edit blocker: synchronous chorus depth calls full md_refresh, including61 route/phase-cache rebuilds (~82ms), longer than a240BPM1/16. Two prepared notes can fire while foreground is blocked, then the next head is raw/unprepared. No CRC or wire fault is involved. Worker is proving exact value-only cache invalidation versus full route invalidation; the phase-sensitive bank-placement workaround is not the accepted fix.
+
 ## Earlier checkpoints (historical)
 
 ## Accepted branch milestones
