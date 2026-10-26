@@ -27,3 +27,14 @@ Host ROM: build/GAYBOY-TWINK-CHORDS.gb
 SHA256: 5155ffde242b0b02370d2c65b7a14b819a21f24f79e3f35ad67a566d323c3e8b
 
 Reports: build/chord-bank-ms-ui-final.json, build/chord-bank-ms-c1-ui.json, build/chord-bank-host-playback.json, build/chord-bank-host-low-playback.json, build/chord-bank-local-arp.json; native-link and linked-smooth logs share that prefix. Earlier reports may reference the immediately preceding host compile; rerun the final matched pair before delivery.
+
+## Final delivered candidate
+
+Receiver SHA256: 10ab03b935d2bdf368444cff28b84b9d1595916074808f2cbcba2ae52ab18cf8
+Pair folder: DATA/TESTS/TWINK-CHORDS-20261026 (ROMs and matching NOI files).
+
+Receiver boots into CHORD25 bank, with MIDI input unchanged by default. Select LINK ? INPUT ? TWINK. LINK ? BANK switches between CHORD25 and FACTORY. LINK ? PLAY chooses receiver-local MONO / POLY / ARP, ARP HZ and ORDER. Browsing a new chord-bank preset applies its intended mono/trio/duo mode. First25 are specifically prepared and qualified; original factory full-FX compatibility is retained but its complete library is not requalified by this experiment.
+
+Receiver checks: all25 native-ready and correct voice groups, low Wave and pulse octave allocation, held chord through browsing, bad/partial CRC atomicity, releases and F3 previews; 60 musical-rate changed chords, 126 accepted F5 frames, two intentional bad CRC rejections, no overflow/unarmed edges. Local8Hz arp APU intervals124.995?125.447ms and16Hz32attacks/2seconds. Faster-than-frame changes may coalesce on receiver; do not claim every arbitrary-rate burst produces a separate audible attack.
+
+Final exact-pair regressions: chord-bank-final-pair-playback.json (30/60 scheduled chord changes at120/240BPM plus stop), chord-bank-final-pair-ui.json (all13 actual MS editing/navigation actions at eachtempo). Both pass. User performs soundchecks on hardware.
