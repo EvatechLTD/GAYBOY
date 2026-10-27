@@ -2,7 +2,9 @@
 
 Your Game Boy has a music problem. Good. Let's make it worse.
 
-**Stable release: [GAYBOY 1.0](https://github.com/EvatechLTD/GAYBOY/releases/tag/v1.0)**
+**Final free demo: [download the frozen release](https://github.com/EvatechLTD/GAYBOY/releases/tag/free-demo-final).**
+
+This public repository is frozen at the final free-demo version. See [release details and checksums](docs/FREE_DEMO_FINAL.md).
 
 **GAYBOY** is a Game Boy music workstation: a synthesizer, piano-roll sequencer, sample drum machine and performance mixer in a `.gb` ROM. Make chiptune melodies, program beats and play the handheld as a MIDI synth through Arduinoboy.
 
