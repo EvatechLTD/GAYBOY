@@ -5,12 +5,13 @@
 #include "resident.h"
 #include "song_audio.h"
 #include "song_link.h"
+#include "song_twink.h"
 #include "smooth_playback.h"
 #include "mod_bypass.h"
 extern const uint16_t notes[140];
 extern uint8_t globalmod[10],seqtilesready;
 void seq_audition_stop(void) BANKED;
-static uint8_t audible(uint8_t c){uint8_t solos=seqsolo&95;if(drumsolomask)solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
+static uint8_t audible(uint8_t c){uint8_t solos=seqsolo&(syncmode==SYNC_TWINK?111:95);if(drumsolomask)solos|=64;return !(seqmuted&(1<<c))&&(!solos||(solos&(1<<c)));}
 extern uint8_t noisepatch[2][5],pulsekickpatch[8],tablemode[4],pattern_dirty,lfo_irq_mask;
 extern volatile uint8_t editirq_enabled,editirq_running,drum_irq_active;
 extern uint8_t editbuffer_reading;
@@ -41,6 +42,7 @@ __at (0xA300) SongRuntime song_runtime;
 #define R song_runtime
 static uint8_t cache_put(uint16_t at,const uint8_t *p,uint8_t n){if(at+n>CACHE_SIZE){R.error=2;return 0;}
  __critical{SWITCH_RAM_MBC5(2);memcpy((void *)(CACHE_BASE+at),p,n);SWITCH_RAM_MBC5(0);}return 1;}
+uint8_t song_cache_put(uint16_t at,const uint8_t *p,uint8_t n) BANKED {return cache_put(at,p,n);}
 void song_cache_get(uint16_t at,uint8_t *p,uint8_t n) BANKED {uint8_t b[16];
  /* Destination may itself be bank-zero SRAM. Stage through WRAM before
     restoring its bank; a direct memcpy would write the wrong RAM bank. */
@@ -71,7 +73,7 @@ __at (0xA3B4) static uint8_t write_count;
 __at (0xA3B6) static SongScene *current_scene;
 static uint8_t *frame(void){return QBASE+(uint16_t)song_qwrite*QSIZE;}
 static void put_reg(uint8_t reg,uint8_t value){uint8_t *p=write_pointer;if(write_count>=91){R.error=2;return;}*p++=reg;*p++=value;write_pointer=p;write_count++;if(reg==0x21)SIM[0x11]=value;}
-static void begin_frame(void){uint8_t *p=frame();write_frame=p;write_pointer=p+QHEADER;write_count=0;p[0]=R.clock;p[1]=R.clock>>8;}
+static void begin_frame(void){uint8_t *p=frame();write_frame=p;write_pointer=p+QHEADER;write_count=0;if(syncmode==SYNC_TWINK)song_twink_begin();p[0]=R.clock;p[1]=R.clock>>8;}
 static void finish_frame(void){uint8_t *p=write_frame;p[2]=write_count;p[3]=R.scene;memcpy(p+4,(const void *)&R.position,4);p[8]=R.done;song_qwrite=(song_qwrite+1)&7;}
 static void plan_prefetch(void){SongClip c;if(R.need){if(R.prefetch<R.total)song_read(R.prefetch,&c);else{memset(&c,0,sizeof(c));c.pad=255;}R.next=c;R.need=0;}}
 static uint8_t scale(uint16_t x){uint8_t q=x>>7;return q+((uint8_t)((x&127)+q)>=127);}
@@ -132,7 +134,7 @@ static int8_t shape(uint8_t phase){uint8_t n;static const uint8_t sine[17]={0,6,
  switch(globalmod[4]){case 1:return (phase>>1)-64;case 2:return phase<128?64:-64;case 3:return (int8_t)((phase&0xC0)*73+37)/2;case 4:n=phase&63;if(phase&64)n=64-n;n=sine[n>>2];return phase&128?-(int8_t)n:n;default:return phase<128?(int16_t)phase-64:191-(int16_t)phase;}}
 static int8_t amount(int8_t depth,int8_t value){int16_t x=(int16_t)depth*value;return x<0?-((-x)>>6):x>>6;}
 static uint8_t compile_scene(uint8_t pad,uint16_t *used){SongScene *s=&song_scenes[pad];uint8_t c,i,div,point[2],*p;uint16_t scale;uint32_t numerator,denominator,q,period;
- if(seqmode||seqswing!=50||monomode||polymode||waveengine||seqeventcounts[3]||seqeventcounts[4]||seqeventcounts[5]){R.error=3;return 0;}
+ if(seqmode||seqswing!=50||monomode||polymode||waveengine||seqeventcounts[3]||seqeventcounts[4]||(seqeventcounts[5]&&syncmode!=SYNC_TWINK)){R.error=3;return 0;}
  memset(s,0,sizeof(*s));s->master=master;s->power=power;
  for(c=0;c<4;c++)s->length[c]=seqlength[c==3?6:c];
  for(c=0;c<3;c++){
@@ -153,6 +155,7 @@ static uint8_t compile_scene(uint8_t pad,uint16_t *used){SongScene *s=&song_scen
  }
  editirq_wave_capture(s->wave);
  if(!compile_drums(s,used))return 0;
+ if(syncmode==SYNC_TWINK&&!song_twink_compile(pad,used))return 0;
  div=globalmod[6];if(globalmod[7]){denominator=globalmod[8]==1?160:globalmod[8]==2?360:240;if(div<=8)numerator=(uint32_t)R.bpm<<(8-div);else{numerator=R.bpm;denominator<<=div-8;}q=(numerator<<16)/denominator;}else q=(uint32_t)globalmod[5]*15360UL;
  s->lfowhole=q>>16;s->lfofraction=q;return 1;
 }
@@ -194,14 +197,14 @@ void song_drum_emit(void) BANKED {uint8_t p[6],*h=current_scene->drum;SongScene 
  else if(p[1]&2){if(!(SIM[0x11]&7)){put_reg(0x21,8);put_reg(0x23,128);}}
  if(p[1]&4){R.kickleft=p[5]?p[5]:256;route=(route&~0x11)|h[6];put_reg(0x25,route);put_reg(0x10,h[0]);put_reg(0x11,h[1]);put_reg(0x12,p[4]);put_reg(0x13,h[2]);put_reg(0x14,h[3]);}
 }
-static void quiet(void){off(0);off(1);off(2);put_reg(0x21,8);put_reg(0x23,128);R.kickleft=0;}
+static void quiet(void){if(syncmode==SYNC_TWINK)song_twink_quiet();off(0);off(1);off(2);put_reg(0x21,8);put_reg(0x23,128);R.kickleft=0;}
 static void scene(uint8_t pad){uint8_t c;SongScene *s;
  R.scene=pad;if(pad>=5){quiet();return;}s=&song_scenes[pad];current_scene=s;put_reg(0x26,s->power?128:0);put_reg(0x24,s->master);
  if(R.kickleft){put_reg(0x12,8);put_reg(0x14,128);R.kickleft=0;}
  R.drumstep=0;R.drumcursor=s->begin[3];
  for(c=0;c<3;c++){R.voice[c].step=R.voice[c].count=R.voice[c].index=0;R.voice[c].residual=0;R.voice[c].wait=65535U;R.voice[c].cursor=s->begin[c];group(c);}
  /* Empty P1 groups silence pulse 1. Apply its drum owner afterwards. */
- song_drum_emit();
+ song_drum_emit();if(syncmode==SYNC_TWINK)song_twink_scene(pad,0);
 }
 /* Cold seek before starting the timer. Read only compiled events up to each
    track's local position; never replay the whole song or add IRQ work. */
@@ -218,6 +221,7 @@ static void seek_scene(uint8_t pad,uint32_t offset){uint8_t c,h[2],p[6],flags=0,
  d=s->drum;
  if(flags&1){route=(route&~0x88)|d[flags&32?5:4];put_reg(0x25,route);put_reg(0x20,0);put_reg(0x21,env);put_reg(0x22,freq);put_reg(0x23,128);}
  if(p[1]&4){R.kickleft=p[5]?p[5]:256;route=(route&~0x11)|d[6];put_reg(0x25,route);put_reg(0x10,d[0]);put_reg(0x11,d[1]);put_reg(0x12,p[4]);put_reg(0x13,d[2]);put_reg(0x14,d[3]);}
+ if(syncmode==SYNC_TWINK)song_twink_scene(pad,offset);
 }
 static void seek_position(uint32_t start){uint16_t i;uint32_t chain=0;uint8_t pad=255;SongClip clip;
  R.position=start;R.current.pad=255;R.next.pad=255;R.prefetch=R.total;
@@ -247,7 +251,7 @@ static void step(void){uint8_t c;SongScene *s;
  if(R.scene>=5)return;s=current_scene;
  if((uint16_t)R.drumstep+1>=s->length[3]){R.drumstep=0;R.drumcursor=s->begin[3];}else R.drumstep++;
  for(c=0;c<3;c++){if((uint16_t)R.voice[c].step+1>=s->length[c]){R.voice[c].step=0;R.voice[c].cursor=s->begin[c];}else R.voice[c].step++;group(c);}
- song_drum_emit();
+ song_drum_emit();if(syncmode==SYNC_TWINK)song_twink_step();
 }
 static void deadline(uint8_t boundary){uint16_t wait,phase=R.phase;uint8_t c;
  if(boundary){R.stepleft=R.units;while(phase>=R.bpm){phase-=R.bpm;R.stepleft--;}R.stepleft+=R.remainder>phase;}
@@ -340,6 +344,13 @@ song_commit_ready$:
  ld d,h
  ld e,l
  call _song_program
+ ld a,(#_syncmode)
+ cp #6
+ jr nz,song_commit_no_ms$
+ ld e,#b_song_twink_commit
+ ld hl,#_song_twink_commit
+ call ___sdcc_bcall_ehl
+song_commit_no_ms$:
  ld a,(#_song_qpointer)
  ld l,a
  ld a,(#_song_qpointer+1)
@@ -459,17 +470,10 @@ void song_go(void) BANKED {
  if(song_link_active)DIV_REG=0;
  TIMA_REG=252;IF_REG&=~TIM_IFLAG;seqplaying=song_playing=1;smooth_playback_preparing=0;TAC_REG=4;song_audio_commit();
 }
-void song_start(uint8_t smooth) BANKED {
- dirty=1;if(song_playing){song_stop();return;}if(song_link_active){song_link_finish();return;}
- if(seqplaying){song_view.error=6;return;}if(syncmode==1){song_link_request(smooth);return;}if(syncmode){song_view.error=7;return;}
- if(song_prepare(smooth,seqbpm,smooth?0:song_view.cursor&~15UL)){
-  song_status(1);__critical{song_arm();song_go();}
- }
-}
 uint8_t song_prepare(uint8_t smooth,uint16_t bpm,uint32_t start) BANKED {uint8_t original=mx.slot,mask=0,c,err;uint16_t i,n,used=0;SongClip clip;
  n=song_pattern_mode?1:song_count();if(!n){song_view.error=1;return 0;}if(!song_pattern_mode&&start>=song_end()){song_view.error=10;return 0;}
  if(smooth)smooth_playback_begin();else {smooth_playback_preparing=1;song_status(0);}
- song_pick_clear();seq_audition_stop();if(pattern_dirty)sparse_snapshot(original);panic();memset((void *)&R,0,sizeof(R));R.origin=original;R.scene=255;R.bpm=bpm;R.units=15360U/bpm;R.remainder=15360U-R.units*bpm;
+ song_pick_clear();seq_audition_stop();if(pattern_dirty)sparse_snapshot(original);panic();memset((void *)&R,0,sizeof(R));R.origin=original;R.scene=255;R.bpm=bpm;R.units=15360U/bpm;R.remainder=15360U-R.units*bpm;if(syncmode==SYNC_TWINK)song_twink_reset();
  for(i=0;i<n;i++){if(song_pattern_mode){memset(&clip,0,sizeof(clip));clip.pad=original;clip.length=0xffffffffUL;}else song_read(i,&clip);if(clip.pad>=5||!clip.length||clip.start+clip.length<clip.start){song_view.error=8;smooth_playback_preparing=0;smooth_playback_update();return 0;}mask|=1<<clip.pad;}
  for(c=0;c<5;c++)if(mask&(1<<c)){if(!sparse_restore(c)){R.error=3;break;}seqbpm=bpm;if(!compile_scene(c,&used))break;}
  err=R.error;sparse_restore(original);seqbpm=bpm;smooth_playback_preparing=0;editbuffer_reset();arp_irq_reset();editirq_enabled=editirq_running=lfo_irq_mask=drum_irq_active=0;seqirqdirty=seqirqready=seqirqfired=0;

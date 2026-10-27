@@ -30,6 +30,10 @@ def audit(rom):
   assert s['_song_scenes']==0xA000 and s['_song_runtime']==0xA300
   assert s['_song_view']==0xA4ED and s['_song_qread']==0xA3C0 and s['_song_qpointer']==0xA3CE
   assert 5*104<=0x300 and 0xA300+162<=0xA3B0
+  if '_ms_scenes' in s:
+   assert s['_ms_scenes']==0xA210 and s['_ms_cursor']==0xA230
+   assert s['_ms_step']==0xA232 and s['_ms_pad']==0xA233 and s['_song_twink_overflows']==0xA234
+   assert 0xA000+5*104<=0xA210 and 0xA210+5*6<=0xA230 and 0xA234+2<=0xA300
   assert 0xA500+8*192==0xAB00 and 8+158*9<=5*288
   assert 128+352==480 and 480+288==768
   # Song retained tile signatures follow both stopped selection staging lists.
