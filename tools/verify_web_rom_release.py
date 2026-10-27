@@ -22,7 +22,7 @@ with sync_playwright() as p:
     page=browser.new_page()
     if '--local-rom-only' in sys.argv:
         assert URL.startswith('http://127.0.0.1:'), 'Offline shelf stub is local-only'
-        page.route('**/network-beats.js', lambda r:r.fulfill(
+        page.route('**/network-beats.js*', lambda r:r.fulfill(
             content_type='application/javascript',body='/* PHP shelf is verified on the live site. */'))
     errors=[]
     page.on('pageerror',lambda e:errors.append(str(e)))
