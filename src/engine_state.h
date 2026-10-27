@@ -5,7 +5,7 @@ uint8_t waveengine,arprate=2,softshape[2]={0,2},softnext;
 uint8_t mixsamples[32],mixcounter;
 volatile uint8_t mixready[2],mixbuffer[32],mixrunning,mixread,mixwrite;
 volatile uint16_t engineblocks,mixunderruns;
-void midi(uint8_t b);
+void midi(uint8_t b) BANKED;
 void enginestop(void) BANKED;
 void enginepitch(void) BANKED;
 void enginenote(uint8_t note,uint8_t vel,uint8_t owner) BANKED;

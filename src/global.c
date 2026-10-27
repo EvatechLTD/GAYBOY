@@ -18,7 +18,7 @@ uint8_t editirq_owned(uint8_t c) NONBANKED;
 void stop(uint8_t c) BANKED {
  if(seqplaying&&seqservicing&&editirq_owned(c))return;
  /* A newly committed IRQ attack already replaced this sequencer release. */
- if(!syncmode&&c<2&&seqplaying&&seqservicing&&(seqirqfired&(1<<c)))return;
+ if(SYNC_LOCAL_AUDIO&&c<2&&seqplaying&&seqservicing&&(seqirqfired&(1<<c)))return;
  if(c==0&&pulsekickleft){if(!eval_audio_release(c))active[c]=0;return;}
  if(experimental_mode&&c<3&&(mono_owned&(1<<c))){if(c==2){wave_track_down=0;eval_note(2,0);if(!MOD_LEVEL(2)||!globalmod[3])active[2]=0;}else if(!eval_audio_release(c))active[c]=0;return;}
  if(c==2&&waveengine==3){if(experimental_mode){wave_track_down=0;eval_note(2,0);if(!MOD_LEVEL(2)||!globalmod[3])active[2]=0;}return;}
@@ -34,7 +34,9 @@ void stop(uint8_t c) BANKED {
  else if(c==2){if(waveengine)enginestop();NR30_REG=0;}
  else NR42_REG=0;
 }
-void panic_audio(void) BANKED{twink_panic();uint8_t c;seqapending=seqamoved=0;seqplaying=0;seqticks=0;drum_stop();exp_reset();monocount=monodown=0;modreset();memset(keycount,0,4);voice_reset();for(c=0;c<4;c++){active[c]=0;stop(c);held[c]=255;sustain[c]=0;}NR12_REG=NR22_REG=0;}
+extern volatile uint8_t drum_irq_active;
+void arp_irq_reset(void) NONBANKED;
+void panic_audio(void) BANKED{twink_panic();uint8_t c;seqapending=seqamoved=0;seqplaying=0;if(syncmode==1&&syncarmed){sync_transport(0);drum_irq_active=0;arp_irq_reset();}seqticks=0;drum_stop();exp_reset();monocount=monodown=0;modreset();memset(keycount,0,4);voice_reset();for(c=0;c<4;c++){active[c]=0;stop(c);held[c]=255;sustain[c]=0;}NR12_REG=NR22_REG=0;}
 extern uint8_t seqgate[7];
 extern uint16_t seqcachedbpm,seqdeadline;
 uint8_t experimental_mode=1;
@@ -88,7 +90,7 @@ void native_input(uint8_t p,uint8_t edge) BANKED {
 
 uint8_t ui_menu_allowed(uint8_t item) BANKED {if(item==7||item==9||item==14||item==5||item==6)return 0;if(item==2)return 1;if(item==27)return 1;if(item==26)return clear_available();if(item==19||item==20||item==24||item==25)return 0;if(item==23)return 1;if(item>=21)return page==8;if(!experimental_mode&&(item==2||item==5||item==6||item==7||item==9||item==14))return 0;return item&&(!(item>=1&&item<=6)||page<7);}
 
-void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint16_t magnitude=wheel<0?-wheel:wheel,result;uint8_t range=param[c][25];result=(magnitude>>6)*range+(((magnitude&63)*range)>>6);bend[c]=wheel<0?-(int16_t)result:result;updatepitch(c);if(!syncmode)seq_irq_refresh(c);}
+void bendupdate(uint8_t c) BANKED {int16_t wheel=(int16_t)wheellast[c]-8192;uint16_t magnitude=wheel<0?-wheel:wheel,result;uint8_t range=param[c][25];result=(magnitude>>6)*range+(((magnitude&63)*range)>>6);bend[c]=wheel<0?-(int16_t)result:result;updatepitch(c);if(SYNC_LOCAL_AUDIO)seq_irq_refresh(c);}
 
 /* Keep frame-rate FX work out of the scarce fixed-ROM interrupt bank. */
 extern uint16_t pattern_generation;
@@ -96,7 +98,7 @@ void service_frame(void) BANKED {uint16_t now,delta;uint8_t users=0,needed=0;__c
  if(lastframe!=now){
   /* Let an imminent sequencer event precede the next video-rate mod update.
      lastframe stays unchanged so the deferred update catches up afterward. */
-  if(seqplaying&&!syncmode&&!seqservicing&&delta<seqdeadline&&seqdeadline-delta<=8)return;
+  if(seqplaying&&SYNC_LOCAL_AUDIO&&!seqservicing&&delta<seqdeadline&&seqdeadline-delta<=8)return;
   delta=now-lastframe;frameadvance=delta>255?255:delta;lastframe=now;
   if(seq_live_timed)seq_live_service();
   {

@@ -4,6 +4,7 @@
 #include "song_mode.h"
 #include "song_link.h"
 #include "smooth_playback.h"
+#include "native_sync.h"
 #include "link_control.h"
 
 /* This protocol owns the cable only while a prepared Song transport is armed.
@@ -19,7 +20,7 @@
 #define FAILED 0xD3
 #define ARMED 0xD4
 #define STOPPING 0xDC
-enum {M_HEADER=1,M_WAIT,M_ARM,M_GO,S_HEADER,S_PREP,S_READY,S_ARM,RUN,ENDING,FAIL,M_PREP,M_ARM_WAIT,S_LISTEN};
+enum {M_HEADER=1,M_WAIT,M_ARM,M_GO,S_HEADER,S_PREP,S_READY,S_ARM,RUN,ENDING,FAIL,M_PREP,M_ARM_WAIT,S_LISTEN,M_LOCAL_PREP};
 uint8_t song_link_active;
 typedef struct {
  volatile uint8_t state,reply,transfer,rxat,txat,peer;
@@ -43,9 +44,10 @@ void editirq_clock_reset(void) NONBANKED;
 static uint16_t frame(void){uint16_t n;__critical{n=sys_time;}return n;}
 static uint8_t expired(void){uint16_t n;__critical{n=sys_time-W.since;}return n>900;}
 static uint8_t checksum(void){uint8_t i,j,c=0;for(i=0;i<9;i++){c^=W.header[i];for(j=0;j<7;j++)c=c&64?((c<<1)^9)&127:(c<<1)&127;}return c;}
-static void send(uint8_t b){uint16_t now=frame();__critical{if(!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)){W.sentframe=now;W.transfer=1;SB_REG=b;SC_REG=0x81;}}}
+static void send(uint8_t b){uint16_t now=song_pattern_mode?DIV_REG:frame();__critical{if(!(SC_REG&0x80)&&!(IF_REG&SIO_IFLAG)){W.sentframe=now;W.transfer=1;SB_REG=b;SC_REG=0x81;}}}
 static void quiet(void){NR12_REG=NR22_REG=NR42_REG=8;NR14_REG=NR24_REG=NR44_REG=128;NR30_REG=0;}
 static void begin_slave(void){
+ native_prepare=0;
  song_link_active=1;memset((void *)&W,0,sizeof(W));W.state=S_HEADER;W.reply=WAIT;W.since=sys_time;syncarmed=syncdue=0;syncslave=1;syncr=syncw;rd=wr;
 }
 /* Called from SIO. No __critical routines, implicit EI, source scans or UI. */
@@ -77,7 +79,7 @@ void song_link_receive(uint8_t b) BANKED {uint8_t timer,base;uint16_t local;
  if(W.state==S_HEADER){
   if(b&128){W.state=FAIL;return;}
   W.header[W.rxat++]=b;
-  if(W.rxat==10){if(W.header[0]!=1||W.header[9]!=checksum())W.state=FAIL;else W.state=S_PREP;}
+  if(W.rxat==10){if((W.header[0]!=1&&W.header[0]!=2)||W.header[9]!=checksum()||(W.header[0]==1&&page!=SONG_PAGE))W.state=FAIL;else{song_pattern_mode=W.header[0]==2;W.state=S_PREP;}}
   return;
  }
  if(b==ARM&&W.state==S_READY){W.state=S_ARM;return;}
@@ -99,14 +101,16 @@ static void phase_service(void){uint8_t low,high,timer,pending;uint16_t local,am
  }}
 }
 
+void pattern_link_request(void) BANKED {if(seqplaying||song_link_active)return;song_pattern_mode=1;song_link_request(1);}
 void song_link_request(uint8_t smooth) BANKED {uint32_t start=smooth?0:song_view.cursor&~15UL;uint16_t bpm=seqbpm;uint8_t i;
  if(seqplaying)return;
+ native_prepare=0;
  /* Finish any native idle poll before changing ownership of SB/SC. */
  while((SC_REG&0x81)==0x81||IF_REG&SIO_IFLAG);
  __critical{song_link_active=1;syncarmed=syncdue=0;syncr=syncw;rd=wr;SC_REG=0;}
  link_reset();memset((void *)&W,0,sizeof(W));W.smooth=smooth;W.since=frame();
  if(syncrole==2){syncslave=1;W.state=S_LISTEN;W.reply=WAIT;SB_REG=WAIT;SC_REG=0x80;return;}
- syncslave=0;W.state=M_PREP;W.header[0]=1;W.header[1]=bpm&127;W.header[2]=bpm>>7;
+ syncslave=0;W.state=M_PREP;W.header[0]=song_pattern_mode?2:1;W.header[1]=bpm&127;W.header[2]=bpm>>7;
  for(i=3;i<8;i++){W.header[i]=start&127;start>>=7;}W.header[8]=smooth;W.header[9]=checksum();
  dirty=1;
 }
@@ -142,7 +146,7 @@ void song_link_finish(void) BANKED {uint16_t since=frame();uint8_t wasplaying=so
  }
  __critical{song_link_active=0;syncarmed=syncdue=0;syncr=syncw;rd=wr;syncslave=1;if(syncrole==1)syncslave=0;SB_REG=0;SC_REG=syncslave?0x80:0;}
  link_reset();
- if(!wasplaying){__critical{TAC_REG=0;remove_TIM(song_timer);remove_TIM(song_slave_timer);remove_TIM(engine_timer);add_TIM(engine_timer);}smooth_playback_preparing=0;smooth_playback_update();}
+ if(!wasplaying){__critical{TAC_REG=0;remove_TIM(song_timer);remove_TIM(song_slave_timer);remove_TIM(engine_timer);add_TIM(engine_timer);}smooth_playback_preparing=0;song_pattern_mode=0;smooth_playback_update();}
  dirty=1;
 }
 void song_link_service(void) BANKED {uint16_t bpm;uint32_t start;uint8_t i,prepared;
@@ -163,12 +167,16 @@ void song_link_service(void) BANKED {uint16_t bpm;uint32_t start;uint8_t i,prepa
   return;
  }
  /* Stopped handshake bytes leave a full video-frame rearm margin. */
- if(W.transfer||SC_REG&0x80||IF_REG&SIO_IFLAG||W.sentframe==frame())return;
+ if(W.transfer||SC_REG&0x80||IF_REG&SIO_IFLAG||(song_pattern_mode?(uint8_t)(DIV_REG-W.sentframe)<8:W.sentframe==frame()))return;
  switch(W.state){
  case M_PREP:
+  if(song_pattern_mode){W.state=M_HEADER;W.txat=0;send(BEGIN);break;}
   if(!song_prepare(W.smooth,seqbpm,W.smooth?0:song_view.cursor&~15UL)){song_link_finish();return;}
   W.state=M_HEADER;W.since=frame();W.txat=0;send(BEGIN);break;
- case M_HEADER:if(W.txat<10)send(W.header[W.txat++]);else {W.state=M_WAIT;send(POLL);}break;
+ case M_HEADER:if(W.txat<10)send(W.header[W.txat++]);else {W.state=song_pattern_mode?M_LOCAL_PREP:M_WAIT;send(POLL);}break;
+ case M_LOCAL_PREP:
+  if(!song_prepare(1,seqbpm,0)){song_link_finish();return;}
+  W.state=M_WAIT;W.since=frame();send(POLL);break;
  case M_WAIT:
   if(W.peer==FAILED){song_link_finish();song_view.error=11;}
   else if(W.peer==READY){W.state=M_ARM_WAIT;send(ARM);}else send(POLL);break;

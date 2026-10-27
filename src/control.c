@@ -3,7 +3,7 @@
 #include "api.h"
 extern const uint8_t limits[26];
 extern uint8_t edited[4],lastcc,lastvalue;
-void cc_apply(uint8_t c,uint8_t n,uint8_t x) BANKED {uint8_t i,v,mask;if(!syncmode){seqirqdirty=1;if(n==107)seqirqready=0;else if(n==50||n==63||n==120||n==123)seqirqready&=~(1<<c);}lastcc=n;lastvalue=x;edited[c]=1;dirty=1;
+void cc_apply(uint8_t c,uint8_t n,uint8_t x) BANKED {uint8_t i,v,mask;if(SYNC_LOCAL_AUDIO){seqirqdirty=1;if(n==107)seqirqready=0;else if(n==50||n==63||n==120||n==123)seqirqready&=~(1<<c);}lastcc=n;lastvalue=x;edited[c]=1;dirty=1;
  if(n==120||n==123){keycount[c]=0;stop(c);held[c]=255;return;}if(n==64){if(c==2&&waveengine){enginesustain(x>=64);return;}sustain[c]=x>=64;if(!sustain[c]&&held[c]==255)stop(c);return;}
  if(n>=112&&n<=126)return;
  if(n<41||n>119)return;
@@ -24,3 +24,11 @@ void cc_apply(uint8_t c,uint8_t n,uint8_t x) BANKED {uint8_t i,v,mask;if(!syncmo
  else if(i==22){if(v)stop(c);}
  else liveparam(c,i);
 }
+
+/* Cold configuration/transport wrappers do not belong in fixed IRQ ROM. */
+void globals(void) BANKED {NR52_REG=power?0x80:0;if(power){NR50_REG=master|(monomode?0:vin);NR51_REG=route;}}
+void panic_audio(void) BANKED;
+void panic(void) BANKED {panic_audio();}
+
+void seq_native_touch(void) NONBANKED;
+void cc(uint8_t c,uint8_t n,uint8_t x) BANKED {cc_apply(c,n,x);seq_native_touch();seq_irq_refresh(c);}

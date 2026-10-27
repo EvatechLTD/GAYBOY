@@ -121,14 +121,88 @@ void input_vblank(void);
 uint8_t editirq_elapsed(uint8_t fallback) NONBANKED;
 extern volatile uint8_t drum_irq_active;
 void drum_irq_tick(uint8_t elapsed) NONBANKED;
-void engine_timer(void){uint8_t n;
- sync_clock_isr();
+uint8_t sync_native_elapsed(uint8_t ticks) NONBANKED;
+uint8_t editirq_elapsed_active(uint8_t fallback) NONBANKED;
+static void engine_timer_legacy(void){uint8_t n;
+ if(syncmode&&syncmode!=SYNC_TWINK)sync_clock_isr();
  if(syncarmed){
-  if(waveengine!=3&&seqplaying){n=editirq_elapsed(1);seqticks+=n;if(!syncslave)seq_irq_tick(n);}
-  syncsub++;if(syncsub<syncdivider)return;syncsub=0;
+  if(waveengine!=3&&seqplaying&&!syncstart){n=editirq_elapsed(1);if(sync_raw_ready&&syncmode==1)n=sync_native_elapsed(n);seqticks+=n;if(!syncslave||sync_raw_ready){if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);}}
+  if(!sync_raw_ready){syncsub++;if(syncsub<syncdivider)return;syncsub=0;}
  }
  /* Sample after the PCM upload. Delayed VBlank sampling alone can miss a
     one-frame tap; both interrupt producers run without nesting. */
  if(waveengine==3){drum_timer();input_vblank();return;}
- if(seqplaying&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);seqticks+=n;}if(!power)return;
+ if(seqplaying&&!syncstart&&!syncarmed&&(!syncmode||!syncslave)){n=editirq_elapsed(64-(TMA_REG>>2));if(drum_irq_active)drum_irq_tick(n);seq_irq_tick(n);seqticks+=n;}if(!power)return;
+}
+
+/* Native link and timed TWINK use the prepared audio executors from local playback.
+   Avoid walking the legacy PCM/pulse-divider branches on every 1 kHz tick. */
+void engine_timer(void) __naked { __asm
+ ldh a,(_syncmode)
+ cp #1
+ jr z,prepared_timer_mode$
+ cp #6
+ jp nz,_engine_timer_legacy
+ ld a,(_twink_v2)
+ or a
+ jp z,_engine_timer_legacy
+ ld a,(_twink_scheduled)
+ or a
+ jp z,_engine_timer_legacy
+prepared_timer_mode$:
+ ld a,(_waveengine)
+ cp #3
+ jp z,_engine_timer_legacy
+ ldh a,(_syncarmed)
+ or a
+ jp z,_engine_timer_legacy
+ ld a,(_seqplaying)
+ or a
+ jp z,_engine_timer_legacy
+ ldh a,(_syncstart)
+ or a
+ jp nz,_engine_timer_legacy
+ ldh a,(_syncslave)
+ or a
+ jr z,native_timer_ready$
+ ld a,(_sync_raw_ready)
+ or a
+ jp z,_engine_timer_legacy
+native_timer_ready$:
+ ; Native followers have no outgoing clock or TWINK pump to service.
+ ldh a,(_syncslave)
+ or a
+ jr nz,native_timer_music$
+ call _sync_clock_isr
+native_timer_music$:
+ ld a,#1
+ call _editirq_elapsed_active
+ ld c,a
+ ld a,(_sync_raw_ready)
+ or a
+ ld a,c
+ jr z,native_timer_elapsed$
+ call _sync_native_elapsed
+native_timer_elapsed$:
+ or a
+ ret z
+ ld c,a
+ ld b,#0
+ ld hl,#_seqticks
+ ld a,(hl)
+ add a,c
+ ld (hl+),a
+ ld a,(hl)
+ adc a,b
+ ld (hl),a
+ ld a,(_drum_irq_active)
+ or a
+ ld a,c
+ jr z,native_timer_notes$
+ push af
+ call _drum_irq_tick
+ pop af
+native_timer_notes$:
+ jp _seq_irq_tick
+ __endasm;
 }

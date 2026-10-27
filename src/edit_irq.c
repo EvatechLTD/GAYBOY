@@ -1,9 +1,12 @@
 #pragma bank 47
 #pragma opt_code_speed
 #include "api.h"
+#include "smooth_playback.h"
 #include "mod_bypass.h"
 #include "lfo_irq.h"
 #include "mixer_shared.h"
+#include "twink_schedule.h"
+#include "twink_chord.h"
 extern volatile uint8_t drum_irq_active;
 extern uint8_t editbuffer_valid,editbuffer_irq_mask,arpirq_enabled;
 extern uint8_t arp_active_mask;
@@ -16,9 +19,9 @@ uint8_t editbuffer_irq_event(uint8_t c,uint8_t step,uint8_t *out) NONBANKED;
 void editbuffer_irq_boundary(const uint8_t *position,uint8_t enabled) NONBANKED;
 void editirq_wave_capture(uint8_t *out) BANKED;
 extern uint8_t tablemode[4],seqrecordtrack;
-static uint8_t wavebytes[16],position[3],irq_patch[3][7];
+static uint8_t wavebytes[16],position[4],irq_patch[3][7];
 volatile uint8_t editirq_enabled,editirq_running;
-static uint16_t gate[3],prepared_bpm;
+static uint16_t gate[4],prepared_bpm;
 static uint8_t prepared_mask,prepared_buffer,prepared_frame,prepared_wave,prepared_kick,prepared_owner,prepared_record,prepared_power;
 static volatile uint16_t editirq_phase;
 static uint8_t divider_last,divider_fraction;
@@ -30,13 +33,87 @@ uint8_t editirq_owned(uint8_t c) NONBANKED {
  if(c>=3||!seqplaying||!(editirq_enabled&editbuffer_irq_mask&(1<<c))||seqrecordtrack==c)return 0;
  return (!evalpatch[c][EV_MODE]&&!evalpatch[c][EV_CHORD_HISTORY]);
 }
+/* Native transport has already proved playback is active. Share the exact
+   DIV accumulator without repeating every synthesis eligibility test. */
+uint8_t editirq_elapsed_active(uint8_t fallback) NONBANKED __naked {fallback;__asm
+ push bc
+ ld e,a
+ ldh a,(#0x04)
+ ld b,a
+ jp _editirq_elapsed_calculate
+ __endasm;
+}
 /* DIV measures wall time even if a register commit spans a TIMA overflow.
    All enabled paths sample more often than DIV's 15.625 ms wrap interval. */
 void editirq_clock_reset(void) NONBANKED {divider_last=DIV_REG;divider_fraction=0;}
-uint8_t editirq_elapsed(uint8_t fallback) NONBANKED {uint8_t now=DIV_REG,delta,n;
- if(!seqplaying||(!arpirq_enabled&&!editirq_running&&!lfo_irq_mask&&!drum_irq_active)){divider_last=now;divider_fraction=0;return fallback;}
- delta=now-divider_last;divider_last=now;if(delta>editirq_max_gap)editirq_max_gap=delta;n=(delta&15)+divider_fraction;divider_fraction=n&15;return (delta>>4)+(n>>4);
+/* Serial IRQ observes time between timer callbacks without consuming it. */
+uint8_t editirq_pending(void) NONBANKED {return ((uint16_t)(uint8_t)(DIV_REG-divider_last)+divider_fraction)>>4;}
+uint8_t editirq_elapsed(uint8_t fallback) NONBANKED __naked {fallback;__asm
+ push bc
+ ld e,a
+ ldh a,(#0x04)
+ ld b,a
+ ld a,(_seqplaying)
+ or a
+ jr z,elapsed_fallback$
+ ld a,(_arpirq_enabled)
+ ld c,a
+ ld a,(_editirq_running)
+ or a,c
+ ld c,a
+ ld a,(_lfo_irq_mask)
+ or a,c
+ ld c,a
+ ld a,(_drum_irq_active)
+ or a,c
+ ld c,a
+ ld a,(_sync_raw_ready)
+ or a,c
+ jr z,elapsed_fallback$
+_editirq_elapsed_calculate:
+ ld a,(_divider_last)
+ ld c,a
+ ld a,b
+ ld (_divider_last),a
+ sub a,c
+ ld c,a
+ ld a,(_editirq_max_gap)
+ cp a,c
+ jr nc,elapsed_fraction$
+ ld a,c
+ ld (_editirq_max_gap),a
+elapsed_fraction$:
+ ld a,c
+ and #15
+ ld b,a
+ ld a,(_divider_fraction)
+ add a,b
+ ld b,a
+ and #15
+ ld (_divider_fraction),a
+ ld a,c
+ swap a
+ and #15
+ ld c,a
+ ld a,b
+ and #16
+ jr z,elapsed_done$
+ inc c
+elapsed_done$:
+ ld a,c
+ pop bc
+ ret
+elapsed_fallback$:
+ ld a,b
+ ld (_divider_last),a
+ xor a
+ ld (_divider_fraction),a
+ ld a,e
+ pop bc
+ ret
+ __endasm;
 }
+
 void editirq_commit(void) NONBANKED {
  uint8_t c,bit,i,e[7],mask,vol,found,solos,vel,*patch;uint16_t amp,pitch;
  editbuffer_irq_boundary(position,editirq_enabled);
@@ -62,6 +139,8 @@ void editirq_commit(void) NONBANKED {
     if(c==0){NR12_REG=8;NR14_REG=128;}else if(c==1){NR22_REG=8;NR24_REG=128;}else if(c==2)NR30_REG=0;
    }
   }
+ if((editirq_enabled&8)&&syncmode==SYNC_TWINK&&twink_scheduled){if(++position[3]>=seqlength[5])position[3]=0;twink_chord_step(position[3]);}
+
 }
 /* This dispatcher runs up to1024 times/s. Keep elapsed and the phase sum in
    registers; stack-spilled C arithmetic was consuming the editor's budget. */
@@ -96,7 +175,10 @@ void seq_irq_tick(uint8_t elapsed) NONBANKED __naked {
   jr z,90203$
   ld a,(_syncslave)
   or a,a
-  ret nz
+  jr z,90203$
+  ld a,(_sync_raw_ready)
+  or a,a
+  ret z
 90203$:
   ld a,(_seqbpm)
   ld e,a
@@ -134,15 +216,21 @@ void seq_irq_tick(uint8_t elapsed) NONBANKED __naked {
   jr 90205$
  __endasm;
 }
-void seq_native_pcm_tick(void) NONBANKED {uint8_t old=seqfraction>=55?2:3,n=editirq_elapsed(old);if((editirq_running||arpirq_enabled||lfo_irq_mask)&&seqplaying&&(!syncmode||!syncslave)){seqticks-=old;seqticks+=n;}seq_irq_tick(n);}
+void seq_native_pcm_tick(void) NONBANKED {uint8_t old=seqfraction>=55?2:3,n=editirq_elapsed(old);if((editirq_running||arpirq_enabled||lfo_irq_mask)&&seqplaying&&(!syncmode||!syncslave)){seqticks-=old;seqticks+=n;}if(!sync_raw_ready)seq_irq_tick(n);}
 void seq_irq_launch(void) BANKED {uint8_t c,mask;uint16_t clock;uint32_t left;__critical{mask=editirq_enabled;clock=editirq_phase;editirq_running=editirq_enabled=0;}if(!seqplaying)return;for(c=0;c<3;c++)if(mask&(1<<c)){left=(uint32_t)gate[c]*15360U;seqgateleft[c]=left>clock?(left-clock+seqbpm-1)/seqbpm:0;}}
 void seq_irq_refresh(uint8_t c) BANKED {(void)c;seq_irq_launch();}
+/* Publish step zero through the same prepared packet executor as later
+   steps. No gate conversion, note search or synthesis preparation after GO. */
+void seq_irq_start(void) BANKED {uint8_t c;
+ if(!editirq_running)return;
+ __critical{for(c=0;c<4;c++){position[c]=seqlength[c==3?5:c]-1;gate[c]=0;}editirq_phase=seqticks*seqbpm;editirq_commit();}
+}
 void seq_irq_prepare(void) BANKED {
  uint8_t c,want=0,patch[3][7],image[16],changed=seqirqdirty;uint16_t start,units;
  if(changed)drum_irq_configure();
  if((eval_lfousers&7)||lfo_irq_mask)lfo_irq_prepare(changed);if(arp_active_mask)eval_arp_prepare();
  seqirqdirty=0;
- if((syncmode&&linkstate==2)||!editbuffer_active()||monomode||polymode||seqswing!=50||seqmode||syncmode&&syncslave){if(editirq_running)seq_irq_launch();return;}
+ if((syncmode!=1&&syncmode&&linkstate==2)||(!editbuffer_active()&&!(smooth_playback_preparing&&editbuffer_valid))||monomode||polymode||seqswing!=50||seqmode||!SYNC_EVENT_IRQ){if(editirq_running)seq_irq_launch();return;}
  /* A page change does not change sound. Validate again on real changes or
     ownership transitions; cache an ineligible result for at most one frame. */
  if(!changed&&prepared_bpm==seqbpm&&(editirq_running||prepared_frame==(uint8_t)sys_time)&&editirq_enabled==prepared_mask&&prepared_buffer==editbuffer_irq_mask&&prepared_wave==waveengine&&prepared_kick==!!pulsekickleft&&prepared_owner==mono_owned&&prepared_record==seqrecordtrack&&prepared_power==power)return;
@@ -154,7 +242,7 @@ void seq_irq_prepare(void) BANKED {
   patch[c][0]=(param[c][0]<<6)|param[c][7];patch[c][1]=(param[c][2]<<3)|param[c][3];patch[c][2]=128|(param[c][8]<<6);patch[c][3]=(param[0][4]<<4)|(param[0][5]<<3)|param[0][6];patch[c][5]=param[2][16];patch[c][6]=(mx.pan[c]&1?1<<c:0)|(mx.pan[c]&2?16<<c:0);
   want|=1<<c;
  }
- want&=editbuffer_irq_mask;
+ want&=editbuffer_irq_mask;if(syncmode==SYNC_TWINK&&seqlength[5])want|=8;
  if(!want){if(editirq_running)seq_irq_launch();prepared_bpm=seqbpm;prepared_mask=0;return;}
  if(want&4)editirq_wave_capture(image);
  /* Refresh patch bytes atomically without resetting an unchanged clock. */
@@ -163,9 +251,11 @@ void seq_irq_prepare(void) BANKED {
  }
  if(editirq_running)seq_irq_launch();
  units=15360U/seqbpm;
- for(c=0;c<3;c++){position[c]=seqposition[c];gate[c]=(seqgateleft[c]+units-1)/units;}
+ for(c=0;c<4;c++){position[c]=seqposition[c==3?5:c];gate[c]=(seqgateleft[c==3?5:c]+units-1)/units;}
  prepared_bpm=seqbpm;prepared_mask=want;
  __critical{for(c=0;c<3;c++)if(want&(1<<c))memcpy(irq_patch[c],patch[c],7);if(want&4)memcpy(wavebytes,image,16);
-  start=seqclock+seqticks*seqbpm;while(start>=15360U){start-=15360U;for(c=0;c<3;c++)if(++position[c]>=seqlength[c])position[c]=0;}editirq_phase=start;/* DIV remains in the continuous transport epoch. */editirq_enabled=want;editirq_running=1;
+  start=seqclock+seqticks*seqbpm;while(start>=15360U){start-=15360U;for(c=0;c<4;c++)if(++position[c]>=seqlength[c==3?5:c])position[c]=0;}editirq_phase=start;/* DIV remains in the continuous transport epoch. */editirq_enabled=want;editirq_running=1;
  }
 }
+
+uint8_t twink_chord_next_step(void) BANKED {uint16_t next=(editirq_running?position[3]:seqposition[5])+1U;return next>=seqlength[5]?0:next;}

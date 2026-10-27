@@ -39,11 +39,11 @@ uint16_t fine_direct_value(uint16_t base,int16_t value) BANKED {
  return base+(value<lo?lo:value>hi?hi:value);
 }
 uint16_t fine_preview(uint16_t base,uint8_t c) BANKED {return fine_preview_value(base,finepitch[c]);}
-void fine_edit(uint8_t c,int8_t delta) BANKED {seq_native_touch();if(!syncmode)seqirqdirty=1;
+void fine_edit(uint8_t c,int8_t delta) BANKED {seq_native_touch();if(SYNC_LOCAL_AUDIO)seqirqdirty=1;
  uint8_t direct=c==4||(c==2&&(waveengine==2||(evalwaveactive?expconfig[0]:evalwavefx[0]))),note;uint16_t base=finebase[c];int16_t value;
  if(!base||finemode[c]!=direct){note=c==4?36:c<4&&held[c]!=255?held[c]:60;base=direct?ddsnotes[note>107?107:note]:notes[note+(c==2?12:0)];finevalid[c]=0;}
  fine_bounds(c,base,direct,1);value=finepitch[c]+delta;if(value<finelo[c])value=finelo[c];if(value>finehi[c])value=finehi[c];finepitch[c]=value;
- if(c<3)updatepitch(c);if(!c&&eval_mode(0)==2)updatepitch(1);if(!syncmode)seq_irq_refresh(c);dirty=1;
+ if(c<3)updatepitch(c);if(!c&&eval_mode(0)==2)updatepitch(1);if(SYNC_LOCAL_AUDIO)seq_irq_refresh(c);dirty=1;
 }
 
 const uint8_t fxmodmax[6]={15,4,3,7,16,63};

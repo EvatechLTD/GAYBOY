@@ -4,7 +4,6 @@ extern __at (0xFFDA) uint8_t syncmode;
 extern __at (0xFFDB) uint8_t syncslave;
 extern __at (0xFFDC) uint8_t syncpending;
 extern __at (0xFFDD) uint8_t syncbusy;
-extern __at (0xFF98) volatile uint8_t synctx[32];
 extern __at (0xFFD8) volatile uint8_t syncr;
 extern __at (0xFFD9) volatile uint8_t syncw;
 extern __at (0xFFB8) volatile uint8_t syncirqphase[3];
@@ -19,6 +18,12 @@ extern __at (0xFFC6) volatile uint8_t synctxwait;
 extern __at (0xFFC7) volatile uint8_t synctick;
 extern __at (0xFFC8) volatile uint8_t syncstart;
 extern __at (0xFFC9) volatile uint8_t synctxbyte;
+extern uint8_t sync_raw_ready;
+/* Direct MS is an output lane; the host keeps its standalone audio clock. */
+#define SYNC_LOCAL_AUDIO (!syncmode||syncmode==6)
+#define SYNC_EVENT_IRQ (!syncmode||!syncslave||sync_raw_ready)
+void sync_raw_configure(void) BANKED;
+void sync_raw_tick(void) BANKED;
 void sync_control_service(void) BANKED;
 void sync_clock_isr(void) NONBANKED;
 void sync_timer_config(void) BANKED;

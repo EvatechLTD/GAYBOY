@@ -304,7 +304,16 @@ void eval_seq_tick(uint16_t ticks) BANKED {uint8_t c;uint32_t period;
   else arp_foreground_tick(c,ticks);
  }
 }
-
+/* The bulk caller proves clocked straight1/16 ownership. Add its exact
+   modulo15360 phase delta; no repeated long multiply/divide per voice. */
+void eval_seq_phase_add(uint16_t delta) BANKED {uint8_t c;uint16_t phase;
+ if(!experimental_mode||!arp_active_mask)return;
+ for(c=0;c<3;c++)if(arp_active_mask&bitmasks[c]){
+  phase=(uint16_t)arpclock[c]+delta;
+  if(phase>=15360U)phase-=15360U;
+  arpclock[c]=phase;
+ }
+}
 static uint8_t drumallowed[32],drumdirty=1,drumnativesafe;
 void seq_native_touch(void) NONBANKED;
 void eval_drum_dirty(void) BANKED {drumdirty=1;}

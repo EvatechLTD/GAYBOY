@@ -141,7 +141,7 @@ static void prepare(uint8_t force){
  if(mod_bypass){lfo_irq_mask=0;return;}
  if(!force&&frame==(uint8_t)sys_time&&playing==seqplaying)return;
  frame=sys_time;playing=seqplaying;
- if(!seqplaying||!power||monomode||polymode||syncmode&&syncslave){lfo_irq_mask=0;return;}
+ if(!seqplaying||!power||monomode||polymode||!SYNC_EVENT_IRQ){lfo_irq_mask=0;return;}
  if(clockkey!=globalmod[7]||ratekey!=globalmod[5]||divkey!=div||timingkey!=globalmod[8]||bpmkey!=seqbpm){
   if(globalmod[7]){if(div>16)div=16;denominator=globalmod[8]==1?160:globalmod[8]==2?360:240;
    if(div<=8)numerator=(uint32_t)seqbpm<<(8-div);else{numerator=seqbpm;denominator<<=div-8;}
@@ -175,7 +175,7 @@ static void prepare(uint8_t force){
 void lfo_irq_prepare(uint8_t force) BANKED {
  uint8_t state,blocked;uint16_t generation;
  if(preparing)return;
- state=(seqplaying?1:0)|(power?2:0)|((monomode||polymode)?4:0)|((syncmode&&syncslave)?8:0)|(mod_bypass?16:0);
+ state=(seqplaying?1:0)|(power?2:0)|((monomode||polymode)?4:0)|((!SYNC_EVENT_IRQ)?8:0)|(mod_bypass?16:0);
  blocked=mono_owned;
  if(finepitch[0]||bend[0]||tablemode[0])blocked|=1;
  if(finepitch[1]||bend[1]||tablemode[1])blocked|=2;

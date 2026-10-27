@@ -7,6 +7,7 @@
 #include "smooth_playback.h"
 #include "song_mode.h"
 #include "song_link.h"
+#include "twink_schedule.h"
 void eval_chord_dirty(uint8_t c) BANKED;
 void drum_irq_changed(uint8_t mask) BANKED;
 void arp_irq_pattern_changed(uint8_t c) NONBANKED;
@@ -32,6 +33,11 @@ uint16_t editbuffer_swaps,editbuffer_restarts;
 static uint8_t eb_slot=255,eb_building,eb_buildtrack;
 uint16_t editbuffer_base=EB_BASE0;
 static uint16_t eb_target=EB_BASE1,eb_generation,eb_activegeneration,eb_left;
+extern uint16_t twink_ms_generation;
+extern volatile uint8_t twink_private_active,twink_private_next;
+void twink_prepare_notes(void) BANKED;
+static uint16_t eb_ms_revision,eb_build_ms_revision;
+static uint8_t eb_ms_level,eb_reuse_ms;
 static uint16_t eb_counts[7],eb_offsets[7],eb_newcounts[7],eb_newoffsets[7];
 extern uint16_t pattern_generation;
 extern const uint16_t notes[140];
@@ -41,7 +47,7 @@ void editbuffer_reset(void) BANKED {editbuffer_valid=editbuffer_ready=eb_buildin
 uint8_t editbuffer_active(void) BANKED {return editbuffer_valid&&seqplaying&&eb_slot==mx.slot;}
 static uint16_t total(void){return seqeventoffsets[6]+seqeventcounts[6];}
 static void offsets(void){uint8_t c;uint16_t n=0;for(c=0;c<7;c++){seqeventoffsets[c]=n;n+=seqeventcounts[c];}}
-static void changed(uint8_t c){indexvalid=0;offsets();if(!editbuffer_active()){if(c==6)eval_drum_dirty();else eval_chord_dirty(c);}resident_events_changed();seqeventfull=0;}
+static void changed(uint8_t c){indexvalid=0;offsets();if(!editbuffer_active()){if(c==6)eval_drum_dirty();else eval_chord_dirty(c);}resident_events_changed();if(c==TWINK_TRACK)twink_schedule_changed();seqeventfull=0;}
 uint16_t seq_event_count(uint8_t c) BANKED {return c<7?(editbuffer_reading?eb_counts[c]:seqeventcounts[c]):0;}
 uint16_t seq_event_total(void) BANKED {return total();}
 static void readnote(uint16_t index,uint8_t *e){uint8_t a,b,c,d;uint8_t bank=1+(mx.slot>>2);const uint8_t *p=(const uint8_t *)(0xA000U+(uint16_t)(mx.slot&3)*2048U+RESIDENT_EVENTS+index*4);__critical{SWITCH_RAM_MBC5(bank);a=*p++;b=*p++;c=*p++;d=*p;SWITCH_RAM_MBC5(0);}e[0]=a;e[1]=b;e[2]=c;e[3]=d;}
@@ -57,7 +63,7 @@ static void eb_notify_foreground(void){uint8_t c,mask,reading,busy;if(!eb_notify
  for(c=0;c<3;c++)if(mask&(1<<c)){arp_irq_pattern_changed(c);eval_chord_refresh(c);}
  if(mask&64)eval_drum_dirty();drum_irq_changed(mask);editbuffer_reading=reading;seqservicing=busy;
 }
-void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*head,v,amp,budget=16;uint16_t at,f,scaled,longest;
+void editbuffer_service(void) BANKED {uint8_t e[4],old[7],hash,mask,*dst,*bits,*head,v,amp,budget=16;uint16_t at,f,scaled,longest;
  if(song_playing||song_link_active)return;
  if((!seqplaying&&!smooth_playback_preparing)||mx.slot!=eb_slot){if(editbuffer_valid)seq_irq_launch();editbuffer_valid=editbuffer_ready=eb_building=0;eb_slot=mx.slot;}
  eb_notify_foreground();
@@ -74,7 +80,9 @@ void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*
  }
  if((eb_building||editbuffer_ready)&&eb_generation!=pattern_generation){eb_building=editbuffer_ready=0;editbuffer_restarts++;}
  if(editbuffer_ready)return;
- if(!eb_building){eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);eb_generation=pattern_generation;eb_left=total();eb_buildtrack=6;eb_changedmask=editbuffer_valid?0:127;for(hash=0;hash<7;hash++)if(eb_newcounts[hash]!=eb_counts[hash])eb_changedmask|=1<<hash;eb_newmask=7;for(hash=0;hash<3;hash++)if(!eb_newcounts[hash])eb_newmask&=~(1<<hash);for(hash=4;hash<6;hash++)if(eb_newcounts[hash])eb_newmask&=~(1<<(hash-4));
+ if(!eb_building){if(syncmode==SYNC_TWINK)twink_prepare_notes();eb_target=editbuffer_base==EB_BASE0?EB_BASE1:EB_BASE0;memcpy(eb_newcounts,seqeventcounts,14);memcpy(eb_newoffsets,seqeventoffsets,14);if(syncmode==SYNC_TWINK&&twink_private_next)eb_newcounts[5]=0;eb_generation=pattern_generation;eb_build_ms_revision=twink_ms_generation;
+  eb_reuse_ms=syncmode==SYNC_TWINK&&editbuffer_valid&&eb_ms_revision==eb_build_ms_revision&&eb_counts[5]==eb_newcounts[5]&&eb_ms_level==mx.level[5];
+  eb_left=total();eb_buildtrack=6;eb_changedmask=editbuffer_valid?0:127;for(hash=0;hash<7;hash++)if(eb_newcounts[hash]!=eb_counts[hash])eb_changedmask|=1<<hash;eb_newmask=7;for(hash=0;hash<3;hash++)if(!eb_newcounts[hash])eb_newmask&=~(1<<hash);for(hash=4;hash<6;hash++)if(eb_newcounts[hash]&&!(hash==5&&syncmode==SYNC_TWINK))eb_newmask&=~(1<<(hash-4));
   __critical{SWITCH_RAM_MBC5(2);memset((void *)(eb_target+EB_BITS),0,32);SWITCH_RAM_MBC5(0);}eb_building=1;}
  /* Copy a bounded batch, yielding between records for queued input or audio.
     A main-loop pass can span many video frames during dense drawing. */
@@ -89,17 +97,38 @@ void editbuffer_service(void) BANKED {uint8_t e[4],old[4],hash,mask,*dst,*bits,*
   for(hash=0;hash<7;hash++)if((editbuffer_valid?eb_counts[hash]:seqeventcounts[hash])&&seqlength[hash]>longest){longest=seqlength[hash];eb_boundarytrack=hash;}
   eb_building=0;editbuffer_ready=1;return;
  }
- at=--eb_left;while(eb_buildtrack&&at<eb_newoffsets[eb_buildtrack])eb_buildtrack--;readnote(at,e);
+ at=--eb_left;while(eb_buildtrack&&at<eb_newoffsets[eb_buildtrack])eb_buildtrack--;
+ if(eb_buildtrack==TWINK_TRACK&&syncmode==SYNC_TWINK&&twink_private_next){eb_left=eb_newoffsets[5];continue;}
+ if(eb_buildtrack==TWINK_TRACK&&eb_reuse_ms){
+  /* An edit on another lane only relocates these immutable MS packets.
+     Clone their compiled bytes; no resident scan, comparison or synthesis. */
+  const uint8_t *prior=(const uint8_t *)(editbuffer_base+(eb_offsets[5]+at-eb_newoffsets[5])*7);
+  __critical{SWITCH_RAM_MBC5(2);memcpy(old,prior,7);SWITCH_RAM_MBC5(0);}
+  memcpy(e,old,4);f=old[4]|((uint16_t)old[5]<<8);amp=old[6];hash=e[0]+eb_buildtrack*64;
+  goto eb_store_record;
+ }
+ readnote(at,e);
  /* Compare within each lane, so offsets moving after an insertion in some
     other lane do not invalidate an otherwise identical playback cache. */
  if(!(eb_changedmask&(1<<eb_buildtrack))){eb_note(eb_offsets[eb_buildtrack]+at-eb_newoffsets[eb_buildtrack],old);if(memcmp(e,old,4))eb_changedmask|=1<<eb_buildtrack;}
  hash=e[0]+eb_buildtrack*64;
  f=eb_buildtrack<3?notes[e[1]-1+(eb_buildtrack==2?12:0)]:0;v=e[2];if(mx.level[eb_buildtrack]!=127){scaled=(uint16_t)v*mx.level[eb_buildtrack]+63;v=(scaled>>7)+((uint8_t)((scaled&127)+(scaled>>7))>=127);}
  scaled=eb_buildtrack<4?(uint16_t)param[eb_buildtrack][1]*v:0;amp=(scaled+1+(scaled>>7))>>7;
+ if(eb_buildtrack==TWINK_TRACK&&syncmode==SYNC_TWINK){
+  /* Other lanes can move MS record addresses without changing its packet.
+     Reuse only after checking actual pitch and compiled velocity. */
+  if(editbuffer_valid&&at-eb_newoffsets[5]<eb_counts[5]){
+   const uint8_t *prior=(const uint8_t *)(editbuffer_base+(eb_offsets[5]+at-eb_newoffsets[5])*7);
+   __critical{SWITCH_RAM_MBC5(2);memcpy(old,prior,7);SWITCH_RAM_MBC5(0);}
+  }else old[1]=0;
+  f=old[1]==e[1]&&old[6]==v?old[4]|((uint16_t)old[5]<<8):twink_note_crcs(e[1]-1,v);amp=v;
+ }
  if(eb_buildtrack==2){amp=v?(v>84?1:v>42?2:3):0;if(amp&&param[2][15]){amp+=param[2][15]-1;if(amp>3)amp=3;}else amp=0;amp<<=5;}mask=1U<<(hash&7);
+ eb_store_record:
+ mask=1U<<(hash&7);
  dst=(uint8_t *)(eb_target+at*7);bits=(uint8_t *)(eb_target+EB_BITS+(hash>>3));head=(uint8_t *)(eb_target+EB_HEAD+hash);
  __critical{SWITCH_RAM_MBC5(2);memcpy(dst,e,4);dst[4]=f;dst[5]=f>>8;dst[6]=amp;
- if((*bits&mask)&&eb_buildtrack<4&&e[1]>=*(uint8_t *)(eb_target+(uint16_t)*head*7+1)){uint8_t *link=(uint8_t *)(eb_target+EB_NEXT+*head);*(uint8_t *)(eb_target+EB_NEXT+at)=*link==*head?(uint8_t)at:*link;*link=at;}
+ if((*bits&mask)&&((eb_buildtrack<4&&e[1]>=*(uint8_t *)(eb_target+(uint16_t)*head*7+1))||(eb_buildtrack==TWINK_TRACK&&e[1]>*(uint8_t *)(eb_target+(uint16_t)*head*7+1)))){uint8_t *link=(uint8_t *)(eb_target+EB_NEXT+*head);*(uint8_t *)(eb_target+EB_NEXT+at)=*link==*head?(uint8_t)at:*link;*link=at;}
  else{*(uint8_t *)(eb_target+EB_NEXT+at)=(*bits&mask)?*head:(uint8_t)at;*head=at;}*bits|=mask;SWITCH_RAM_MBC5(0);}
  }while(--budget);
  if(!eb_left){longest=0;eb_boundarytrack=255;for(hash=0;hash<7;hash++)if((editbuffer_valid?eb_counts[hash]:seqeventcounts[hash])&&seqlength[hash]>longest){longest=seqlength[hash];eb_boundarytrack=hash;}eb_building=0;editbuffer_ready=1;}
@@ -116,7 +145,8 @@ void editbuffer_priority_service(void) BANKED {uint8_t budget=4,building;uint16_
    snapshot before triggering a 16-step boundary. Cache invalidation stays foreground. */
 static void eb_publish(void) NONBANKED {
  editbuffer_base=eb_target;memcpy(eb_counts,eb_newcounts,14);memcpy(eb_offsets,eb_newoffsets,14);
- eb_activegeneration=eb_generation;editbuffer_irq_mask=eb_newmask;editbuffer_valid=1;
+ if(syncmode==SYNC_TWINK)twink_private_active=twink_private_next;
+ eb_activegeneration=eb_generation;eb_ms_revision=eb_build_ms_revision;eb_ms_level=mx.level[5];editbuffer_irq_mask=eb_newmask;editbuffer_valid=1;
  editbuffer_ready=0;editbuffer_swaps++;eb_notify|=eb_changedmask;
 }
 /* Synchronous startup only: never advance musical time to build a snapshot. */
@@ -267,17 +297,17 @@ void seq_event_erase(uint8_t c,uint16_t i) BANKED {uint16_t at;uint8_t old[4];if
 uint8_t seq_event_put(uint8_t c,uint16_t i,const uint8_t *event) BANKED {uint8_t e[4],old[4];uint16_t at,n;if(c==3||c>=7||!event[1]||event[2]>127)return 0;memcpy(e,event,4);if(c<3&&eval_mode(c)&&i==65535U&&seq_note_event(c,e[0],old))e[2]=old[2];
  if(i!=65535U){if(i>=seqeventcounts[c])return 0;at=seqeventoffsets[c]+i;readnote(at,old);native_edit_mark(c,old,e);resident_write(mx.slot,RESIDENT_EVENTS+at*4,e,4);
   /* Velocity cannot change address chains or drum voice admission. */
-  if(old[0]==e[0]){if(!editbuffer_active()){if(c!=6)eval_chord_dirty(c);else if(old[1]!=e[1]||old[3]!=e[3])eval_drum_dirty();}resident_events_changed();seqeventfull=0;}else changed(c);return 1;}
+  if(old[0]==e[0]){if(!editbuffer_active()){if(c!=6)eval_chord_dirty(c);else if(old[1]!=e[1]||old[3]!=e[3])eval_drum_dirty();}resident_events_changed();if(c==TWINK_TRACK)twink_schedule_changed();seqeventfull=0;}else changed(c);return 1;}
  n=total();if(n>=RESIDENT_NOTES){seqeventfull=1;return 0;}i=seqeventcounts[c];
  at=seqeventoffsets[c]+i;native_edit_mark(c,0,e);resident_move((at+1)*4,at*4,(n-at)*4);resident_write(mx.slot,RESIDENT_EVENTS+at*4,e,4);seqeventcounts[c]++;changed(c);return 1;}
 void seq_track_clear(uint8_t c) BANKED {uint16_t at,end;if(c>=7)return;at=seqeventoffsets[c];end=at+seqeventcounts[c];resident_move(at*4,end*4,(total()-end)*4);seqeventcounts[c]=0;changed(c);}
-void seq_storage_clear(void) BANKED {indexvalid=0;memset(seqeventcounts,0,14);memset(seqeventoffsets,0,14);resident_events_changed();seqeventfull=0;}
+void seq_storage_clear(void) BANKED {twink_schedule_changed();indexvalid=0;memset(seqeventcounts,0,14);memset(seqeventoffsets,0,14);resident_events_changed();seqeventfull=0;}
 static uint16_t find(uint8_t c,uint8_t step,uint8_t note){uint16_t cursor=0;uint8_t e[4];while(seq_event_next_step(c,step,&cursor,e))if(!note||e[1]==note)return cursor-1;return 65535U;}
 uint8_t seq_note_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[1]:0;}
 uint8_t seq_velocity_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[2]:0;}
 uint16_t seq_duration_get(uint8_t c,uint8_t step) BANKED {uint16_t i;uint8_t e[4];i=find(c,step,page==8?seqpitch[c]+1:0);return i==65535U?0:seq_event_get(c,i,e)?e[3]?e[3]:256U:0;}
 uint8_t seq_note_set(uint8_t c,uint8_t step,uint8_t note,uint8_t velocity,uint16_t duration) BANKED {uint16_t i;uint8_t e[4];if(c==3||(c>=4&&!(c==TWINK_TRACK&&syncmode==SYNC_TWINK))||duration>256)return 0;i=find(c,step,note?note:seqpitch[c]+1);if(!note){if(i!=65535U)seq_event_erase(c,i);return 1;}e[0]=step;e[1]=note;e[2]=velocity;e[3]=duration;return seq_event_put(c,i,e);}
-void storage_sorted_dirty(void) BANKED {indexvalid=0;} void storage_sorted_install(uint8_t mask) BANKED {(void)mask;}
+void storage_sorted_dirty(void) BANKED {twink_schedule_changed();indexvalid=0;} void storage_sorted_install(uint8_t mask) BANKED {(void)mask;}
 void storage_sorted_prepare(void) BANKED {prepare_index();} void storage_cursor_reset(void) BANKED {}
 
 uint8_t editbuffer_record_index(uint8_t c,uint8_t relative) BANKED {return eb_offsets[c]+relative;}

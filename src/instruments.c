@@ -7,6 +7,7 @@
 #include "smooth_playback.h"
 extern uint8_t seqselectused;
 void seq_native_touch(void) NONBANKED;
+uint8_t seq_twink_input_service(void) BANKED;
 #include "tones.h"
 void mixer_pattern_changed(void) BANKED;
 void seq_native_launch_clear(void) BANKED;
@@ -88,7 +89,7 @@ void ui_input(uint8_t p,uint8_t edge) BANKED {uint8_t i,head=seqhead,gesture,tra
   if(tracking){stop=0;
    if(c!=6&&seqpitch[c]!=oldpitch){
     if(gesture&&(edge&J_UP)&&seqpitch[c]>oldtop){top=(int16_t)oldtop+seqrows;seqtop[c]=top>127?127:top;seqgesturepage=1;}
-    if(gesture&&(edge&J_DOWN)&&(int16_t)seqpitch[c]<(int16_t)oldtop-seqrows+1){top=(int16_t)oldtop-seqrows;seqtop[c]=top<(c==2?24:36)+seqrows-1?(c==2?24:36)+seqrows-1:top;seqgesturepage=1;}
+    if(gesture&&(edge&J_DOWN)&&(int16_t)seqpitch[c]<(int16_t)oldtop-seqrows+1){top=(int16_t)oldtop-seqrows;seqtop[c]=top<((c==2||c==TWINK_TRACK)?24:36)+seqrows-1?((c==2||c==TWINK_TRACK)?24:36)+seqrows-1:top;seqgesturepage=1;}
     /* Ordinary one-row octave scrolling keeps its retained fast path. Stop
        on arrival at an edge, but do not relatch every retained scroll row. */
     if(gesture||seqtop[c]==oldtop){

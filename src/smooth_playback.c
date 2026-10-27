@@ -1,11 +1,13 @@
 #pragma bank 37
 #include "api.h"
 #include "smooth_playback.h"
+#include "song_link.h"
 uint8_t smooth_playback_requested,smooth_playback_active,smooth_playback_preparing;
 static uint8_t saved_lcdc,saved_oam;
 /* A one-shot transport request, never a saved/global playback preference. */
 void smooth_playback_start(void) BANKED {
  if(seqplaying)return;
+ if(syncmode==1){pattern_link_request();return;}
  smooth_playback_requested=1;seq_transport();smooth_playback_requested=0;
 }
 void smooth_playback_begin(void) BANKED {
