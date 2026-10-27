@@ -72,8 +72,9 @@ machines. The unchanged one-way receiver still waits for a complete F5 packet
 and processes the chord through its existing synth path. Measured three-note
 attacks were approximately 19–25 ms after first-byte start; larger eight-note
 packets can approach 37 ms. This implementation does not compensate that
-external latency or change Monosimp's attack path. Hardware confirmation remains
-necessary before promotion.
+external latency or change Monosimp's attack path. The user subsequently tested
+this exact host on hardware and reported that it works pretty good. GAYBOY main
+merge/publication has not been requested in that approval.
 
 The original new-fixture trials accidentally silenced drums by clearing their
 engine-level defaults. They are **not** full-load performance evidence. In
@@ -83,3 +84,18 @@ audible kick, noise, P2 and Wave events and compares event values as well as
 counts. Use `baseline-stress240` / `eight-stress240` for the qualified stress
 comparison. Reports remain under `build/`; the hardware ROM is preserved in
 workspace `DATA/TESTS/TWINK-SONG-20261026/GAYBOY-TWINK-SONG.gb`.
+
+## Current handoff after hardware testing
+
+The user approved Monosimp promotion; its main is now 0a512be and rebuilds to
+the identical accepted receiver SHA above. Prior uncommitted Monosimp-main
+experiments were preserved on archive/main-before-synth-core-20261026.
+
+No blocking song-TWINK implementation work remains after the hardware report.
+GAYBOY is still private TWINK_SONG, not merged or published. Before release,
+refresh superseded protocol documentation and integrate/recheck the host main
+build. Separately, requalify cable disconnect/reconnect on the new one-way
+protocol: the historical TODO describes a retired handshake and cannot prove
+a current failure. Further external onset-latency tuning is optional future
+work; local host timing must remain protected. Gayboy shared panic stop and
+linked Smooth start/stop already exist and passed their recorded checks.
